@@ -1,0 +1,1920 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emissor Fiscal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f2; --card:#ffffff; --ink:#1c2321; --muted:#66716d; --line:#dfe3df;
+  --brand:#0f6b52; --brand-2:#0b5742; --brand-soft:#e3f1ec; --warn:#a85b00; --warn-soft:#fff3e0;
+  --bad:#b3261e; --bad-soft:#fdeceb; --ok:#1d7a3a; --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;background:var(--brand);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px}
+header h1{font-size:16px;margin:0;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header select{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 8px;max-width:45vw}
+header select option{color:#000}
+.badge{font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(255,255,255,.18);white-space:nowrap}
+.amb{background:var(--warn-soft);color:var(--warn);font-size:12.5px;padding:7px 16px;border-bottom:1px solid #f1d9b5}
+main{max-width:980px;margin:0 auto;padding:16px 14px 96px}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:6;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;max-width:140px;background:none;border:0;padding:9px 2px 8px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+nav button.on{color:var(--brand);font-weight:600}
+h2{font-size:19px;margin:4px 0 12px}
+h3{font-size:15px;margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 160px}
+label{display:block;font-size:12.5px;color:var(--muted);margin:8px 0 4px;font-weight:500}
+input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:#fff}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600;font-size:14px}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.pri:hover{background:var(--brand-2)}
+.btn.bad{color:var(--bad);border-color:#efc5c2}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn.block{width:100%;padding:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.list .it{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.list .it:last-child{border-bottom:0}
+.it .grow{flex:1;min-width:0}
+.it .t{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.it .s{font-size:12.5px;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;background:var(--brand-soft);color:var(--brand);font-weight:600}
+.tag.w{background:var(--warn-soft);color:var(--warn)}
+.tag.b{background:var(--bad-soft);color:var(--bad)}
+.empty{text-align:center;color:var(--muted);padding:26px 10px}
+.msg{padding:10px 12px;border-radius:9px;font-size:13.5px;margin:8px 0}
+.msg.err{background:var(--bad-soft);color:var(--bad)}
+.msg.info{background:var(--brand-soft);color:var(--brand-2)}
+.msg.warn{background:var(--warn-soft);color:var(--warn)}
+.total{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;padding:4px 0}
+.total.big{font-size:22px;font-weight:700}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:700}
+.qty input{width:58px;text-align:center;padding:5px}
+.results{max-height:260px;overflow:auto;margin-top:6px}
+.res{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:8px;cursor:pointer}
+.res:hover{background:var(--brand-soft)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{padding:8px 12px;border-radius:99px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:13.5px}
+.seg button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.grid2{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:820px){.grid2{grid-template-columns:1.3fr 1fr}}
+/* modal */
+#modal{position:fixed;inset:0;z-index:20;background:rgba(16,24,22,.45);display:none;align-items:flex-end;justify-content:center}
+#modal.on{display:flex}
+#modal .box{background:#fff;width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px 22px}
+@media(min-width:700px){#modal{align-items:center}#modal .box{border-radius:16px}}
+.mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.mhead h2{margin:0}
+.x{background:none;border:0;font-size:24px;cursor:pointer;color:var(--muted);line-height:1}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.actions .btn{flex:1}
+/* cupom e danfe */
+.cupom{font:12px/1.35 'JetBrains Mono',monospace;max-width:310px;margin:8px auto;padding:12px;border:1px dashed #bbb;background:#fffef9}
+.cupom .c{text-align:center}
+.cupom hr{border:0;border-top:1px dashed #999;margin:6px 0}
+.cupom table{width:100%;border-collapse:collapse}
+.cupom td{vertical-align:top;padding:1px 0}
+.cupom .r{text-align:right}
+.qr{width:120px;height:120px;margin:6px auto;border:1px solid #999;display:flex;align-items:center;justify-content:center;font-size:10px;text-align:center;color:#777}
+.danfe{font-size:12px;border:1px solid #333;padding:8px;margin:8px 0;background:#fff}
+.danfe .bx{border:1px solid #333;padding:5px;margin:-1px 0 0}
+.danfe .lb{font-size:9.5px;text-transform:uppercase;color:#555}
+.danfe table{width:100%;border-collapse:collapse;font-size:11px}
+.danfe th,.danfe td{border:1px solid #999;padding:3px;text-align:left}
+.semvalor{color:var(--bad);font-weight:700;text-align:center;margin:4px 0}
+pre.json{font:11.5px/1.4 'JetBrains Mono',monospace;background:#0f1715;color:#d5efe6;padding:12px;border-radius:9px;overflow:auto;max-height:320px;white-space:pre}
+.small{font-size:12.5px;color:var(--muted)}
+.v{font-size:13px;padding:7px 10px;border-radius:8px;margin:5px 0}
+.v.erro{background:var(--bad-soft);color:var(--bad)}.v.aviso{background:var(--warn-soft);color:var(--warn)}.v.info{background:#eef2f6;color:#3b4a5a}.v.ok{background:var(--brand-soft);color:var(--brand-2)}
+.stats{display:flex;gap:8px;margin:10px 0}.stats div{flex:1;background:var(--bg);border-radius:10px;padding:8px;text-align:center;font-size:12px;color:var(--muted)}.stats b{display:block;font-size:20px;color:var(--ink)}
+code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);padding:1px 4px;border-radius:4px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+.bar{height:8px;background:var(--brand);border-radius:4px;margin-top:2px}
+.chk{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:14px;margin:12px 0 4px}.chk input{width:auto}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#1c2321;color:#fff;padding:10px 16px;border-radius:99px;font-size:13.5px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="hTitle">Emissor Fiscal</h1>
+  <select id="empSel" aria-label="Empresa"></select>
+  <span class="badge" id="badge">…</span>
+</header>
+<div class="amb" id="ambBar" style="display:none">Ambiente de <b>homologação</b>: as notas vão para a SEFAZ de testes e não têm valor fiscal.</div>
+<main id="main"></main>
+<nav id="nav"></nav>
+<div id="modal"><div class="box" id="mbox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== utilidades ================== */
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dig = v => String(v ?? '').replace(/\D/g, '');
+const brl = n => (Number(n) || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const num = v => { if (typeof v === 'number') return v; const n = parseFloat(String(v ?? '').replace(/\./g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+const numIn = v => { const s = String(v ?? '').trim(); if (/,/.test(s)) return num(s); const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^a-zA-Z0-9-]/g, '');
+const clone = o => JSON.parse(JSON.stringify(o));
+function isoNow(){
+  const d = new Date(Date.now() - 3 * 3600e3); // horário de Brasília (UTC-3)
+  return d.toISOString().slice(0, 19) + '-03:00';
+}
+function fmtData(iso){ if(!iso) return ''; const [d, t] = iso.split('T'); return d.split('-').reverse().join('/') + ' ' + (t || '').slice(0, 5); }
+function fmtDoc(d){ d = dig(d); if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'); if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'); return d; }
+function cpfOk(c){ c = dig(c); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false;
+  for (let t = 9; t < 11; t++){ let s = 0; for (let i = 0; i < t; i++) s += +c[i] * (t + 1 - i); if (((s * 10) % 11) % 10 !== +c[t]) return false; } return true; }
+function cnpjOk(c){ c = dig(c); if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false;
+  const calc = n => { let s = 0, p = n - 7; for (let i = 0; i < n; i++){ s += +c[i] * p--; if (p < 2) p = 9; } const r = s % 11; return r < 2 ? 0 : 11 - r; };
+  return calc(12) === +c[12] && calc(13) === +c[13]; }
+let toastT;
+function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2400); }
+
+const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
+const PAGAMENTOS = [['01','Dinheiro'],['17','PIX'],['04','Cartão de débito'],['03','Cartão de crédito'],['05','Crédito loja'],['15','Boleto'],['99','Outros']];
+const PAG_NOME = Object.fromEntries(PAGAMENTOS);
+const CBS_2026 = 0.9, IBS_2026 = 0.1; // alíquotas de teste de 2026 (destaque informativo)
+
+/* ================== estado e armazenamento ================== */
+const S = { tab:'venda', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
+  nfe:null, caixas:[], perfis:[], inutilizacoes:[], conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
+let db = null, unsubs = [], local = {};
+const LS = 'emissor-fiscal-v1';
+S.nfe = { op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } };
+function lsLoad(){ try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch(e){ return {}; } }
+function lsSave(){ try { localStorage.setItem(LS, JSON.stringify(local)); } catch(e){} }
+const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes'];
+const colOf = k => k === 'empresas' ? 'empresas' : `empresas/${S.empId}/${k}`;
+const emp = () => S.empresas.find(e => e.id === S.empId) || null;
+
+function refreshFromLocal(){
+  S.empresas = Object.values(local['empresas'] || {});
+  if (!S.empId) S.empId = (local.config && local.config.empresaAtual) || (S.empresas[0] && S.empresas[0].id) || null;
+  SUBCOLS.forEach(k => S[k] = S.empId ? Object.values(local[colOf(k)] || {}) : []);
+}
+async function put(k, obj){
+  obj = clone(obj);
+  if (SB && db && k === 'empresas' && !obj.id){
+    const { data, error } = await SB.rpc('criar_empresa', { dados:obj });
+    if (error){ const x = new Error(error.message); x.code = 'invalid_argument'; throw x; }
+    obj.id = data; return obj;
+  }
+  if (!obj.id) obj.id = uid();
+  if (db){ await db.collection(colOf(k)).doc(obj.id).set(obj); }
+  else { const c = colOf(k); local[c] = local[c] || {}; local[c][obj.id] = obj; lsSave(); refreshFromLocal(); render(); }
+  return obj;
+}
+async function del(k, id){
+  if (db){ await db.collection(colOf(k)).doc(id).delete(); }
+  else { const c = colOf(k); if (local[c]) delete local[c][id]; lsSave(); refreshFromLocal(); render(); }
+}
+function setEmp(id, persist = true){
+  S.empId = id; unsubs.forEach(u => u()); unsubs = []; SUBCOLS.forEach(k => S[k] = []); S.cart = []; S.pags = []; S.nfe = nfeVazia();
+  if (db && id){
+    SUBCOLS.forEach(k => {
+      unsubs.push(db.collection(`empresas/${id}/${k}`).onSnapshot(snap => { S[k] = snap.docs.map(d => d.data()); render(); }, () => {}));
+    });
+  } else if (!db) refreshFromLocal();
+  carregarPapel(id);
+  if (persist){
+    if (db) db.doc('config/app').set({ empresaAtual:id }).catch(() => {});
+    else { local.config = { empresaAtual:id }; lsSave(); }
+  }
+  render();
+}
+function startDb(){
+  S.loadingDb = true;
+  const timer = setTimeout(() => { if (S.loadingDb){ S.dbNote = 'A nuvem ainda não respondeu — os dados podem estar desatualizados.'; renderBadge(); } }, 10000);
+  let cfgId = null;
+  db.doc('config/app').get().then(s => { if (s.exists){ cfgId = s.data().empresaAtual; if (cfgId && cfgId !== S.empId && S.empresas.find(e => e.id === cfgId)) setEmp(cfgId, false); } }).catch(() => {});
+  S.unsubEmp = db.collection('empresas').onSnapshot(snap => {
+    if (!snap.metadata.fromCache){ S.loadingDb = false; clearTimeout(timer); S.dbNote = ''; }
+    S.empresas = snap.docs.map(d => d.data());
+    if (!S.empId || !S.empresas.find(e => e.id === S.empId)){
+      const alvo = (cfgId && S.empresas.find(e => e.id === cfgId)) ? cfgId : (S.empresas[0] && S.empresas[0].id) || null;
+      if (alvo !== S.empId) setEmp(alvo, false);
+    }
+    render(); renderBadge();
+  }, err => { S.loadingDb = false; clearTimeout(timer); S.dbNote = 'Não foi possível acessar a nuvem (' + err.code + ').'; renderBadge(); });
+}
+async function init(){ S.carregando = true; await iniciarProducao(); }
+function renderBadge(){
+  const b = $('#badge');
+  if (!S.logado){ b.textContent = ''; b.style.display = 'none'; return; }
+  b.style.display = ''; b.textContent = (S.ambiente === 'producao' ? '' : 'teste · ') + ({ dono:'dono', gerente:'gerente', operador:'operador' }[S.papelEmp] || 'conta');
+  b.title = S.meuEmail || '';
+}
+async function safe(fn, okMsg){
+  try { await fn(); if (okMsg) toast(okMsg); return true; }
+  catch(e){ const c = e && e.code; toast(c === 'quota_exceeded' ? 'Limite de armazenamento atingido.' : c === 'invalid_argument' ? 'Sem permissão para salvar aqui.' : 'Erro ao salvar. Tente de novo.'); return false; }
+}
+
+
+/* ================== conferência fiscal (NCM) ================== */
+const CAPS = {'01':'Animais vivos','02':'Carnes e miudezas','03':'Peixes e crustáceos','04':'Leite, laticínios, ovos e mel','05':'Outros produtos de origem animal','06':'Plantas vivas e flores','07':'Produtos hortícolas','08':'Frutas','09':'Café, chá, mate e especiarias','10':'Cereais','11':'Produtos da moagem, malte, amidos','12':'Sementes e frutos oleaginosos','13':'Gomas e resinas','14':'Matérias para entrançar','15':'Gorduras e óleos','16':'Preparações de carne e peixe','17':'Açúcares e confeitaria','18':'Cacau e preparações','19':'Preparações de cereais, massas e pães','20':'Preparações de hortícolas e frutas','21':'Preparações alimentícias diversas','22':'Bebidas, álcool e vinagres','23':'Resíduos alimentares e rações','24':'Fumo','25':'Sal, terras, pedras, cimento','26':'Minérios','27':'Combustíveis e óleos minerais','28':'Químicos inorgânicos','29':'Químicos orgânicos','30':'Produtos farmacêuticos','31':'Adubos','32':'Tintas, vernizes e corantes','33':'Perfumaria e cosméticos','34':'Sabões, detergentes e ceras','35':'Colas e enzimas','36':'Pólvoras e fósforos','37':'Produtos fotográficos','38':'Produtos químicos diversos','39':'Plásticos e suas obras','40':'Borracha e suas obras','41':'Peles e couros','42':'Obras de couro e bolsas','43':'Peleteria','44':'Madeira e obras de madeira','45':'Cortiça','46':'Cestaria','47':'Pastas de madeira','48':'Papel e cartão','49':'Livros e impressos','50':'Seda','51':'Lã','52':'Algodão','53':'Outras fibras vegetais','54':'Filamentos sintéticos','55':'Fibras sintéticas descontínuas','56':'Pastas, feltros e cordas','57':'Tapetes','58':'Tecidos especiais','59':'Tecidos impregnados','60':'Tecidos de malha','61':'Vestuário de malha','62':'Vestuário (exceto malha)','63':'Outros artefatos têxteis','64':'Calçados','65':'Chapéus','66':'Guarda-chuvas','67':'Penas e flores artificiais','68':'Obras de pedra, gesso e cimento','69':'Produtos cerâmicos','70':'Vidro e suas obras','71':'Pedras e metais preciosos, joias','72':'Ferro e aço','73':'Obras de ferro ou aço','74':'Cobre','75':'Níquel','76':'Alumínio','78':'Chumbo','79':'Zinco','80':'Estanho','81':'Outros metais comuns','82':'Ferramentas e cutelaria','83':'Obras diversas de metais','84':'Máquinas e aparelhos mecânicos','85':'Máquinas e aparelhos elétricos','86':'Veículos ferroviários','87':'Veículos automóveis e partes','88':'Aeronaves','89':'Embarcações','90':'Óptica, medida e instrumentos médicos','91':'Relógios','92':'Instrumentos musicais','93':'Armas e munições','94':'Móveis, colchões e iluminação','95':'Brinquedos, jogos e esporte','96':'Obras diversas','97':'Objetos de arte e antiguidades'};
+const ACESS = /\b(capa|pelicula|suporte|carregador|cabo|mochila|case|bolsa|fone|adaptador)\b/;
+// [regex na descrição normalizada, prefixos de NCM esperados, nome, regex de exclusão opcional]
+const KW = [
+  [/\barroz\b/, ['1006','1904','1102','1103'], 'arroz'],
+  [/\bfeij(ao|oes)\b/, ['0713','2005'], 'feijão'],
+  [/\bacucar\b/, ['1701','1702'], 'açúcar'],
+  [/\bcafe\b/, ['0901','2101'], 'café', /\b(cafeteira|xicara|filtro)\b/],
+  [/\bleite\b/, ['0401','0402','0403','0404','1901','2202'], 'leite', /\b(coco|rosas|hidratante|corporal|demaquilante)\b/],
+  [/\b(cerveja|chope|chopp)\b/, ['2203'], 'cerveja'],
+  [/\brefrigerante\b/, ['2202'], 'refrigerante'],
+  [/\bagua mineral\b/, ['2201'], 'água mineral'],
+  [/\bvinho\b/, ['2204','2205','2206'], 'vinho', /\bvinagre\b/],
+  [/\b(cachaca|vodka|whisky|uisque|conhaque|licor|gin|rum)\b/, ['2208'], 'bebida destilada'],
+  [/\boleo de soja\b/, ['1507'], 'óleo de soja'],
+  [/\bfarinha de trigo\b/, ['1101'], 'farinha de trigo'],
+  [/\b(macarrao|espaguete|lasanha|talharim)\b/, ['1902'], 'massa alimentícia'],
+  [/\b(biscoito|bolacha)s?\b/, ['1905'], 'biscoito'],
+  [/\bsabonete\b/, ['3401'], 'sabonete'],
+  [/\bdetergente\b/, ['3402'], 'detergente'],
+  [/\b(shampoo|xampu|condicionador)\b/, ['3305'], 'produto capilar'],
+  [/\b(creme dental|pasta de dente)\b/, ['3306'], 'creme dental'],
+  [/\bpapel higienico\b/, ['4818'], 'papel higiênico'],
+  [/\bfraldas?\b/, ['9619'], 'fralda'],
+  [/\bpneus?\b/, ['4011','4012'], 'pneu'],
+  [/\bcigarros?\b/, ['2402'], 'cigarro'],
+  [/\bovos?\b/, ['0407','0408'], 'ovos', /\b(pascoa|chocolate)\b/],
+  [/\bqueijos?\b/, ['0406'], 'queijo', /\b(pao de queijo|biscoito|ralador)\b/],
+  [/\bmanteiga\b/, ['0405'], 'manteiga', /\b(cacau|biscoito)\b/],
+  [/\biogurte\b/, ['0403'], 'iogurte'],
+  [/\bsorvete\b/, ['2105'], 'sorvete'],
+  [/\b(gasolina|diesel|querosene)\b/, ['2710'], 'combustível'],
+  [/\bcimento\b/, ['2523'], 'cimento', /\b(cola|aditivo)\b/],
+  [/\b(smartphone|celular)\b/, ['8517'], 'telefone celular', ACESS],
+  [/\bnotebook\b/, ['8471'], 'computador portátil', ACESS],
+  [/\b(tenis|sandalia|chinelo|sapato|bota)\b/, ['64'], 'calçado', /\b(mesa|cadarco|palmilha)\b/],
+  [/\b(camiseta|camisa|bermuda|calca|vestido|blusa)\b/, ['61','62'], 'vestuário'],
+  [/\blampadas?\b/, ['8539','9405'], 'lâmpada'],
+  [/\bparafusos?\b/, ['7318'], 'parafuso', /\b(parafusadeira)\b/],
+  [/\btinta\b/, ['3208','3209','3210','3215'], 'tinta', /\b(cabelo|coloracao|tatuagem)\b/],
+  [/\bfrango\b/, ['0207','1602'], 'frango'],
+  [/\b(carne bovina|picanha|alcatra|patinho|acem|fraldinha)\b/, ['0201','0202','0206','0210','1602'], 'carne bovina'],
+  [/\b(medicamento|comprimidos?|xarope)\b/, ['3003','3004'], 'medicamento'],
+  [/\bracao\b/, ['2309'], 'ração'],
+  [/\b(glp|botijao)\b/, ['2711','7311'], 'gás GLP'],
+];
+// NCMs que costumam ter ST (aviso informativo — conferir no RICMS/PI)
+const ST_NCM = ['2201','2202','2203','2204','2205','2206','2208','2402','2523','2710','3003','3004','3208','3209','3210','3303','3304','3305','3306','3307','4011','8507','8539','8708'];
+// NCMs que podem ter PIS/COFINS monofásico
+const MONO = ['3003','3004','3303','3304','3305','3306','3307','340111','4011','4013','8708','2710'];
+// NCMs que podem estar na Cesta Básica Nacional (LC 214/2025, Anexo I — alíquota zero de IBS/CBS)
+const CESTA = ['1006','0401','0402','040510','151710','0713','0901','210111','1507','110620','110220','110313','1101','1701','1902','19059090','0201','0202','0203','0204','0206','0207','0302','0303','0304','0406','2501','0903','110412'];
+const CSOSN_OK = ['101','102','103','201','202','203','300','400','500','900'];
+const CST_OK = ['00','10','20','30','40','41','50','51','60','70','90'];
+
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+const fmtNcm = c => { c = dig(c); return c.length === 8 ? `${c.slice(0,4)}.${c.slice(4,6)}.${c.slice(6)}` : c; };
+const fmtPref = c => c.length <= 2 ? 'cap. ' + c : c.length === 4 ? c : c.slice(0,4) + '.' + c.slice(4);
+function gtinOk(g){ g = dig(g); if (![8,12,13,14].includes(g.length)) return false; let s = 0;
+  g.slice(0, -1).split('').reverse().forEach((d, i) => s += +d * (i % 2 === 0 ? 3 : 1)); return (10 - s % 10) % 10 === +g.slice(-1); }
+
+function validarProduto(p, e){
+  const out = [], E = m => out.push({n:'erro', m}), A = m => out.push({n:'aviso', m}), I = m => out.push({n:'info', m});
+  const ncm = dig(p.ncm), cap = ncm.slice(0, 2), simples = String(e && e.regime) !== '3', cst = dig(p.cst_csosn), cest = dig(p.cest);
+  if (ncm.length !== 8) E('NCM deve ter 8 dígitos.');
+  else if (!CAPS[cap]) E(`O capítulo ${cap} não existe na NCM.`);
+  else {
+    if (S.ncmMap){ if (!S.ncmMap[ncm]) E(`NCM ${fmtNcm(ncm)} não existe na tabela vigente.`); }
+    else I('Importe a tabela NCM oficial para conferir se o código existe.');
+    const d = norm(p.descricao);
+    for (const [re, prefs, nome, exc] of KW){
+      if (re.test(d) && !(exc && exc.test(d)) && !prefs.some(x => ncm.startsWith(x))){
+        A(`A descrição indica ${nome} (NCM ${prefs.map(fmtPref).join(' ou ')}), mas o NCM informado é do capítulo ${cap} — ${CAPS[cap]}.`); break; }
+    }
+  }
+  if (simples && cst && !CSOSN_OK.includes(cst)) E(`CSOSN ${cst} não existe. Use 101, 102, 103, 201, 202, 203, 300, 400, 500 ou 900.`);
+  if (!simples && cst && !CST_OK.includes(cst)) E(`CST ICMS ${cst} não existe para regime normal.`);
+  const st = simples ? ['201','202','203','500'].includes(cst) : ['10','30','60','70'].includes(cst);
+  if (cest && cest.length !== 7) E('CEST deve ter 7 dígitos.');
+  if (st && !cest) E(`Produto com substituição tributária (${simples ? 'CSOSN' : 'CST'} ${cst}) precisa de CEST.`);
+  if (cest && !st) A(`CEST informado, mas o ${simples ? 'CSOSN' : 'CST'} ${cst || '—'} não indica substituição tributária.`);
+  if (st && cst !== '500'){
+    if (!(num(p.st_mva) > 0) || !(num(p.st_aliq) > 0)) A('Para calcular o ICMS-ST como substituto, informe a MVA e a alíquota interna ST.');
+    else if (!(num(p.icms_aliq) > 0)) A('Informe a alíquota de ICMS própria para deduzir do ICMS-ST.');
+  }
+  if (!simples && ['20','70'].includes(cst) && !(num(p.icms_red) > 0)) A(`CST ${cst} é com redução de base: informe o percentual de redução.`);
+  if (!st && ncm.length === 8 && ST_NCM.some(x => ncm.startsWith(x))) I('Este NCM costuma ter substituição tributária. Confira no RICMS/PI se o produto está sujeito a ST.');
+  if (ncm.length === 8 && MONO.some(x => ncm.startsWith(x))){
+    if (simples) I('NCM pode ter PIS/COFINS monofásico: segregue essa receita no PGDAS-D.');
+    else if (p.pis_cst !== '04' || p.cofins_cst !== '04') A('NCM pode ter PIS/COFINS monofásico (na revenda, normalmente CST 04). Confira.');
+  }
+  if (ncm.length === 8 && CESTA.some(x => ncm.startsWith(x)) && (p.cst_ibscbs || '000') === '000')
+    A('NCM pode estar na Cesta Básica Nacional (alíquota zero de IBS/CBS, Anexo I da LC 214/2025), mas o CST IBS/CBS está como tributação integral (000). Confira o CST e o cClassTrib.');
+  if (p.gtin && p.gtin !== 'SEM GTIN' && !gtinOk(p.gtin)) E('Código de barras (GTIN) com dígito verificador inválido.');
+  return out;
+}
+const temErro = v => v.some(x => x.n === 'erro'), temAviso = v => v.some(x => x.n === 'aviso');
+function validarHtml(v){
+  if (!v.length) return '<div class="v ok">✓ Nenhuma pendência fiscal encontrada.</div>';
+  const ic = { erro:'✕', aviso:'⚠', info:'ℹ' };
+  return v.map(x => `<div class="v ${x.n}"><b>${ic[x.n]}</b> ${esc(x.m)}</div>`).join('');
+}
+function errosEmissao(L){
+  const e = emp(), out = [];
+  L.forEach(l => validarProduto(l.p, e).filter(x => x.n === 'erro').forEach(x => out.push(`${esc(l.p.descricao)}: ${esc(x.m)}`)));
+  return out;
+}
+
+/* ---------- tabela NCM oficial ---------- */
+const LSN = 'emissor-fiscal-ncm';
+const limpaDesc = d => String(d || '').replace(/<[^>]+>/g, '').replace(/^[\s\-–—]+/, '').trim();
+function aplicarNcm(map, meta){ S.ncmMap = map; S.ncmMeta = meta || {}; S.ncmFull = null; }
+function ncmPath(c){
+  const m = S.ncmMap; if (!m) return ''; const parts = [];
+  [4,5,6,7,8].forEach(n => { const k = c.slice(0, n); if (k.length === n && m[k]) parts.push(limpaDesc(m[k])); });
+  return parts.join(' › ');
+}
+function ncmFull(){
+  if (!S.ncmMap) return [];
+  if (!S.ncmFull) S.ncmFull = Object.keys(S.ncmMap).filter(k => k.length === 8).sort().map(k => { const p = ncmPath(k); return [k, p, norm(p)]; });
+  return S.ncmFull;
+}
+function ncmInfoHtml(c){
+  c = dig(c); if (c.length < 2) return '';
+  const cap = c.slice(0, 2);
+  if (!CAPS[cap]) return `<span style="color:var(--bad)">✕ Capítulo ${esc(cap)} não existe.</span>`;
+  if (c.length === 8 && S.ncmMap) return S.ncmMap[c] ? `<span style="color:var(--ok)">✓ ${esc(ncmPath(c))}</span>` : `<span style="color:var(--bad)">✕ ${fmtNcm(c)} não existe na tabela vigente.</span>`;
+  return `Capítulo ${esc(cap)} — ${esc(CAPS[cap])}`;
+}
+function ncmBuscaHtml(q){
+  const t = norm(q); if (t.length < 3) return '';
+  let r;
+  if (/^[\d.\s]+$/.test(q)){ const d = dig(q); r = ncmFull().filter(x => x[0].startsWith(d)); }
+  else { const ws = t.split(' '); r = ncmFull().filter(x => ws.every(w => x[2].includes(w))); }
+  const tot = r.length; r = r.slice(0, 30);
+  if (!r.length) return '<div class="small" style="padding:8px">Nada encontrado.</div>';
+  return r.map(x => `<div class="res" style="display:block;cursor:default"><b class="num">${fmtNcm(x[0])}</b><div class="small">${esc(x[1])}</div></div>`).join('')
+    + (tot > 30 ? `<div class="small" style="padding:8px">Mostrando 30 de ${tot}. Refine a busca.</div>` : '');
+}
+async function carregarNcm(){
+  try {
+    if (db){
+      const snap = await db.collection('ncm').get(); if (snap.empty) return;
+      const map = {}; let meta = null;
+      snap.docs.forEach(d => { const x = d.data(); if (d.id === 'meta') meta = x; else Object.assign(map, x.itens || {}); });
+      if (Object.keys(map).length) aplicarNcm(map, meta);
+    } else { const x = JSON.parse(localStorage.getItem(LSN) || 'null'); if (x && x.map) aplicarNcm(x.map, x.meta); }
+    render();
+  } catch(e){}
+}
+function parseNcmArquivo(txt){
+  const map = {}, meta = {}, hoje = isoNow().slice(0, 10);
+  const vigente = df => { const m = String(df || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return !m || `${m[3]}-${m[2]}-${m[1]}` >= hoje; };
+  const t = txt.replace(/^﻿/, '').trim();
+  if (t[0] === '{' || t[0] === '['){
+    const j = JSON.parse(t); let arr = Array.isArray(j) ? j : null;
+    if (!arr){ for (const k of Object.keys(j)) if (Array.isArray(j[k])){ arr = j[k]; break; }
+      meta.data = j.Data_Ultima_Atualizacao_NCM || j.data_ultima_atualizacao_ncm || ''; meta.ato = j.Ato || j.ato || ''; }
+    (arr || []).forEach(o => {
+      if (!o || typeof o !== 'object') return;
+      const ks = Object.keys(o), kc = ks.find(k => /^cod/i.test(k)), kd = ks.find(k => /^desc/i.test(k)), kf = ks.find(k => /data_?fim/i.test(k));
+      if (!kc || !kd) return; const c = dig(o[kc]); if (c.length < 2 || c.length > 8) return;
+      if (kf && !vigente(o[kf])) return;
+      map[c] = String(o[kd] || '').replace(/<[^>]+>/g, '').trim();
+    });
+  } else {
+    t.split(/\r?\n/).forEach(l => { const p = l.split(/;|\t/); if (p.length < 2) return; const c = dig(p[0]); if (c.length < 2 || c.length > 8) return;
+      map[c] = p.slice(1).join(' ').replace(/^"|"$/g, '').trim(); });
+  }
+  return { map, meta };
+}
+function formNcm(){
+  openModal(`${mhead('Tabela NCM oficial')}
+  <p>Baixe a tabela vigente no <a href="https://portalunico.siscomex.gov.br/classif/" target="_blank" rel="noopener">Portal Único Siscomex</a>, na área de Classificação Fiscal (download da nomenclatura em <b>JSON</b>), e envie o arquivo aqui.</p>
+  <p class="small">Também aceita CSV ou TXT com uma linha por código no formato <code>código;descrição</code>. Códigos com data de fim vencida são ignorados.</p>
+  <input type="file" id="ncmFile" accept=".json,.csv,.txt">
+  <div id="ncmPrev"></div><div id="ncmProg" class="small"></div>`);
+}
+async function lerArquivoNcm(file){
+  $('#ncmPrev').innerHTML = '<p class="small">Lendo arquivo…</p>';
+  try {
+    const r = parseNcmArquivo(await file.text());
+    const n8 = Object.keys(r.map).filter(c => c.length === 8).length;
+    if (n8 < 100) { $('#ncmPrev').innerHTML = `<div class="msg err">Encontrei só ${n8} códigos de 8 dígitos. Confira se é o arquivo da tabela NCM.</div>`; return; }
+    S.ncmImport = r;
+    $('#ncmPrev').innerHTML = `<div class="msg info"><b>${n8.toLocaleString('pt-BR')}</b> códigos NCM vigentes${r.meta.data ? ' · atualização ' + esc(r.meta.data) : ''}${r.meta.ato ? '<br>' + esc(r.meta.ato) : ''}</div>
+      <button class="btn pri block" id="btnSalvarNcm" data-act="salvarNcm">Salvar tabela</button>`;
+  } catch(e){ $('#ncmPrev').innerHTML = '<div class="msg err">Não consegui ler o arquivo. Envie o JSON baixado do Siscomex ou um CSV código;descrição.</div>'; }
+}
+async function salvarNcm(){
+  const { map, meta } = S.ncmImport, caps = {};
+  Object.entries(map).forEach(([c, d]) => { const k = c.slice(0, 2); (caps[k] = caps[k] || {})[c] = d; });
+  meta.total = Object.keys(map).filter(c => c.length === 8).length; meta.importado_em = isoNow();
+  const btn = $('#btnSalvarNcm'); if (btn) btn.disabled = true;
+  try {
+    if (db){
+      const ks = Object.keys(caps).sort();
+      for (let i = 0; i < ks.length; i++){ $('#ncmProg').textContent = `Salvando capítulo ${i + 1} de ${ks.length}…`; await db.collection('ncm').doc('cap-' + ks[i]).set({ itens:caps[ks[i]] }); }
+      await db.collection('ncm').doc('meta').set(meta);
+    } else localStorage.setItem(LSN, JSON.stringify({ map, meta }));
+    aplicarNcm(map, meta); S.ncmImport = null; closeModal(); render(); toast('Tabela NCM importada.');
+  } catch(e){ if (btn) btn.disabled = false; $('#ncmProg').innerHTML = `<div class="msg err">Não foi possível salvar a tabela (${esc(e.code || e.message || 'erro')}).</div>`; }
+}
+
+/* ================== cálculo fiscal ================== */
+
+const ST_SIMPLES = ['201','202','203'], ST_NORMAL = ['10','30','70'];
+const aliqInterOf = origem => ['1','2','3','8'].includes(String(origem)) ? 4 : 12;
+const r4 = n => Math.round(n * 10000) / 10000;
+function calcItem(p, qtd, preco, cfop, e, x = {}){
+  const bruto = r2(qtd * preco), desc = r2(x.desc || 0), frete = r2(x.frete || 0), seguro = r2(x.seguro || 0), outras = r2(x.outras || 0);
+  const simples = e && String(e.regime) !== '3', inter = !!x.inter, cst = p.cst_csosn || (simples ? '102' : '00');
+  const baseOp = r2(bruto - desc + frete + seguro + outras), aliqInter = aliqInterOf(p.origem);
+  const o = { bruto, desc, frete, seguro, outras, baseOp, cfop, cst, aliqInter, icmsBase:0, icmsAliq:0, icmsRed:0, icms:0,
+    stMva:0, stBase:0, stAliq:0, st:0, fcpStAliq:0, fcpSt:0, difal:null,
+    pisCst:p.pis_cst || (simples ? '49' : '01'), pisAliq:num(p.pis_aliq), pis:0,
+    cofCst:p.cofins_cst || (simples ? '49' : '01'), cofAliq:num(p.cofins_aliq), cof:0,
+    cbs:r2(baseOp * CBS_2026 / 100), ibs:r2(baseOp * IBS_2026 / 100) };
+  const red = num(p.icms_red), aliqPropria = inter ? aliqInter : num(p.icms_aliq);
+  // ICMS próprio (regime normal)
+  if (!simples && ['00','10','20','70','90'].includes(cst) && aliqPropria > 0){
+    o.icmsRed = ['20','70'].includes(cst) ? red : 0; o.icmsAliq = aliqPropria;
+    o.icmsBase = r2(baseOp * (1 - o.icmsRed / 100)); o.icms = r2(o.icmsBase * aliqPropria / 100);
+  }
+  // ICMS-ST (quando o emitente é o substituto)
+  const ehST = simples ? ST_SIMPLES.includes(cst) : ST_NORMAL.includes(cst), mva = num(p.st_mva), aSt = num(p.st_aliq);
+  if (ehST && aSt > 0 && !x.semST){
+    o.stMva = (inter && mva > 0 && aSt > aliqInter) ? r4(((1 + mva / 100) * (1 - aliqInter / 100) / (1 - aSt / 100) - 1) * 100) : mva;
+    const redSt = cst === '70' ? red : 0;
+    o.stBase = r2(baseOp * (1 + o.stMva / 100) * (1 - redSt / 100)); o.stAliq = aSt;
+    const ded = (!simples && o.icms > 0) ? o.icms : r2(baseOp * (1 - redSt / 100) * aliqPropria / 100);
+    o.st = Math.max(0, r2(o.stBase * aSt / 100 - ded));
+    o.fcpStAliq = num(p.st_fcp); o.fcpSt = r2(o.stBase * o.fcpStAliq / 100);
+  }
+  // DIFAL (EC 87/2015) — venda interestadual a não contribuinte
+  if (x.difal && numIn(x.difal.aliq) > 0){
+    const aD = numIn(x.difal.aliq), fD = numIn(x.difal.fcp), dupla = x.difal.metodo !== 'unica';
+    const base = dupla ? r2((baseOp - baseOp * aliqInter / 100) / (1 - (aD + fD) / 100)) : baseOp;
+    o.difal = { base, aliqDest:aD, aliqInter, fcpAliq:fD, fcp:r2(base * fD / 100), valor:Math.max(0, r2(base * aD / 100 - baseOp * aliqInter / 100)), metodo:dupla ? 'dupla' : 'unica' };
+  }
+  const basePC = r2(bruto - desc);
+  if (o.pisAliq > 0) o.pis = r2(basePC * o.pisAliq / 100);
+  if (o.cofAliq > 0) o.cof = r2(basePC * o.cofAliq / 100);
+  o.basePC = basePC;
+  return o;
+}
+function itemFocus(i, n, p, qtd, preco, c){
+  const it = { numero_item:n, codigo_produto:p.codigo || p.id.slice(0,8), descricao:p.descricao, codigo_ncm:dig(p.ncm), cfop:c.cfop,
+    unidade_comercial:p.unidade || 'UN', quantidade_comercial:qtd, valor_unitario_comercial:preco, valor_bruto:c.bruto,
+    unidade_tributavel:p.unidade || 'UN', quantidade_tributavel:qtd, valor_unitario_tributavel:preco,
+    codigo_barras_comercial:p.gtin || 'SEM GTIN', codigo_barras_tributavel:p.gtin || 'SEM GTIN',
+    icms_origem:p.origem || '0', icms_situacao_tributaria:c.cst,
+    pis_situacao_tributaria:c.pisCst, cofins_situacao_tributaria:c.cofCst };
+  if (p.cest) it.cest = dig(p.cest);
+  if (c.desc > 0) it.valor_desconto = c.desc;
+  if (c.frete > 0) it.valor_frete = c.frete;
+  if (c.seguro > 0) it.valor_seguro = c.seguro;
+  if (c.outras > 0) it.valor_outras_despesas = c.outras;
+  if (c.icms > 0) Object.assign(it, { icms_modalidade_base_calculo:'3', icms_base_calculo:c.icmsBase, icms_aliquota:c.icmsAliq, icms_valor:c.icms });
+  if (c.icmsRed > 0) it.icms_reducao_base_calculo = c.icmsRed;
+  if (c.stBase > 0){
+    Object.assign(it, { icms_modalidade_base_calculo_st:'4', icms_margem_valor_adicionado_st:c.stMva, icms_base_calculo_st:c.stBase, icms_aliquota_st:c.stAliq, icms_valor_st:c.st });
+    if (c.fcpSt > 0) Object.assign(it, { fcp_base_calculo_st:c.stBase, fcp_percentual_st:c.fcpStAliq, fcp_valor_st:c.fcpSt });
+  }
+  if (c.difal) Object.assign(it, { icms_base_calculo_uf_destino:c.difal.base, fcp_base_calculo_uf_destino:c.difal.base, fcp_percentual_uf_destino:c.difal.fcpAliq,
+    icms_aliquota_interna_uf_destino:c.difal.aliqDest, icms_aliquota_interestadual:c.difal.aliqInter, icms_percentual_partilha:100,
+    fcp_valor_uf_destino:c.difal.fcp, icms_valor_uf_destino:c.difal.valor, icms_valor_uf_remetente:0 });
+  if (c.pis > 0) Object.assign(it, { pis_base_calculo:c.basePC, pis_aliquota_porcentual:c.pisAliq, pis_valor:c.pis });
+  if (c.cof > 0) Object.assign(it, { cofins_base_calculo:c.basePC, cofins_aliquota_porcentual:c.cofAliq, cofins_valor:c.cof });
+  // Reforma (IBS/CBS) — guardado para mapear no layout RTC da Focus na fase do servidor
+  it._rtc = { cst_ibs_cbs:p.cst_ibscbs || '000', classificacao_tributaria:p.cclasstrib || '000001', base:c.baseOp, cbs_aliquota:CBS_2026, cbs_valor:c.cbs, ibs_aliquota:IBS_2026, ibs_valor:c.ibs };
+  return it;
+}
+function ratear(total, pesos){
+  total = r2(total); const soma = pesos.reduce((a, b) => a + b, 0);
+  if (!total || !soma) return pesos.map(() => 0);
+  let acc = 0;
+  return pesos.map((b, i) => { if (i === pesos.length - 1) return r2(total - acc); const v = r2(total * b / soma); acc = r2(acc + v); return v; });
+}
+function descTotalValor(base, d){ if (!d) return 0; const v = numIn(d.v); return d.tipo === '%' ? r2(base * Math.min(v, 100) / 100) : r2(v); }
+function montarLinhas(itens, e, opts){
+  const liq = itens.map(i => r2(i.qtd * i.preco - (i.desc || 0)));
+  const dT = descTotalValor(liq.reduce((a, b) => a + b, 0), opts.descTotal);
+  const rD = ratear(dT, liq), rF = ratear(opts.frete || 0, liq), rS = ratear(opts.seguro || 0, liq), rO = ratear(opts.outras || 0, liq);
+  return itens.map((i, k) => ({ p:i.p, qtd:i.qtd, preco:i.preco, descItem:i.desc || 0,
+    c:calcItem(i.p, i.qtd, i.preco, i.cfop, e, { desc:r2((i.desc || 0) + rD[k]), frete:rF[k], seguro:rS[k], outras:rO[k], inter:opts.inter, difal:opts.difal, semST:opts.semST }) }));
+}
+function totais(L){
+  const t = { prod:0, desc:0, frete:0, seguro:0, outras:0, icmsBase:0, icms:0, stBase:0, st:0, fcpSt:0, difal:0, fcpDest:0, pis:0, cof:0, cbs:0, ibs:0 };
+  L.forEach(({ c }) => { t.prod += c.bruto; t.desc += c.desc; t.frete += c.frete; t.seguro += c.seguro; t.outras += c.outras; t.icmsBase += c.icmsBase; t.icms += c.icms;
+    t.stBase += c.stBase; t.st += c.st; t.fcpSt += c.fcpSt; if (c.difal){ t.difal += c.difal.valor; t.fcpDest += c.difal.fcp; } t.pis += c.pis; t.cof += c.cof; t.cbs += c.cbs; t.ibs += c.ibs; });
+  Object.keys(t).forEach(k => t[k] = r2(t[k]));
+  t.nota = r2(t.prod - t.desc + t.frete + t.seguro + t.outras + t.st + t.fcpSt);
+  return t;
+}
+function cartLinhas(){
+  const e = emp();
+  const itens = S.cart.map(ci => { const p = S.produtos.find(x => x.id === ci.pid); return p ? { p, qtd:ci.qtd, preco:num(p.preco), desc:ci.desc || 0, cfop:p.cfop || '5102' } : null; }).filter(Boolean);
+  return montarLinhas(itens, e, { descTotal:S.descTotal, semST:true });
+}
+function nfeCtx(){
+  const e = emp(), cli = S.clientes.find(c => c.id === S.nfe.clienteId);
+  const inter = !!(cli && e && cli.uf && cli.uf !== e.uf), naoContrib = cli && (cli.ind_ie || '9') !== '1';
+  return { e, cli, inter, naoContrib, precisaDifal:inter && naoContrib && S.nfe.op === 'venda' };
+}
+function nfeLinhas(){
+  const { e, inter, naoContrib, precisaDifal } = nfeCtx();
+  const itens = S.nfe.itens.map(ci => { const p = S.produtos.find(x => x.id === ci.pid); if (!p) return null;
+    const cfop = cfopOp(p.cfop, S.nfe.op, inter);
+    return { p, qtd:ci.qtd, preco:ci.preco, desc:numIn(ci.desc), cfop }; }).filter(Boolean);
+  return montarLinhas(itens, e, { inter, semST:!!naoContrib || S.nfe.op !== 'venda', difal:precisaDifal ? S.nfe.difal : null, descTotal:S.nfe.descTotal,
+    frete:numIn(S.nfe.vFrete), seguro:numIn(S.nfe.vSeguro), outras:numIn(S.nfe.vOutras) });
+}
+function totaisPayload(T){
+  const o = { valor_produtos:T.prod, valor_desconto:T.desc, valor_frete:T.frete, valor_seguro:T.seguro, valor_outras_despesas:T.outras,
+    icms_base_calculo:T.icmsBase, icms_valor_total:T.icms, icms_base_calculo_st:T.stBase, icms_valor_total_st:T.st, valor_total:T.nota };
+  if (T.fcpSt) o.fcp_valor_total_st = T.fcpSt;
+  if (T.difal || T.fcpDest){ o.icms_valor_total_uf_destino = T.difal; o.fcp_valor_total_uf_destino = T.fcpDest; o.icms_valor_total_uf_remetente = 0; }
+  return o;
+}
+function linhaTot(rot, v, cls = ''){ return `<div class="total ${cls}"><span>${rot}</span><span class="num">${brl(v)}</span></div>`; }
+
+/* ================== navegação ================== */
+const ICON = {
+  venda:'<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4M8 9h3M8 12h6"/>',
+  nfe:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>',
+  notas:'<path d="M5 5h14M5 10h14M5 15h9M5 20h6"/>',
+  produtos:'<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',
+  clientes:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  empresa:'<path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/>',
+  caixa:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3M8 6V4h8v2"/>'
+};
+const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
+function renderNav(){
+  $('#nav').innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${l}</button>`).join('');
+}
+function renderHeader(){
+  const sel = $('#empSel');
+  sel.innerHTML = S.empresas.length ? S.empresas.map(e => `<option value="${esc(e.id)}" ${e.id === S.empId ? 'selected' : ''}>${esc(e.fantasia || e.razao)}</option>`).join('') + '<option value="__nova">+ Nova empresa</option>'
+    : '<option value="">Sem empresa</option><option value="__nova">+ Nova empresa</option>';
+}
+
+/* ================== render principal ================== */
+function render(){
+  const ae = document.activeElement, aid = ae && ae.id, sel = ae && ae.selectionStart, val = ae && ae.value;
+  renderNav(); renderHeader();
+  const m = $('#main');
+  const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
+  $('#nav').style.display = fora ? 'none' : ''; $('#empSel').style.display = fora ? 'none' : '';
+  $('#ambBar').style.display = !fora && S.ambiente !== 'producao' ? '' : 'none';
+  if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
+  else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
+  else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
+  else if (!e && S.tab !== 'empresa'){
+    m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
+  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
+  if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
+}
+
+/* ---------- Cupom (NFC-e) ---------- */
+function resultadosHtml(q, act){
+  const t = q.trim().toLowerCase(); if (!t) return '';
+  const r = S.produtos.filter(p => (p.descricao || '').toLowerCase().includes(t) || (p.codigo || '').toLowerCase() === t || (p.gtin || '') === t).slice(0, 30);
+  if (!r.length) return '<div class="small" style="padding:8px">Nenhum produto encontrado.</div>';
+  return r.map(p => `<div class="res" data-act="${act}" data-id="${esc(p.id)}"><span>${esc(p.descricao)} <span class="small">${esc(p.codigo || '')}</span></span><b class="num">${brl(p.preco)}</b></div>`).join('');
+}
+
+/* ---------- NF-e ---------- */
+function pagResumo(total){
+  const soma = r2(S.pags.reduce((a, p) => a + numIn(p.valor), 0));
+  const din = r2(S.pags.filter(p => p.forma === '01').reduce((a, p) => a + numIn(p.valor), 0));
+  return { soma, din, falta:Math.max(0, r2(total - soma)), troco:Math.max(0, r2(soma - total)) };
+}
+function vVenda(){
+  if (!S.produtos.length) return `<h2>Cupom fiscal (NFC-e)</h2><div class="card empty">Cadastre pelo menos um produto para começar a vender.${pode('produto') ? '<br><br><button class="btn pri" data-act="novoProd">Cadastrar produto</button>' : ''}</div>`;
+  const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), lim = num(e.limite_cpf_nfce || 10000);
+  return `<h2>Cupom fiscal (NFC-e)</h2>
+  <div class="grid2"><div>
+    <div class="card"><label for="busca">Buscar produto (nome, código ou código de barras)</label>
+      <input id="busca" autocomplete="off" placeholder="Digite ou passe o leitor…" value="${esc(S.busca)}">
+      <div class="results" id="resV">${resultadosHtml(S.busca, 'addCart')}</div></div>
+    <div class="card"><h3 style="margin-top:0">Itens</h3>
+      ${L.length ? `<div class="list">${L.map((l, i) => `<div class="it"><div class="grow" data-act="descItem" data-i="${i}" style="cursor:pointer"><div class="t">${esc(l.p.descricao)}</div>
+        <div class="s">${brl(l.preco)} / ${esc(l.p.unidade || 'UN')}${l.descItem ? ` · <span style="color:var(--bad)">desc. −${brl(l.descItem)}</span>` : ' · <u>desconto</u>'}</div></div>
+        <div class="qty"><button data-act="qtd" data-i="${i}" data-d="-1">−</button><input id="q${i}" data-qi="${i}" inputmode="decimal" value="${l.qtd}"><button data-act="qtd" data-i="${i}" data-d="1">+</button></div>
+        <b class="num" style="min-width:76px;text-align:right">${brl(r2(l.c.bruto - l.descItem))}</b></div>`).join('')}</div>` : '<div class="empty">Nenhum item ainda.</div>'}
+    </div></div>
+    <div><div class="card">
+      ${linhaTot('Subtotal', T.prod, 'small')}${T.desc ? linhaTot('Descontos', -T.desc, 'small') : ''}
+      ${linhaTot('Total', T.nota, 'big')}
+      ${linhaTot('IBS/CBS destacado (2026, informativo)', T.cbs + T.ibs, 'small')}
+      <label for="descTot">Desconto no total</label>
+      <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="descTipo" data-t="${t}" class="${S.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
+        <input id="descTot" inputmode="decimal" placeholder="0" value="${esc(S.descTotal.v)}"></div>
+      <label>Pagamento <span class="small">(toque para adicionar — dá para combinar formas)</span></label>
+      <div class="seg">${PAGAMENTOS.slice(0, 4).map(([c, n]) => `<button data-act="addPag" data-c="${c}">${n}</button>`).join('')}</div>
+      ${S.pags.length ? `<div class="list" style="margin-top:6px">${S.pags.map((p, i) => `<div class="it" style="padding:6px 0"><div class="grow">${esc(PAG_NOME[p.forma])}</div>
+        <input id="pv${i}" data-pv="${i}" inputmode="decimal" style="width:110px;text-align:right" value="${esc(p.valor)}"><button class="x" data-act="rmPag" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}</div>` : ''}
+      ${pg.falta > 0 && S.pags.length ? linhaTot('Falta receber', pg.falta) : ''}${pg.troco > 0 ? linhaTot('<b>Troco</b>', pg.troco) : ''}
+      <label for="cpf">CPF do consumidor ${T.nota >= lim ? '<b style="color:var(--bad)">(obrigatório nesta venda)</b>' : '(opcional)'}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
+      <label for="nomeCons">Nome (opcional)</label><input id="nomeCons" value="${esc(S.nomeCons)}">
+      ${CONTINGENCIA_DISPONIVEL ? `<label class="chk"><input type="checkbox" data-act="contOn" ${S.conting ? 'checked' : ''}> Contingência offline (sem internet)</label>` : ''}
+      ${!navigator.onLine ? '<div class="msg warn">Sem internet: o cupom não consegue ser enviado agora.</div>' : ''}
+      ${S.conting ? '<div class="msg warn">Em contingência: o cupom sai marcado e precisa ser transmitido em até 24 horas (aba Notas).</div>' : ''}
+      ${!caixaAberto() ? '<div class="msg info">Caixa fechado. Abra o caixa na aba <b>Caixa</b> para vender.</div>' : ''}
+      <div id="errV"></div>
+      <div class="actions"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Limpar</button><button class="btn pri" data-act="emitirNfce" ${L.length ? '' : 'disabled'}>${S.conting ? 'Emitir em contingência' : 'Emitir cupom'}</button></div>
+      <p class="small">Venda para CNPJ não sai em NFC-e: use a aba NF-e. CPF obrigatório a partir de ${brl(lim)}.</p>
+    </div></div></div>`;
+}
+function formDescItem(i){
+  const ci = S.cart[i], p = S.produtos.find(x => x.id === ci.pid), bruto = r2(ci.qtd * num(p.preco));
+  openModal(`${mhead('Desconto no item')}<p><b>${esc(p.descricao)}</b><br><span class="small">${ci.qtd} × ${brl(p.preco)} = ${brl(bruto)}</span></p>
+  <div class="row" style="flex-wrap:nowrap"><select id="diTipo" style="flex:0 0 80px"><option>R$</option><option>%</option></select><input id="diV" inputmode="decimal" placeholder="0" value="${ci.desc ? String(ci.desc).replace('.', ',') : ''}"></div>
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="remDescItem" data-i="${i}">Sem desconto</button><button class="btn pri" data-act="aplDescItem" data-i="${i}">Aplicar</button></div>`);
+  setTimeout(() => { const el = $('#diV'); if (el) el.focus(); }, 50);
+}
+function aplDescItem(i){
+  const ci = S.cart[i], p = S.produtos.find(x => x.id === ci.pid), bruto = r2(ci.qtd * num(p.preco));
+  const v = numIn(val('diV')), d = val('diTipo') === '%' ? r2(bruto * v / 100) : r2(v);
+  if (!(d >= 0) || d >= bruto) return $('#errM').innerHTML = '<div class="msg err">O desconto precisa ser menor que o valor do item.</div>';
+  ci.desc = d; closeModal(); render();
+}
+
+/* ---------- NF-e ---------- */
+function vNfe(){
+  const n = S.nfe, { e, cli, inter, precisaDifal } = nfeCtx(), L = nfeLinhas(), T = totais(L), simples = String(e.regime) !== '3';
+  const ti = [['9','Sem frete'],['0','Por conta do emitente (CIF)'],['1','Por conta do destinatário (FOB)'],['2','Terceiros']];
+  return `<h2>NF-e (modelo 55)${n.op !== 'venda' ? ' — <span style="color:var(--warn)">' + (n.op === 'dev_venda' ? 'devolução de venda' : 'devolução de compra') + '</span>' : ''}</h2>
+  <div class="grid2"><div>
+    <div class="card"><label for="nfeCli">Destinatário</label>
+      <select id="nfeCli"><option value="">Selecione o cliente…</option>${S.clientes.map(c => `<option value="${esc(c.id)}" ${c.id === n.clienteId ? 'selected' : ''}>${esc(c.nome)} — ${fmtDoc(c.doc)}</option>`).join('')}</select>
+      ${!S.clientes.length ? '<p class="small">Nenhum cliente cadastrado. <a href="#" data-act="novoCli">Cadastrar agora</a></p>' : ''}
+      ${cli ? `<p class="small">${esc(cli.municipio || '')}/${esc(cli.uf || '')} · ${({'1':'Contribuinte ICMS','2':'Contribuinte isento','9':'Não contribuinte'})[cli.ind_ie || '9']}${inter ? ' · <span class="tag w">interestadual — CFOP 6xxx</span>' : ''}</p>` : ''}
+      <label for="nfeOp">Operação</label><select id="nfeOp">${OPS.map(([c, t]) => `<option value="${c}" ${n.op === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      ${n.op !== 'venda' ? `<label for="nfeRef">Chave de acesso da nota ${n.op === 'dev_venda' ? 'de venda que está sendo devolvida' : 'de compra (do fornecedor)'} *</label>
+        <input id="nfeRef" inputmode="numeric" placeholder="44 dígitos" value="${esc(fmtChave(n.ref))}"><div class="small" id="refInfo" style="margin-top:4px">${refInfo(n.ref)}</div>
+        <p class="small">Devolução: CFOP ${n.op === 'dev_venda' ? '1202/2202 (1411/2411 com ST)' : '5202/6202 (5411/6411 com ST)'} automático e pagamento "sem pagamento". Se a nota original teve ICMS-ST, confira com a SEFAZ-PI como devolver o imposto.</p>` : ''}
+      <label for="nfeNat">Natureza da operação</label><input id="nfeNat" value="${esc(n.natureza)}">
+    </div>
+    ${precisaDifal ? `<div class="card"><h3 style="margin-top:0">DIFAL — ${esc(cli.uf)}</h3>
+      <p class="small">Venda interestadual a não contribuinte. Informe a carga da UF de destino. O sistema guarda esses valores para as próximas notas com destino a ${esc(cli.uf)}.</p>
+      <div class="row">${fld('dfAliq','Alíquota interna ' + esc(cli.uf) + ' (%) *', n.difal.aliq, 'inputmode="decimal"')}${fld('dfFcp','FCP ' + esc(cli.uf) + ' (%)', n.difal.fcp, 'inputmode="decimal"')}</div>
+      ${sel('dfMet','Base de cálculo', n.difal.metodo, [['dupla','Base dupla (LC 190/2022)'],['unica','Base única']])}
+      ${simples ? '<div class="msg warn" style="margin-top:8px">Empresa do Simples Nacional: confirme se o DIFAL é exigido nesta operação antes de destacar.</div>' : ''}
+      ${T.difal ? linhaTot('DIFAL para ' + esc(cli.uf), T.difal) + (T.fcpDest ? linhaTot('FCP para ' + esc(cli.uf), T.fcpDest) : '') + '<p class="small">Recolhido por GNRE — não soma no total da nota.</p>' : ''}
+    </div>` : ''}
+    <div class="card"><label for="buscaNfe">Adicionar produto</label><input id="buscaNfe" autocomplete="off" placeholder="Buscar…" value="${esc(S.buscaNfe)}">
+      <div class="results" id="resN">${resultadosHtml(S.buscaNfe, 'addNfe')}</div>
+      <h3>Itens</h3>
+      ${L.length ? `<div class="list">${L.map((l, i) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${esc(l.p.descricao)}</div>
+        <div class="s">NCM ${fmtNcm(l.p.ncm)} · CFOP ${l.c.cfop} · ${esc(l.c.cst)}${l.c.st ? ` · ST ${brl(l.c.st)} (MVA ${String(l.c.stMva).replace('.', ',')}%)` : ''}${l.c.icms ? ` · ICMS ${brl(l.c.icms)}` : ''}</div></div>
+        <div class="g3"><div><label>Qtd</label><input id="nq${i}" data-nq="${i}" inputmode="decimal" value="${l.qtd}"></div>
+        <div><label>Valor unit.</label><input id="np${i}" data-np="${i}" inputmode="decimal" value="${String(l.preco).replace('.', ',')}"></div>
+        <div><label>Desc. R$</label><input id="nd${i}" data-nd="${i}" inputmode="decimal" placeholder="0,00" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
+        <div style="display:flex;width:100%;align-items:center;gap:8px;margin-top:6px"><b class="num" style="flex:1">${brl(r2(l.c.bruto - l.descItem))}</b>
+        <button class="btn sm bad" data-act="rmNfe" data-i="${i}">Remover</button></div></div>`).join('')}</div>` : '<div class="empty">Nenhum item.</div>'}
+    </div></div>
+    <div><div class="card">
+      <h3 style="margin-top:0">Valores da nota</h3>
+      <label for="nDescTot">Desconto no total</label>
+      <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="nDescTipo" data-t="${t}" class="${n.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
+        <input id="nDescTot" inputmode="decimal" placeholder="0" value="${esc(n.descTotal.v)}"></div>
+      <div class="row">${fld('nFrete','Frete (R$)', n.vFrete, 'inputmode="decimal" placeholder="0,00"')}${fld('nSeguro','Seguro (R$)', n.vSeguro, 'inputmode="decimal" placeholder="0,00"')}${fld('nOutras','Outras despesas (R$)', n.vOutras, 'inputmode="decimal" placeholder="0,00"')}</div>
+      <p class="small">Desconto, frete, seguro e outras são rateados entre os itens pelo valor.</p>
+      <div style="margin-top:10px">${linhaTot('Produtos', T.prod)}${T.desc ? linhaTot('Desconto', -T.desc, 'small') : ''}${T.frete ? linhaTot('Frete', T.frete, 'small') : ''}${T.seguro ? linhaTot('Seguro', T.seguro, 'small') : ''}${T.outras ? linhaTot('Outras despesas', T.outras, 'small') : ''}
+      ${T.icms ? linhaTot('ICMS próprio (BC ' + brl(T.icmsBase) + ')', T.icms, 'small') : ''}${T.st ? linhaTot('ICMS-ST (BC ' + brl(T.stBase) + ')', T.st, 'small') : ''}${T.fcpSt ? linhaTot('FCP-ST', T.fcpSt, 'small') : ''}
+      ${linhaTot('IBS/CBS (2026, informativo)', T.cbs + T.ibs, 'small')}${linhaTot('Total da nota', T.nota, 'big')}</div>
+      <label for="nfeFrete">Modalidade do frete</label><select id="nfeFrete">${ti.map(([c, t]) => `<option value="${c}" ${n.frete === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      ${n.op === 'venda' ? `<label for="nfePag">Pagamento</label><select id="nfePag">${PAGAMENTOS.map(([c, t]) => `<option value="${c}" ${n.pag === c ? 'selected' : ''}>${t}</option>`).join('')}<option value="90" ${n.pag === '90' ? 'selected' : ''}>Sem pagamento</option></select>` : ''}
+      <label for="nfeObs">Informações complementares</label><textarea id="nfeObs" rows="3">${esc(n.obs)}</textarea>
+      <div id="errN"></div>
+      <div class="actions"><button class="btn bad" data-act="limparNfe">Limpar</button><button class="btn pri" data-act="emitirNfe" ${L.length && cli ? '' : 'disabled'}>${n.op === 'venda' ? 'Emitir NF-e' : 'Emitir devolução'}</button></div>
+    </div></div></div>`;
+}
+const nfeVazia = () => ({ op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } });
+function selCliente(id){
+  S.nfe.clienteId = id;
+  const { e, cli } = nfeCtx(), cfg = cli && e.difal_uf && e.difal_uf[cli.uf];
+  S.nfe.difal = cfg ? { aliq:String(cfg.aliq).replace('.', ','), fcp:String(cfg.fcp || '').replace('.', ','), metodo:cfg.metodo || 'dupla' } : { aliq:'', fcp:'', metodo:'dupla' };
+  render();
+}
+
+/* ---------- Notas ---------- */
+function vNotas(){
+  const f = S.filtroNotas, pend = S.notas.filter(n => n.status === 'contingencia'), gaps = buracos(), agora = new Date();
+  const lista = S.notas.filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
+    || (f === 'pend' && n.status === 'contingencia') || (f === 'dev' && n.op && n.op !== 'venda')).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  const tot = lista.filter(n => notaValida(n) && (n.op || 'venda') === 'venda').reduce((s, n) => s + (n.total || 0), 0);
+  const nome = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '65' ? 'Cupom' : 'NF-e';
+  const tag = n => n.status === 'cancelada' ? '<span class="tag b">cancelada</span>' : n.status === 'contingencia' ? '<span class="tag b">contingência</span>'
+    : (n.devolucoes || []).length ? '<span class="tag w">devolvida</span>' : tagStatus(n);
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Notas emitidas</h2></div>
+  ${pend.length ? `<div class="card" style="border-color:#efc5c2"><b>${pend.length} cupom(ns) em contingência</b><p class="small">Transmita assim que a internet voltar. Prazo: 24 horas após a emissão.${pend.some(n => prazoCont(n) < agora) ? ' <b style="color:var(--bad)">Há prazo vencido.</b>' : ''}</p>
+    ${pode('emitir') ? '<button class="btn pri" data-act="transmitirTodas">Transmitir todos</button>' : ''}</div>` : ''}
+  ${gaps.length && pode('inutilizar') ? `<div class="card"><b>Números pulados</b><p class="small">Notas não emitidas nesses números precisam ser inutilizadas.</p>
+    ${gaps.map(g => `<div class="it"><div class="grow">${g.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(g.serie)}: nº ${g.ini}${g.fim > g.ini ? ' a ' + g.fim : ''}</div>
+      <button class="btn sm" data-act="inutilizar" data-m="${g.modelo}" data-s="${esc(g.serie)}" data-i="${g.ini}" data-f="${g.fim}">Inutilizar</button></div>`).join('')}</div>` : ''}
+  ${pode('inutilizar') || pode('backup') ? `<div class="actions" style="margin:0 0 12px">${pode('inutilizar') ? '<button class="btn" data-act="inutilizar">Inutilizar numeração</button>' : ''}${pode('backup') ? '<button class="btn" data-act="pacote">Pacote do mês p/ contador</button>' : ''}</div>` : ''}
+  <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas</div><div class="list">${lista.map(n => `
+    <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${nome(n)} nº ${n.numero} <span class="small">série ${n.serie}</span></div>
+      <div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</div></div>
+      <div style="text-align:right"><div class="num"><b>${brl(n.total)}</b></div>${tag(n)}</div></div>`).join('')}</div>`
+    : '<div class="empty">Nenhuma nota por aqui.</div>'}</div>
+  ${S.inutilizacoes.length ? `<div class="card"><h3 style="margin-top:0">Inutilizações</h3><div class="list">${[...S.inutilizacoes].sort((a, b) => b.em.localeCompare(a.em)).map(i => `<div class="it"><div class="grow"><div class="t">${i.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(i.serie)}: nº ${i.ini}${i.fim > i.ini ? ' a ' + i.fim : ''}</div><div class="s">${fmtData(i.em)} · ${esc(i.justificativa)}</div></div></div>`).join('')}</div></div>` : ''}`;
+}
+
+/* ---------- Produtos / Clientes / Empresa ---------- */
+function vProdutos(){
+  if (S.prodView === 'perfis') return vPerfis();
+  const e = emp(), V = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')).map(p => ({ p, v:validarProduto(p, e) }));
+  const nErr = V.filter(x => temErro(x.v)).length, nAv = V.filter(x => !temErro(x.v) && temAviso(x.v)).length, f = S.filtroProd;
+  const lista = V.filter(x => f === 'todos' || (f === 'erro' && temErro(x.v)) || (f === 'aviso' && !temErro(x.v) && temAviso(x.v)));
+  const tag = v => { const ne = v.filter(x => x.n === 'erro').length, na = v.filter(x => x.n === 'aviso').length;
+    return ne ? `<span class="tag b">✕ ${ne}</span>` : na ? `<span class="tag w">⚠ ${na}</span>` : '<span class="tag">✓ ok</span>'; };
+  const m = S.ncmMeta || {};
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos</h2>${pode('produto') ? '<button class="btn pri" data-act="novoProd" style="flex:0 0 auto">+ Produto</button>' : ''}</div>
+  ${segProd()}
+  <div class="card"><h3 style="margin-top:0">Conferência fiscal</h3>
+    <div class="stats"><div><b>${V.length}</b>produtos</div><div><b style="color:var(--bad)">${nErr}</b>com erro</div><div><b style="color:var(--warn)">${nAv}</b>com aviso</div></div>
+    <p class="small">${S.ncmMap ? `Tabela NCM carregada: ${(m.total || ncmFull().length).toLocaleString('pt-BR')} códigos${m.data ? ' · atualização ' + esc(m.data) : ''}.` : 'Tabela NCM ainda não importada. Por enquanto valem as regras de formato, capítulo, descrição, ST × CEST, monofásico e IBS/CBS.'}</p>
+    ${pode('ncm') ? `<button class="btn" data-act="importarNcm">${S.ncmMap ? 'Atualizar tabela NCM' : 'Importar tabela NCM oficial'}</button>` : ''}
+    ${S.ncmMap ? `<label for="ncmBusca">Consultar NCM por código ou descrição</label><input id="ncmBusca" autocomplete="off" placeholder="Ex.: 1006 ou arroz parboilizado" value="${esc(S.ncmQ)}"><div class="results" id="ncmRes">${ncmBuscaHtml(S.ncmQ)}</div>` : ''}
+  </div>
+  <div class="seg" style="margin-bottom:10px">${[['todos','Todos'],['erro','Com erro'],['aviso','Com aviso']].map(([k, l]) => `<button data-act="filtroProd" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="card">${lista.length ? `<div class="list">${lista.map(({ p, v }) => `<div class="it" data-act="editProd" data-id="${esc(p.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(p.descricao)}</div>
+    <div class="s">NCM ${fmtNcm(p.ncm)} · CFOP ${esc(p.cfop)} · ${esc(p.cst_csosn)}${p.codigo ? ' · cód. ' + esc(p.codigo) : ''}${p.perfil_id && S.perfis.find(f => f.id === p.perfil_id) ? ' · ' + esc(S.perfis.find(f => f.id === p.perfil_id).nome) : ''}</div></div><div style="text-align:right"><b class="num">${brl(p.preco)}</b><br>${tag(v)}</div></div>`).join('')}</div>`
+    : `<div class="empty">${V.length ? 'Nenhum produto neste filtro. 🎉' : 'Nenhum produto cadastrado.'}</div>`}</div>`;
+}
+function vClientes(){
+  const cs = [...S.clientes].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Clientes</h2><button class="btn pri" data-act="novoCli" style="flex:0 0 auto">+ Cliente</button></div>
+  <div class="card">${cs.length ? `<div class="list">${cs.map(c => `<div class="it" data-act="editCli" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(c.nome)}</div>
+    <div class="s">${fmtDoc(c.doc)} · ${esc(c.municipio || '')}/${esc(c.uf || '')}</div></div></div>`).join('')}</div>` : '<div class="empty">Nenhum cliente cadastrado.</div>'}</div>`;
+}
+function vEmpresa(){
+  const e = emp();
+  if (!e) return `<h2>Empresa</h2><div class="card empty">Nenhuma empresa cadastrada.<br><br><button class="btn pri" data-act="novaEmp">Cadastrar empresa</button></div>`;
+  const dUf = Object.entries(e.difal_uf || {});
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Empresa emitente</h2>${pode('empresa') ? '<button class="btn" data-act="editEmp" style="flex:0 0 auto">Editar</button>' : ''}</div>
+  <div class="card"><div class="t" style="font-weight:700;font-size:16px">${esc(e.razao)}</div><div class="small">${esc(e.fantasia || '')}</div>
+    <p>CNPJ ${fmtDoc(e.cnpj)} · IE ${esc(e.ie)}<br>${esc(e.logradouro)}, ${esc(e.numero)} — ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)} · CEP ${esc(e.cep)}</p>
+    <p><span class="tag">${({'1':'Simples Nacional','2':'Simples — excesso de sublimite','3':'Regime Normal'})[e.regime]}</span> <span class="tag w">${e.ambiente === 'producao' ? 'Produção' : 'Homologação'}</span></p></div>
+  <div class="card"><h3 style="margin-top:0">Numeração</h3>
+    <div class="row"><div><label>Cupom (NFC-e)</label>Série ${esc(e.serie_nfce)} · próximo nº <b>${esc(e.prox_nfce)}</b></div><div><label>NF-e</label>Série ${esc(e.serie_nfe)} · próximo nº <b>${esc(e.prox_nfe)}</b></div></div>
+    <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
+  ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
+    <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardUsuarios()}
+  ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
+    <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}
+  <div class="card"><h3 style="margin-top:0">Ligação com a Focus NFe</h3>
+    <p class="small">O certificado A1, a senha e o código CSC da NFC-e são cadastrados no painel da Focus — nunca ficam neste sistema. O token da API fica guardado no servidor (Vercel).</p>
+    <p>ID do CSC: <b>${esc(e.csc_id || '—')}</b></p></div>
+  <div class="card"><h3 style="margin-top:0">Armazenamento</h3><p class="small">${S.mode === 'db' ? 'Dados salvos na nuvem — abra este link em qualquer aparelho.' : 'Esta visualização não acessa a nuvem: os dados ficam só neste navegador.'}</p></div>`;
+}
+
+/* ================== formulários (modal) ================== */
+function openModal(html){ $('#mbox').innerHTML = html; $('#modal').classList.add('on'); }
+function closeModal(){ $('#modal').classList.remove('on'); $('#mbox').innerHTML = ''; }
+const fld = (id, label, v, extra = '') => `<div><label for="${id}">${label}</label><input id="${id}" value="${esc(v ?? '')}" ${extra}></div>`;
+const sel = (id, label, v, opts) => `<div><label for="${id}">${label}</label><select id="${id}">${opts.map(([c, t]) => `<option value="${esc(c)}" ${String(v) === String(c) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+const mhead = t => `<div class="mhead"><h2>${t}</h2><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>`;
+
+function formEmpresa(e){
+  e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1', municipio:'Teresina', cod_municipio:'2211001' };
+  openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}
+  <div class="row">${fld('eRazao','Razão social *',e.razao)}${fld('eFant','Nome fantasia',e.fantasia)}</div>
+  <div class="row">${fld('eCnpj','CNPJ *',fmtDoc(e.cnpj),'inputmode="numeric"')}${fld('eIe','Inscrição estadual *',e.ie,'inputmode="numeric"')}</div>
+  <div class="row">${sel('eReg','Regime tributário',e.regime,[['1','Simples Nacional'],['2','Simples — excesso de sublimite'],['3','Regime Normal (Presumido/Real)']])}${fld('eFone','Telefone',e.telefone,'inputmode="tel"')}</div>
+  <div class="row">${fld('eLog','Logradouro *',e.logradouro)}${fld('eNum','Número *',e.numero)}</div>
+  <div class="row">${fld('eBai','Bairro *',e.bairro)}${fld('eCep','CEP *',e.cep,'inputmode="numeric"')}</div>
+  <div class="row">${fld('eMun','Município *',e.municipio)}${fld('eCodMun','Código IBGE do município *',e.cod_municipio,'inputmode="numeric"')}${sel('eUf','UF',e.uf,UFS.map(u => [u,u]))}</div>
+  <h3>Numeração e NFC-e</h3>
+  <div class="row">${fld('eSNfce','Série NFC-e',e.serie_nfce,'inputmode="numeric"')}${fld('ePNfce','Próximo nº NFC-e',e.prox_nfce,'inputmode="numeric"')}</div>
+  <div class="row">${fld('eSNfe','Série NF-e',e.serie_nfe,'inputmode="numeric"')}${fld('ePNfe','Próximo nº NF-e',e.prox_nfe,'inputmode="numeric"')}</div>
+  <div class="row">${fld('eCsc','ID do CSC (só o número do ID)',e.csc_id,'inputmode="numeric"')}${sel('eAmb','Ambiente',e.ambiente,[['homologacao','Homologação (testes)']])}</div>
+  ${fld('eLim','Exigir CPF na NFC-e a partir de (R$)', String(e.limite_cpf_nfce || 10000).replace('.', ','), 'inputmode="decimal"')}
+  <p class="small">Confira o valor-limite de identificação do consumidor com a SEFAZ-PI.</p>
+  <p class="small">O código CSC em si não é guardado aqui: ele vai direto no painel da Focus NFe.</p>
+  <div id="errM"></div>
+  <div class="actions">${e.id ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar</button></div>`);
+}
+async function salvarEmp(id){
+  const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),
+    logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), cod_municipio:dig(val('eCodMun')), uf:val('eUf'),
+    serie_nfce:dig(val('eSNfce')) || '1', prox_nfce:parseInt(dig(val('ePNfce'))) || 1, serie_nfe:dig(val('eSNfe')) || '1', prox_nfe:parseInt(dig(val('ePNfe'))) || 1,
+    csc_id:dig(val('eCsc')), ambiente:'homologacao', limite_cpf_nfce:numIn(val('eLim')) || 10000 };
+  const antigo = id ? S.empresas.find(x => x.id === id) : null;
+  if (antigo){ if (antigo.difal_uf) o.difal_uf = clone(antigo.difal_uf); }
+  const errs = [];
+  if (!o.razao) errs.push('Informe a razão social.');
+  if (!cnpjOk(o.cnpj)) errs.push('CNPJ inválido.');
+  if (!o.ie) errs.push('Informe a inscrição estadual.');
+  if (!o.logradouro || !o.numero || !o.bairro || !o.municipio) errs.push('Complete o endereço.');
+  if (o.cep.length !== 8) errs.push('CEP deve ter 8 dígitos.');
+  if (o.cod_municipio.length !== 7) errs.push('Código IBGE do município deve ter 7 dígitos (Teresina = 2211001).');
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  if (!o.id) delete o.id;
+  const novo = !o.id; let salvo;
+  if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
+}
+
+function formProduto(p){
+  const e = emp(), simples = String(e.regime) !== '3';
+  p = p || { unidade:'UN', origem:'0', cfop:'5102', cst_csosn:simples ? '102' : '00', pis_cst:simples ? '49' : '01', cofins_cst:simples ? '49' : '01', pis_aliq:'0', cofins_aliq:'0', icms_aliq:simples ? '0' : '20,5', cst_ibscbs:'000', cclasstrib:'000001', gtin:'SEM GTIN' };
+  openModal(`${mhead(p.id ? 'Editar produto' : 'Novo produto')}
+  ${fld('pDesc','Descrição *',p.descricao)}
+  <div class="row">${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
+  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','inputmode="decimal" placeholder="0,00"')}${fld('pUn','Unidade',p.unidade)}</div>
+  <h3>Tributação</h3>
+  <div class="row">${fld('pNcm','NCM * (8 dígitos)',p.ncm,'inputmode="numeric"')}${fld('pCest','CEST',p.cest,'inputmode="numeric"')}</div>
+  <div id="ncmInfo" class="small" style="margin-top:4px">${ncmInfoHtml(p.ncm)}</div>
+  ${perfilSelHtml(p)}
+  ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
+  <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p>
+  <h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>
+  <div id="errM"></div>
+  <div class="actions">${p.id ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
+}
+async function salvarProd(id, force){
+  const o = { descricao:val('pDesc').toUpperCase(), codigo:val('pCod'), gtin:val('pGtin') || 'SEM GTIN', preco:numIn(val('pPreco')), unidade:(val('pUn') || 'UN').toUpperCase(),
+    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil') };
+  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
+  const pf = S.perfis.find(f => f.id === o.perfil_id);
+  if (pf && Object.entries(taxOf(pf)).some(([k, v]) => String(v) !== String(o[k]))) o.perfil_id = '';
+  if (o.gtin.toUpperCase() === 'SEM GTIN') o.gtin = 'SEM GTIN'; else o.gtin = dig(o.gtin);
+  if (id) o.id = id;
+  const errs = [];
+  if (!o.descricao) errs.push('Informe a descrição.');
+  if (!(o.preco > 0)) errs.push('Informe um preço maior que zero.');
+  if (!/^5\d{3}$/.test(o.cfop)) errs.push('CFOP deve ser de saída interna (começando com 5).');
+  if (!o.cst_csosn) errs.push('Informe o CST/CSOSN.');
+  const v = validarProduto(o, emp());
+  $('#valP').innerHTML = validarHtml(v);
+  if (errs.length || temErro(v)){ $('#errM').innerHTML = `<div class="msg err">${errs.length ? errs.join('<br>') : 'Corrija os erros da conferência fiscal acima.'}</div>`; return; }
+  if (temAviso(v) && !force){
+    $('#errM').innerHTML = `<div class="msg warn">Há ${v.filter(x => x.n === 'aviso').length} aviso(s) na conferência fiscal. Confira antes de salvar.</div><button class="btn block" data-act="salvarProd" data-id="${esc(id || '')}" data-force="1">Salvar mesmo assim</button>`;
+    $('#valP').scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+  if (await safe(() => put('produtos', o), 'Produto salvo.')) closeModal();
+}
+
+function formCliente(c){
+  c = c || { uf:'PI', ind_ie:'9', municipio:'Teresina', cod_municipio:'2211001' };
+  openModal(`${mhead(c.id ? 'Editar cliente' : 'Novo cliente')}
+  <div class="row">${fld('cDoc','CPF ou CNPJ *',fmtDoc(c.doc),'inputmode="numeric"')}${fld('cNome','Nome / razão social *',c.nome)}</div>
+  <div class="row">${sel('cInd','Indicador de IE',c.ind_ie,[['9','Não contribuinte'],['1','Contribuinte ICMS'],['2','Contribuinte isento']])}${fld('cIe','Inscrição estadual',c.ie,'inputmode="numeric"')}</div>
+  ${fld('cEmail','E-mail (para envio da nota)',c.email,'type="email"')}
+  <div class="row">${fld('cLog','Logradouro *',c.logradouro)}${fld('cNum','Número *',c.numero)}</div>
+  <div class="row">${fld('cBai','Bairro *',c.bairro)}${fld('cCep','CEP *',c.cep,'inputmode="numeric"')}</div>
+  <div class="row">${fld('cMun','Município *',c.municipio)}${fld('cCodMun','Código IBGE *',c.cod_municipio,'inputmode="numeric"')}${sel('cUf','UF',c.uf,UFS.map(u => [u,u]))}</div>
+  <div id="errM"></div>
+  <div class="actions">${c.id ? `<button class="btn bad" data-act="delCli" data-id="${esc(c.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarCli" data-id="${esc(c.id || '')}">Salvar</button></div>`);
+}
+async function salvarCli(id){
+  const o = { doc:dig(val('cDoc')), nome:val('cNome').toUpperCase(), ind_ie:val('cInd'), ie:dig(val('cIe')), email:val('cEmail'),
+    logradouro:val('cLog'), numero:val('cNum'), bairro:val('cBai'), cep:dig(val('cCep')), municipio:val('cMun'), cod_municipio:dig(val('cCodMun')), uf:val('cUf') };
+  if (id) o.id = id;
+  const errs = [];
+  if (!(o.doc.length === 11 ? cpfOk(o.doc) : cnpjOk(o.doc))) errs.push('CPF/CNPJ inválido.');
+  if (!o.nome) errs.push('Informe o nome.');
+  if (o.ind_ie === '1' && !o.ie) errs.push('Contribuinte ICMS precisa da inscrição estadual.');
+  if (o.ind_ie === '1' && o.doc.length === 11) errs.push('Pessoa física normalmente não é contribuinte — confira o indicador de IE.');
+  if (!o.logradouro || !o.numero || !o.bairro || !o.municipio) errs.push('Complete o endereço.');
+  if (o.cep.length !== 8) errs.push('CEP deve ter 8 dígitos.');
+  if (o.cod_municipio.length !== 7) errs.push('Código IBGE deve ter 7 dígitos.');
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  if (await safe(() => put('clientes', o), 'Cliente salvo.')) closeModal();
+}
+
+function confirmar(msg, act, id){
+  openModal(`${mhead('Confirmar')}<p>${msg}</p><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn bad" data-act="${act}" data-id="${esc(id)}">${act === 'confRemMembro' ? 'Remover' : 'Excluir'}</button></div>`);
+}
+
+/* ================== emissão (simulada) ================== */
+function baseEmitente(e){ return { cnpj_emitente:e.cnpj, inscricao_estadual_emitente:e.ie, regime_tributario_emitente:e.regime }; }
+async function emitirNfce(){
+  const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), errs = [], lim = num(e.limite_cpf_nfce || 10000);
+  const docC = dig(S.cpf);
+  if (docC.length === 14) errs.push('NFC-e não pode ser emitida para CNPJ (Ajuste SINIEF 11/2025). Emita uma NF-e na aba NF-e.');
+  else if (docC && !cpfOk(docC)) errs.push('CPF inválido.');
+  if (T.nota >= lim && !docC) errs.push(`Vendas a partir de ${brl(lim)} exigem o CPF do consumidor.`);
+  if (!(T.nota > 0)) errs.push('O desconto não pode zerar a venda.');
+  if (!S.pags.length) errs.push('Escolha a forma de pagamento.');
+  else {
+    if (S.pags.some(p => !(numIn(p.valor) > 0))) errs.push('Há pagamento sem valor.');
+    if (pg.falta > 0) errs.push(`Falta receber ${brl(pg.falta)}.`);
+    if (pg.troco > 0 && pg.troco > pg.din) errs.push('Troco só pode sair de pagamento em dinheiro: confira os valores.');
+  }
+  L.forEach(l => { if (l.descItem >= l.c.bruto) errs.push(`Desconto maior que o valor em ${esc(l.p.descricao)}.`); });
+  if (!caixaAberto()) errs.push('Abra o caixa antes de vender (aba Caixa).');
+  errs.push(...errosEmissao(L));
+  if (errs.length) return $('#errV').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  const numero = e.prox_nfce, serie = e.serie_nfce, ref = `nfce-${serie}-${numero}-${uid().slice(0, 6)}`;
+  const formas = S.pags.map(p => { const f = { forma_pagamento:p.forma, valor_pagamento:numIn(p.valor) }; if (['03','04'].includes(p.forma)) f.tipo_integracao = '2'; return f; });
+  const payload = { ...baseEmitente(e), natureza_operacao:'VENDA AO CONSUMIDOR', data_emissao:isoNow(), serie, numero,
+    presenca_comprador:'1', consumidor_final:'1', modalidade_frete:'9', local_destino:'1',
+    items:L.map((l, i) => itemFocus(i, i + 1, l.p, l.qtd, l.preco, l.c)), formas_pagamento:formas, ...totaisPayload(T) };
+  if (docC) payload.cpf_destinatario = docC;
+  if (S.nomeCons) payload.nome_destinatario = S.nomeCons.toUpperCase();
+  if (pg.troco > 0) payload.valor_troco = pg.troco;
+  const nota = { id:ref, ref, modelo:'65', serie, numero, data:payload.data_emissao, total:T.nota, destNome:S.nomeCons.toUpperCase() || (docC ? 'CPF ' + fmtDoc(docC) : ''), destDoc:docC,
+    pags:S.pags.map(p => ({ forma:p.forma, valor:numIn(p.valor) })), troco:pg.troco, status:S.conting ? 'contingencia' : 'simulada', ambiente:'homologacao', tot:T, emitida_por:S.meuId || null,
+    chave:gerarChave(e, '65', serie, numero, payload.data_emissao, S.conting ? '9' : '1'), caixa:caixaAberto().id, op:'venda',
+    itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, cfop:l.c.cfop, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc })), payload };
+  const res = await emitirServidor('65', payload, nota, {}, '#errV'); if (!res) return;
+  S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; S.busca = '';
+  render(); verNota(res.nota);
+}
+async function emitirNfe(){
+  const { e, cli, inter, naoContrib, precisaDifal } = nfeCtx(), n = S.nfe, L = nfeLinhas(), T = totais(L), errs = [];
+  if (!cli) errs.push('Selecione o destinatário.');
+  if (!n.natureza) errs.push('Informe a natureza da operação.');
+  if (n.op !== 'venda' && !chaveOk(n.ref)) errs.push('Informe a chave de acesso (44 dígitos) da nota que está sendo devolvida.');
+  L.forEach(l => { if (!(l.qtd > 0) || !(l.preco > 0)) errs.push(`Quantidade/valor inválido em ${esc(l.p.descricao)}.`);
+    if (l.descItem >= r2(l.qtd * l.preco)) errs.push(`Desconto maior que o valor em ${esc(l.p.descricao)}.`); });
+  if (!(T.nota > 0)) errs.push('O total da nota precisa ser maior que zero.');
+  if (!L.length) errs.push('Adicione pelo menos um item.');
+  if (T.frete > 0 && n.frete === '9') errs.push('Há valor de frete, mas a modalidade está "Sem frete". Escolha quem paga o frete.');
+  if (precisaDifal && !(numIn(n.difal.aliq) > 0)) errs.push(`Informe a alíquota interna de ${esc(cli.uf)} para calcular o DIFAL.`);
+  if (precisaDifal && numIn(n.difal.aliq) > 0 && numIn(n.difal.aliq) <= 12) errs.push('A alíquota interna do destino parece baixa demais (≤ 12%). Confira.');
+  errs.push(...errosEmissao(L));
+  if (errs.length) return $('#errN').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  const numero = e.prox_nfe, serie = e.serie_nfe, ref = `nfe-${serie}-${numero}-${uid().slice(0, 6)}`;
+  const payload = { ...baseEmitente(e), natureza_operacao:n.natureza.toUpperCase(), data_emissao:isoNow(), data_entrada_saida:isoNow(), serie, numero,
+    tipo_documento:n.op === 'dev_venda' ? '0' : '1', finalidade_emissao:n.op === 'venda' ? '1' : '4', local_destino:inter ? '2' : '1', consumidor_final:naoContrib ? '1' : '0', presenca_comprador:n.op === 'venda' ? '1' : '0',
+    nome_destinatario:cli.nome, [cli.doc.length === 11 ? 'cpf_destinatario' : 'cnpj_destinatario']:cli.doc,
+    indicador_inscricao_estadual_destinatario:cli.ind_ie || '9', logradouro_destinatario:cli.logradouro, numero_destinatario:cli.numero,
+    bairro_destinatario:cli.bairro, municipio_destinatario:cli.municipio, codigo_municipio_destinatario:cli.cod_municipio, uf_destinatario:cli.uf, cep_destinatario:cli.cep,
+    modalidade_frete:n.frete, items:L.map((l, i) => itemFocus(i, i + 1, l.p, l.qtd, l.preco, l.c)),
+    formas_pagamento:n.op === 'venda' ? [{ forma_pagamento:n.pag, valor_pagamento:n.pag === '90' ? 0 : T.nota }] : [{ forma_pagamento:'90', valor_pagamento:0 }], ...totaisPayload(T) };
+  if (n.op !== 'venda') payload.notas_referenciadas = [{ chave_nfe:dig(n.ref) }];
+  if (cli.ie && cli.ind_ie === '1') payload.inscricao_estadual_destinatario = cli.ie;
+  if (cli.email) payload.email_destinatario = cli.email;
+  let obs = n.obs || '';
+  if (T.difal) obs = (obs ? obs + ' | ' : '') + `DIFAL ${cli.uf}: ${brl(T.difal)}${T.fcpDest ? ' + FCP ' + brl(T.fcpDest) : ''}`;
+  if (obs) payload.informacoes_adicionais_contribuinte = obs;
+  const nota = { id:ref, ref, modelo:'55', serie, numero, data:payload.data_emissao, total:T.nota, destNome:cli.nome, destDoc:cli.doc, destUf:cli.uf, destMun:cli.municipio,
+    natureza:payload.natureza_operacao, pag:n.op === 'venda' ? n.pag : '90', status:'simulada', ambiente:'homologacao', tot:T, obs, emitida_por:S.meuId || null,
+    op:n.op, refChave:n.op !== 'venda' ? dig(n.ref) : '', chave:gerarChave(e, '55', serie, numero, payload.data_emissao),
+    itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, ncm:l.p.ncm, cfop:l.c.cfop, cst:l.c.cst, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc, st:l.c.st })), payload };
+  const novaEmp = { ...e, prox_nfe:numero + 1 };
+  if (precisaDifal) novaEmp.difal_uf = { ...(e.difal_uf || {}), [cli.uf]:{ aliq:numIn(n.difal.aliq), fcp:numIn(n.difal.fcp), metodo:n.difal.metodo } };
+  const res = await emitirServidor('55', payload, nota, { difal_uf:precisaDifal ? { uf:cli.uf, cfg:novaEmp.difal_uf[cli.uf] } : null,
+    refChave:n.op === 'dev_venda' ? dig(n.ref) : null }, '#errN'); if (!res) return;
+  S.nfe = nfeVazia(); S.buscaNfe = '';
+  render(); verNota(res.nota);
+}
+function cupomHtml(n, e){
+  const pags = n.pags || [{ forma:n.pag, valor:n.total + (n.troco || 0) }], T = n.tot || {};
+  return `<div class="cupom"><div class="c"><b>${esc(e.fantasia || e.razao)}</b><br>${esc(e.razao)}<br>CNPJ ${fmtDoc(e.cnpj)} IE ${esc(e.ie)}<br>${esc(e.logradouro)}, ${esc(e.numero)} - ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)}</div><hr>
+  <div class="c"><b>DANFE NFC-e — Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</b></div><hr>
+  <table>${n.itens.map((i, k) => `<tr><td colspan="2">${String(k + 1).padStart(3, '0')} ${esc(i.d)}</td></tr><tr><td>${i.q} ${esc(i.u)} x ${brl(i.v)}</td><td class="r">${brl(i.t)}</td></tr>`).join('')}</table><hr>
+  <table><tr><td>Qtd. total de itens</td><td class="r">${n.itens.length}</td></tr>
+  ${T.desc ? `<tr><td>Valor total R$</td><td class="r">${brl(T.prod)}</td></tr><tr><td>Desconto R$</td><td class="r">−${brl(T.desc)}</td></tr>` : ''}
+  <tr><td><b>VALOR A PAGAR R$</b></td><td class="r"><b>${brl(n.total)}</b></td></tr>
+  <tr><td colspan="2">FORMA DE PAGAMENTO</td></tr>
+  ${pags.map(p => `<tr><td>${esc(PAG_NOME[p.forma] || p.forma)}</td><td class="r">${brl(p.valor)}</td></tr>`).join('')}${n.troco ? `<tr><td>Troco</td><td class="r">${brl(n.troco)}</td></tr>` : ''}</table><hr>
+  ${n.ambiente !== 'producao' ? '<div class="semvalor">EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO — SEM VALOR FISCAL</div>' : ''}
+  ${n.status === 'contingencia' || n.transmitida_em ? '<div class="semvalor">EMITIDA EM CONTINGÊNCIA' + (n.status === 'contingencia' ? '<br>Pendente de autorização' : '') + '</div>' : ''}
+  <div class="c">NFC-e nº ${n.numero} Série ${n.serie} ${fmtData(n.data)}<br>${chaveTxt(n)}</div>
+  <div class="qr">QR Code<br>gerado na<br>autorização</div>
+  <div class="c">${n.destDoc ? 'CONSUMIDOR CPF ' + fmtDoc(n.destDoc) : 'CONSUMIDOR NÃO IDENTIFICADO'}${n.destNome && !n.destNome.startsWith('CPF') ? '<br>' + esc(n.destNome) : ''}<br>Tributos (IBS/CBS 2026): ${brl((T.cbs || 0) + (T.ibs || 0))}</div>
+  ${n.status === 'cancelada' ? '<hr><div class="semvalor">NOTA CANCELADA</div>' : ''}</div>`;
+}
+function danfeHtml(n, e){
+  const T = n.tot || {}, c = (l, v) => `<td><div class="lb">${l}</div>${brl(v || 0)}</td>`;
+  return `<div class="danfe">${n.ambiente !== 'producao' || n.status === 'cancelada' ? `<div class="semvalor">${n.ambiente !== 'producao' ? 'SEM VALOR FISCAL — HOMOLOGAÇÃO' : ''}${n.status === 'cancelada' ? ' — CANCELADA' : ''}</div>` : ''}
+  <div class="bx"><div class="lb">Emitente</div><b>${esc(e.razao)}</b><br>${esc(e.logradouro)}, ${esc(e.numero)} - ${esc(e.bairro)} - ${esc(e.municipio)}/${esc(e.uf)}<br>CNPJ ${fmtDoc(e.cnpj)} · IE ${esc(e.ie)}</div>
+  <div class="bx"><div class="lb">DANFE · NF-e nº ${n.numero} · Série ${n.serie} · ${n.op === 'dev_venda' ? 'Entrada' : 'Saída'}</div>Natureza: ${esc(n.natureza)} · Emissão ${fmtData(n.data)}<br>${chaveTxt(n)}${n.refChave ? `<br><span class="lb">Nota referenciada:</span> ${fmtChave(n.refChave)}` : ''}</div>
+  <div class="bx"><div class="lb">Destinatário</div><b>${esc(n.destNome)}</b> — ${fmtDoc(n.destDoc)}<br>${esc(n.destMun || '')}/${esc(n.destUf || '')}</div>
+  <div class="bx" style="overflow-x:auto"><div class="lb">Cálculo do imposto</div><table><tr>${c('BC ICMS', T.icmsBase)}${c('ICMS', T.icms)}${c('BC ICMS-ST', T.stBase)}${c('ICMS-ST', T.st)}${c('Total produtos', T.prod)}</tr>
+    <tr>${c('Frete', T.frete)}${c('Seguro', T.seguro)}${c('Desconto', T.desc)}${c('Outras desp.', T.outras)}<td><div class="lb">Total da nota</div><b>${brl(n.total)}</b></td></tr></table></div>
+  <div class="bx" style="overflow-x:auto"><div class="lb">Produtos</div><table><tr><th>Descrição</th><th>NCM</th><th>CFOP</th><th>CST</th><th>Qtd</th><th>Unit.</th><th>Desc.</th><th>Total</th></tr>
+  ${n.itens.map(i => `<tr><td>${esc(i.d)}</td><td>${fmtNcm(i.ncm)}</td><td>${esc(i.cfop)}</td><td>${esc(i.cst)}</td><td>${i.q}</td><td>${brl(i.v)}</td><td>${i.desc ? brl(i.desc) : ''}</td><td>${brl(i.t)}</td></tr>`).join('')}</table></div>
+  ${n.obs ? `<div class="bx"><div class="lb">Informações complementares</div>${esc(n.obs)}</div>` : ''}</div>`;
+}
+
+/* ================== visualização da nota ================== */
+function formCancelar(id){
+  openModal(`${mhead('Cancelar nota')}<p class="small">A justificativa precisa ter pelo menos 15 caracteres. Na emissão real, o prazo é de 30 minutos para NFC-e e 24 horas para NF-e.</p>
+  <label for="just">Justificativa</label><textarea id="just" rows="3"></textarea><div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn bad" data-act="confCancelar" data-id="${esc(id)}">Cancelar nota</button></div>`);
+}
+
+/* ================== usuários e permissões ================== */
+// Papéis: gerente (tudo) e operador (emite notas e cadastra clientes). O dono do sistema é sempre gerente.
+const PERM_OPERADOR = ['emitir','cliente'];
+function pode(acao){
+  if (acao === 'usuarios') return !!S.isAdmin;
+  if (acao === 'ncm') return !!S.adminPlat;
+  if (S.papel === 'gerente') return true;
+  return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
+}
+const ACT_PERM = { confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+  novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
+  novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
+  emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
+  exportar:'backup', importarBackup:'backup', salvarBackup:'backup', aprovar:'usuarios', remUser:'usuarios', recusar:'usuarios' };
+let nomesKey = '';
+
+/* ================== backup em planilha ================== */
+let XLSXP = null;
+function loadXlsx(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!XLSXP) XLSXP = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = () => res(window.XLSX); sc.onerror = () => { XLSXP = null; rej(new Error('Não foi possível carregar a biblioteca de planilhas.')); }; document.head.appendChild(sc); });
+  return XLSXP;
+}
+const PROD_COLS = ['id','codigo','descricao','gtin','preco','unidade','ncm','cest','cfop','origem','cst_csosn','icms_aliq','icms_red','st_mva','st_aliq','st_fcp','pis_cst','pis_aliq','cofins_cst','cofins_aliq','cst_ibscbs','cclasstrib'];
+const CLI_COLS = ['id','doc','nome','ind_ie','ie','email','logradouro','numero','bairro','cep','municipio','cod_municipio','uf'];
+async function exportar(){
+  const e = emp();
+  if (!S.dl) return toast('Download indisponível nesta visualização. Abra o sistema pelo claude.ai.');
+  try {
+    const X = await loadXlsx(), wb = X.utils.book_new(), rows = (arr, cols) => arr.map(o => Object.fromEntries(cols.map(c => [c, o[c] ?? ''])));
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows(S.produtos, PROD_COLS), { header:PROD_COLS }), 'Produtos');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows(S.clientes, CLI_COLS), { header:CLI_COLS }), 'Clientes');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet([...S.notas].sort((a, b) => (a.data || '').localeCompare(b.data || '')).map(n => ({ modelo:n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero,
+      data:fmtData(n.data), destinatario:n.destNome || '', documento:n.destDoc || '', total:n.total, status:n.status, ref:n.ref }))), 'Notas');
+    const { difal_uf, ...ee } = e;
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet([ee]), 'Empresa');
+    const buf = X.write(wb, { bookType:'xlsx', type:'array' });
+    const nome = `backup-${(e.fantasia || e.razao || 'empresa').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w]+/g, '-').toLowerCase()}-${isoNow().slice(0, 10)}.xlsx`;
+    await S.dl.save({ filename:nome, data:new Blob([buf]) }); toast('Backup salvo.');
+  } catch(err){ if (err && err.code === 'declined') return; toast(err && err.message && !err.code ? err.message : 'Não foi possível gerar o backup.'); }
+}
+function formBackup(){
+  openModal(`${mhead('Importar planilha')}<p class="small">Use uma planilha exportada por este sistema (abas <b>Produtos</b> e <b>Clientes</b>, com os mesmos nomes de coluna). Produtos são reconhecidos pelo id ou pelo código; clientes, pelo CPF/CNPJ. Os novos são criados e os existentes, atualizados.</p>
+  <input type="file" id="bkFile" accept=".xlsx,.xls"><div id="bkPrev"></div><div id="bkProg" class="small"></div>`);
+}
+async function lerBackup(file){
+  $('#bkPrev').innerHTML = '<p class="small">Lendo planilha…</p>';
+  try {
+    const X = await loadXlsx(), wb = X.read(await file.arrayBuffer(), { type:'array' }), e = emp(), simples = String(e.regime) !== '3';
+    const sh = n => { const k = wb.SheetNames.find(x => norm(x) === norm(n)); return k ? X.utils.sheet_to_json(wb.Sheets[k], { defval:'', raw:true }) : []; };
+    const pad = (v, n) => { const d = dig(v); return d ? d.padStart(n, '0') : ''; }, nv = v => typeof v === 'number' ? v : numIn(v), tx = v => String(v ?? '').trim();
+    const prods = sh('Produtos').filter(r => tx(r.descricao)).map(r => {
+      const g = tx(r.gtin).toUpperCase();
+      const p = { codigo:tx(r.codigo), descricao:tx(r.descricao).toUpperCase(), gtin:!g || g === 'SEM GTIN' ? 'SEM GTIN' : dig(g), preco:nv(r.preco), unidade:(tx(r.unidade) || 'UN').toUpperCase(),
+        ncm:pad(r.ncm, 8), cest:pad(r.cest, 7), cfop:pad(r.cfop, 4) || '5102', origem:tx(r.origem) || '0', cst_csosn:pad(r.cst_csosn, simples ? 3 : 2),
+        icms_aliq:nv(r.icms_aliq), icms_red:nv(r.icms_red), st_mva:nv(r.st_mva), st_aliq:nv(r.st_aliq), st_fcp:nv(r.st_fcp),
+        pis_cst:pad(r.pis_cst, 2), pis_aliq:nv(r.pis_aliq), cofins_cst:pad(r.cofins_cst, 2), cofins_aliq:nv(r.cofins_aliq),
+        cst_ibscbs:pad(r.cst_ibscbs, 3) || '000', cclasstrib:pad(r.cclasstrib, 6) || '000001' };
+      const ex = S.produtos.find(x => (tx(r.id) && x.id === tx(r.id)) || (p.codigo && x.codigo === p.codigo)); if (ex) p.id = ex.id; else if (/^[a-zA-Z0-9-]{8,}$/.test(tx(r.id))) p.id = tx(r.id);
+      return p; });
+    const clis = sh('Clientes').filter(r => dig(r.doc) && tx(r.nome)).map(r => {
+      const d = dig(r.doc), doc = d.length <= 11 ? d.padStart(11, '0') : d.padStart(14, '0');
+      const c = { doc, nome:tx(r.nome).toUpperCase(), ind_ie:tx(r.ind_ie) || '9', ie:dig(r.ie), email:tx(r.email), logradouro:tx(r.logradouro), numero:tx(r.numero), bairro:tx(r.bairro),
+        cep:pad(r.cep, 8), municipio:tx(r.municipio), cod_municipio:pad(r.cod_municipio, 7), uf:(tx(r.uf) || 'PI').toUpperCase() };
+      const ex = S.clientes.find(x => x.doc === doc); if (ex) c.id = ex.id; return c; });
+    if (!prods.length && !clis.length){ $('#bkPrev').innerHTML = '<div class="msg err">Não encontrei as abas Produtos ou Clientes com dados.</div>'; return; }
+    S.bkImport = { prods, clis };
+    const novosP = prods.filter(p => !S.produtos.some(x => x.id === p.id)).length, novosC = clis.filter(c => !c.id).length;
+    const pend = prods.filter(p => temErro(validarProduto(p, e))).length;
+    $('#bkPrev').innerHTML = `<div class="msg info"><b>${prods.length}</b> produto(s): ${novosP} novo(s), ${prods.length - novosP} atualizado(s)<br><b>${clis.length}</b> cliente(s): ${novosC} novo(s), ${clis.length - novosC} atualizado(s)</div>
+      ${pend ? `<div class="msg warn">${pend} produto(s) entram com erro na conferência fiscal e vão bloquear a emissão até serem corrigidos.</div>` : ''}
+      <button class="btn pri block" id="btnBk" data-act="salvarBackup">Importar</button>`;
+  } catch(err){ $('#bkPrev').innerHTML = `<div class="msg err">${esc(err.message && !err.code ? err.message : 'Não consegui ler a planilha.')}</div>`; }
+}
+async function salvarBackup(){
+  const { prods, clis } = S.bkImport, tot = prods.length + clis.length; let i = 0;
+  const btn = $('#btnBk'); if (btn) btn.disabled = true;
+  try {
+    for (const p of prods){ $('#bkProg').textContent = `Salvando ${++i} de ${tot}…`; await put('produtos', p); }
+    for (const c of clis){ $('#bkProg').textContent = `Salvando ${++i} de ${tot}…`; await put('clientes', c); }
+    S.bkImport = null; closeModal(); toast('Planilha importada.'); render();
+  } catch(err){ if (btn) btn.disabled = false; $('#bkProg').innerHTML = `<div class="msg err">Parou em ${i} de ${tot} (${esc(err.code || 'erro')}). Pode importar de novo: os já salvos são atualizados, não duplicados.</div>`; }
+}
+
+/* ================== v4: chave, eventos, caixa, relatórios, perfis, XML, impressão ================== */
+Object.assign(ACT_PERM, { abrirCaixa:'caixa', movCaixa:'caixa', salvarMov:'caixa', fecharCaixa:'caixa', confFechar:'caixa',
+  cce:'cce', salvarCce:'cce', devolver:'devolucao', inutilizar:'inutilizar', salvarInut:'inutilizar', pacote:'backup', gerarPacote:'backup',
+  transmitir:'emitir', transmitirTodas:'emitir', novoPerfil:'produto', editPerfil:'produto', salvarPerfil:'produto', delPerfil:'produto', confDelPerfil:'produto',
+  importarXml:'produto', salvarXml:'produto', exportRel:'relatorio' });
+PERM_OPERADOR.push('caixa');
+
+/* ---------- bibliotecas sob demanda ---------- */
+const LIBS = {};
+function loadLib(url, global){
+  if (window[global]) return Promise.resolve(window[global]);
+  if (!LIBS[url]) LIBS[url] = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = url;
+    sc.onload = () => res(window[global]); sc.onerror = () => { delete LIBS[url]; rej(new Error('Não foi possível carregar um componente. Confira a internet e tente de novo.')); }; document.head.appendChild(sc); });
+  return LIBS[url];
+}
+const loadZip = () => loadLib('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', 'JSZip');
+async function salvarArquivo(filename, data){
+  if (!S.dl){ toast('Download indisponível nesta visualização. Abra o sistema pelo claude.ai.'); return false; }
+  try { await S.dl.save({ filename, data }); return true; }
+  catch(err){ if (err && err.code !== 'declined') toast('Não foi possível baixar o arquivo.'); return false; }
+}
+
+/* ---------- chave de acesso (simulada, com DV correto) ---------- */
+const CUF = { AC:'12',AL:'27',AP:'16',AM:'13',BA:'29',CE:'23',DF:'53',ES:'32',GO:'52',MA:'21',MT:'51',MS:'50',MG:'31',PA:'15',PB:'25',PR:'41',PE:'26',PI:'22',RJ:'33',RN:'24',RS:'43',RO:'11',RR:'14',SC:'42',SP:'35',SE:'28',TO:'17' };
+function dvChave(c43){ let s = 0, w = 2; for (let i = c43.length - 1; i >= 0; i--){ s += +c43[i] * w; w = w === 9 ? 2 : w + 1; } const r = s % 11; return r < 2 ? 0 : 11 - r; }
+function gerarChave(e, modelo, serie, numero, data, tpEmis = '1'){
+  const c43 = (CUF[e.uf] || '22') + data.slice(2, 4) + data.slice(5, 7) + dig(e.cnpj).padStart(14, '0') + modelo + String(serie).padStart(3, '0')
+    + String(numero).padStart(9, '0') + tpEmis + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+  return c43 + dvChave(c43);
+}
+const chaveOk = c => { c = dig(c); return c.length === 44 && dvChave(c.slice(0, 43)) === +c[43]; };
+const fmtChave = c => dig(c).replace(/(\d{4})(?=\d)/g, '$1 ');
+const chaveTxt = n => n.chave ? `Chave de acesso:<br>${fmtChave(n.chave)}` : 'Chave de acesso: ainda não autorizada';
+
+/* ---------- devolução ---------- */
+const OPS = [['venda','Venda'],['dev_venda','Devolução de venda (entrada: o cliente devolve)'],['dev_compra','Devolução de compra (saída: para o fornecedor)']];
+const NAT_OP = { venda:'VENDA DE MERCADORIA', dev_venda:'DEVOLUÇÃO DE VENDA', dev_compra:'DEVOLUÇÃO DE COMPRA' };
+function cfopOp(base, op, inter){
+  let c = String(base || '5102'); const st = ['5401','5403','5405'].includes(c);
+  if (op === 'dev_venda') c = st ? '1411' : '1202'; else if (op === 'dev_compra') c = st ? '5411' : '5202';
+  if (inter) c = ({ '1':'2', '5':'6' }[c[0]] || c[0]) + c.slice(1);
+  return c;
+}
+function refInfo(ref){
+  const c = dig(ref); if (!c) return '';
+  if (!chaveOk(c)) return `<span style="color:var(--bad)">✕ Chave inválida (${c.length}/44 dígitos ou dígito verificador errado).</span>`;
+  const n = S.notas.find(x => x.chave === c);
+  return `<span style="color:var(--ok)">✓ Chave válida${n ? ` · ${n.modelo === '65' ? 'Cupom' : 'NF-e'} nº ${n.numero} de ${fmtData(n.data)} — ${brl(n.total)}` : ''}</span>`;
+}
+function devolver(id){
+  const n = S.notas.find(x => x.id === id), nf = nfeVazia();
+  nf.op = 'dev_venda'; nf.natureza = NAT_OP.dev_venda; nf.ref = n.chave || '';
+  const cli = n.destDoc ? S.clientes.find(c => c.doc === n.destDoc) : null; if (cli) nf.clienteId = cli.id;
+  nf.itens = n.itens.map(i => { const p = (i.pid && S.produtos.find(x => x.id === i.pid)) || S.produtos.find(x => x.descricao === i.d);
+    return p ? { pid:p.id, qtd:i.q, preco:i.v, desc:i.desc ? String(i.desc).replace('.', ',') : '' } : null; }).filter(Boolean);
+  if (cli) { const e = emp(); const cfg = e.difal_uf && e.difal_uf[cli.uf]; if (cfg) nf.difal = { aliq:String(cfg.aliq), fcp:String(cfg.fcp || ''), metodo:cfg.metodo }; }
+  S.nfe = nf; S.tab = 'nfe'; closeModal(); render(); window.scrollTo(0, 0);
+  toast(cli ? 'Confira as quantidades devolvidas antes de emitir.' : 'Selecione ou cadastre o cliente que está devolvendo.');
+}
+
+/* ---------- carta de correção ---------- */
+function formCce(id){
+  const n = S.notas.find(x => x.id === id), ev = (n.eventos || []).filter(e => e.tipo === 'cce');
+  openModal(`${mhead('Carta de correção')}
+  <p class="small">Corrige informações da NF-e nº ${n.numero}. <b>Não pode</b> alterar valores, impostos, quantidades, dados que mudem o remetente ou o destinatário, nem a data de emissão. Cada nova carta substitui a anterior: escreva a correção completa. Limite de 20 cartas por nota.</p>
+  ${ev.length ? `<h3>Cartas registradas</h3>${ev.map(e => `<div class="v info"><b>${e.seq}ª</b> · ${fmtData(e.em)} — ${esc(e.texto)}</div>`).join('')}` : ''}
+  <label for="cceTxt">Texto da correção (15 a 1.000 caracteres)</label><textarea id="cceTxt" rows="4" maxlength="1000"></textarea><div class="small" id="cceCnt">0 / 1000</div>
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="verNota" data-id="${esc(id)}">Voltar</button><button class="btn pri" data-act="salvarCce" data-id="${esc(id)}">Registrar carta</button></div>`);
+}
+async function salvarCce(id){
+  const n = S.notas.find(x => x.id === id), t = val('cceTxt').replace(/\s+/g, ' ').trim();
+  if (t.length < 15 || t.length > 1000) return $('#errM').innerHTML = '<div class="msg err">O texto precisa ter entre 15 e 1.000 caracteres.</div>';
+  $('#errM').innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
+  const r = await eventoServidor({ tipo:'cce', ref:n.ref, texto:t }, 'Carta de correção autorizada.');
+  if (r) verNota(r.nota);
+}
+
+/* ---------- inutilização ---------- */
+function buracos(){
+  // números que precisam ser inutilizados: entre o menor e o maior número tentado, sem nota válida/cancelada/em processamento
+  const usados = {}, todos = {};
+  S.notas.forEach(n => { const k = n.modelo + '|' + n.serie; (todos[k] = todos[k] || []).push(+n.numero);
+    if (notaValida(n) || n.status === 'cancelada') (usados[k] = usados[k] || new Set()).add(+n.numero); });
+  const res = [];
+  Object.entries(todos).forEach(([k, nums]) => {
+    const set = usados[k] || new Set(), inut = S.inutilizacoes.filter(i => i.modelo + '|' + i.serie === k);
+    const usado = x => set.has(x) || inut.some(i => x >= +i.ini && x <= +i.fim);
+    const min = Math.min(...nums), max = Math.max(...nums); let ini = null;
+    for (let x = min; x <= max + 1; x++){
+      if (x <= max && !usado(x)){ if (ini === null) ini = x; }
+      else if (ini !== null){ const [modelo, serie] = k.split('|'); res.push({ modelo, serie, ini, fim:x - 1 }); ini = null; }
+    }
+  });
+  return res;
+}
+function formInut(pre = {}){
+  const e = emp();
+  openModal(`${mhead('Inutilizar numeração')}
+  <p class="small">Use para números que foram pulados e nunca vão ser usados (por exemplo, nota rejeitada). Depois de inutilizados, não podem mais ser emitidos.</p>
+  <div class="row">${sel('iMod','Modelo', pre.modelo || '65', [['65','NFC-e (65)'],['55','NF-e (55)']])}${fld('iSer','Série', pre.serie || e.serie_nfce, 'inputmode="numeric"')}</div>
+  <div class="row">${fld('iIni','Número inicial', pre.ini || '', 'inputmode="numeric"')}${fld('iFim','Número final', pre.fim || '', 'inputmode="numeric"')}</div>
+  <label for="iJust">Justificativa (mínimo 15 caracteres)</label><textarea id="iJust" rows="2">${esc(pre.just || '')}</textarea>
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="salvarInut">Inutilizar</button></div>`);
+}
+async function salvarInut(){
+  const e = emp(), modelo = val('iMod'), serie = dig(val('iSer')), ini = parseInt(dig(val('iIni'))), fim = parseInt(dig(val('iFim'))), just = val('iJust').replace(/\s+/g, ' ');
+  const errs = [];
+  if (!serie) errs.push('Informe a série.');
+  if (!(ini > 0) || !(fim >= ini)) errs.push('Confira os números: o final precisa ser maior ou igual ao inicial.');
+  else if (fim - ini >= 10000) errs.push('Faixa grande demais. Confira os números.');
+  if (just.length < 15) errs.push('A justificativa precisa ter pelo menos 15 caracteres.');
+  const usada = S.notas.find(n => notaValida(n) && n.modelo === modelo && String(n.serie) === serie && +n.numero >= ini && +n.numero <= fim);
+  if (usada) errs.push(`O número ${usada.numero} já foi usado numa nota. Ele não pode ser inutilizado.`);
+  if (S.inutilizacoes.some(i => i.modelo === modelo && String(i.serie) === serie && !(fim < +i.ini || ini > +i.fim))) errs.push('Parte dessa faixa já foi inutilizada.');
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  $('#errM').innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
+  const r = await eventoServidor({ tipo:'inutilizar', modelo, serie, ini, fim, justificativa:just }, 'Numeração inutilizada na SEFAZ.');
+  if (r) closeModal();
+}
+
+/* ---------- contingência NFC-e ---------- */
+const prazoCont = n => { const d = new Date(n.data.slice(0, 19) + '-03:00'); d.setHours(d.getHours() + 24); return d; };
+async function transmitir(ids){
+  for (const id of ids){ const n = clone(S.notas.find(x => x.id === id)); if (!n || n.status !== 'contingencia') continue;
+    n.status = 'simulada'; n.transmitida_em = isoNow(); if (!(await safe(() => put('notas', n)))) return; }
+  toast(ids.length > 1 ? 'Notas transmitidas.' : 'Nota transmitida.');
+}
+
+/* ---------- caixa ---------- */
+const meuCaixaKey = () => S.meuId || 'local';
+const caixaAberto = () => S.caixas.find(c => !c.fechado_em && c.aberto_por === meuCaixaKey());
+function resumoCaixa(cx){
+  const ns = S.notas.filter(n => n.caixa === cx.id && n.modelo === '65' && notaValida(n));
+  const porForma = {}; let total = 0, troco = 0;
+  ns.forEach(n => { total += n.total; troco += n.troco || 0; (n.pags || []).forEach(p => porForma[p.forma] = r2((porForma[p.forma] || 0) + p.valor)); });
+  if (porForma['01'] !== undefined) porForma['01'] = r2(porForma['01'] - troco);
+  const soma = t => r2((cx.movs || []).filter(m => m.tipo === t).reduce((a, m) => a + m.valor, 0));
+  const canc = S.notas.filter(n => n.caixa === cx.id && n.status === 'cancelada');
+  const sup = soma('suprimento'), sang = soma('sangria');
+  return { qtd:ns.length, total:r2(total), porForma, sup, sang, inicial:num(cx.inicial), dinheiroEsperado:r2(num(cx.inicial) + (porForma['01'] || 0) + sup - sang),
+    canc:canc.length, cancValor:r2(canc.reduce((a, n) => a + n.total, 0)) };
+}
+const difTag = d => !d ? '<span class="tag">✓ bateu</span>' : `<span class="tag ${d < 0 ? 'b' : 'w'}">${d < 0 ? 'falta ' : 'sobra '}${brl(Math.abs(d))}</span>`;
+function resumoCaixaHtml(r){
+  return `<div class="stats"><div><b>${r.qtd}</b>vendas</div><div><b>${brl(r.total)}</b>vendido</div><div><b>${brl(r.dinheiroEsperado)}</b>dinheiro na gaveta</div></div>
+    <h3>Por forma de pagamento</h3>${Object.keys(r.porForma).length ? Object.entries(r.porForma).map(([f, v]) => linhaTot(esc(PAG_NOME[f] || f), v)).join('') : '<p class="small">Nenhuma venda ainda.</p>'}
+    ${linhaTot('Troco inicial', r.inicial, 'small')}${r.sup ? linhaTot('Suprimentos', r.sup, 'small') : ''}${r.sang ? linhaTot('Sangrias', -r.sang, 'small') : ''}${r.canc ? linhaTot(`Canceladas (${r.canc})`, r.cancValor, 'small') : ''}`;
+}
+function vCaixa(){
+  const cx = caixaAberto(); let h = '<h2>Caixa</h2>';
+  if (!cx) h += `<div class="card"><p>Nenhum caixa aberto${S.meuId ? ' no seu usuário' : ''}. Abra o caixa para começar a vender.</p>
+    <label for="cxIni">Troco inicial na gaveta (R$)</label><input id="cxIni" inputmode="decimal" placeholder="0,00">
+    <div class="actions"><button class="btn pri" data-act="abrirCaixa">Abrir caixa</button></div></div>`;
+  else h += `<div class="card"><b>Caixa aberto</b><div class="small">desde ${fmtData(cx.aberto_em)}</div>${resumoCaixaHtml(resumoCaixa(cx))}
+    ${(cx.movs || []).length ? `<h3>Movimentos</h3><div class="list">${cx.movs.map(m => `<div class="it"><div class="grow"><div class="t">${m.tipo === 'sangria' ? 'Sangria' : 'Suprimento'}</div><div class="s">${fmtData(m.em)}${m.motivo ? ' · ' + esc(m.motivo) : ''}</div></div>
+      <b class="num" style="color:${m.tipo === 'sangria' ? 'var(--bad)' : 'var(--ok)'}">${m.tipo === 'sangria' ? '−' : '+'}${brl(m.valor)}</b></div>`).join('')}</div>` : ''}
+    <div class="actions"><button class="btn" data-act="movCaixa" data-t="sangria">Sangria</button><button class="btn" data-act="movCaixa" data-t="suprimento">Suprimento</button><button class="btn pri" data-act="fecharCaixa">Fechar caixa</button></div></div>`;
+  const fechados = S.caixas.filter(c => c.fechado_em && (pode('relatorio') || c.aberto_por === meuCaixaKey())).sort((a, b) => b.fechado_em.localeCompare(a.fechado_em)).slice(0, 10);
+  if (fechados.length) h += `<div class="card"><h3 style="margin-top:0">Caixas fechados</h3><div class="list">${fechados.map(c => `<div class="it" data-act="verCaixa" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
+    <div class="t">${fmtData(c.aberto_em)} → ${fmtData(c.fechado_em).slice(-5)}</div><div class="s">${(c.resumo || {}).qtd || 0} vendas · ${brl((c.resumo || {}).total)}</div></div>${difTag(c.diferenca)}</div>`).join('')}</div></div>`;
+  if (pode('relatorio')) h += vRelatorio();
+  return h;
+}
+function formMov(tipo){
+  openModal(`${mhead(tipo === 'sangria' ? 'Sangria (retirada)' : 'Suprimento (reforço)')}
+  ${fld('mvVal','Valor (R$)', '', 'inputmode="decimal" placeholder="0,00"')}${fld('mvMot','Motivo', '', 'placeholder="' + (tipo === 'sangria' ? 'Ex.: depósito no banco' : 'Ex.: troco extra') + '"')}
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="salvarMov" data-t="${tipo}">Registrar</button></div>`);
+  setTimeout(() => { const el = $('#mvVal'); if (el) el.focus(); }, 50);
+}
+async function salvarMov(tipo){
+  const cx = caixaAberto(), v = numIn(val('mvVal'));
+  if (!cx) return closeModal();
+  if (!(v > 0)) return $('#errM').innerHTML = '<div class="msg err">Informe um valor.</div>';
+  if (tipo === 'sangria' && v > resumoCaixa(cx).dinheiroEsperado) return $('#errM').innerHTML = '<div class="msg err">A sangria é maior que o dinheiro esperado na gaveta.</div>';
+  const novo = { ...clone(cx), movs:[...(cx.movs || []), { tipo, valor:r2(v), motivo:val('mvMot'), em:isoNow(), por:S.meuId || null }] };
+  if (await safe(() => put('caixas', novo), tipo === 'sangria' ? 'Sangria registrada.' : 'Suprimento registrado.')) closeModal();
+}
+function formFechar(){
+  const cx = caixaAberto(), r = resumoCaixa(cx);
+  const pend = S.notas.filter(n => n.caixa === cx.id && n.status === 'contingencia').length;
+  openModal(`${mhead('Fechar caixa')}${resumoCaixaHtml(r)}
+  ${pend ? `<div class="msg warn">Há ${pend} cupom(ns) em contingência neste caixa. Transmita na aba Notas.</div>` : ''}
+  ${fld('cxCont','Dinheiro contado na gaveta (R$)', '', 'inputmode="decimal" placeholder="0,00"')}<div id="cxDif" class="small"></div>
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="confFechar">Fechar caixa</button></div>`);
+}
+async function confFechar(){
+  const cx = caixaAberto(), r = resumoCaixa(cx), v = val('cxCont');
+  if (v === '') return $('#errM').innerHTML = '<div class="msg err">Informe o dinheiro contado (pode ser 0).</div>';
+  const contado = numIn(v), dif = r2(contado - r.dinheiroEsperado);
+  if (await safe(() => put('caixas', { ...clone(cx), fechado_em:isoNow(), fechado_por:S.meuId || null, contado, diferenca:dif, resumo:r }), 'Caixa fechado.')){
+    closeModal(); verCaixa(cx.id); }
+}
+function verCaixa(id){
+  const c = S.caixas.find(x => x.id === id); if (!c) return;
+  const r = c.resumo || resumoCaixa(c);
+  openModal(`${mhead('Caixa ' + fmtData(c.aberto_em).slice(0, 10))}<p class="small">Aberto ${fmtData(c.aberto_em)}${c.fechado_em ? ' · fechado ' + fmtData(c.fechado_em) : ''}</p>${resumoCaixaHtml(r)}
+  ${c.fechado_em ? `${linhaTot('Dinheiro contado', c.contado)}<div class="total"><span>Diferença</span>${difTag(c.diferenca)}</div>` : ''}`);
+}
+
+/* ---------- relatórios ---------- */
+function periodo(k){
+  const hoje = isoNow().slice(0, 10), [y, m] = hoje.split('-').map(Number), f = d => d.toISOString().slice(0, 10);
+  if (k === 'hoje') return [hoje, hoje];
+  if (k === '7d'){ const a = new Date(Date.UTC(y, m - 1, +hoje.slice(8, 10) - 6)); return [f(a), hoje]; }
+  if (k === 'mes') return [hoje.slice(0, 8) + '01', hoje];
+  return [f(new Date(Date.UTC(y, m - 2, 1))), f(new Date(Date.UTC(y, m - 1, 0)))];
+}
+function dadosRel(){
+  const [ini, fim] = periodo(S.relPer), ns = S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim; });
+  const vend = ns.filter(n => notaValida(n) && (n.op || 'venda') === 'venda'), canc = ns.filter(n => n.status === 'cancelada');
+  const dev = ns.filter(n => n.op === 'dev_venda' && notaValida(n));
+  const fat = r2(vend.reduce((a, n) => a + n.total, 0)), devV = r2(dev.reduce((a, n) => a + n.total, 0));
+  const dia = {}, forma = {}, prod = {};
+  vend.forEach(n => {
+    const d = n.data.slice(0, 10); dia[d] = r2((dia[d] || 0) + n.total);
+    if (n.pags){ n.pags.forEach(p => forma[p.forma] = r2((forma[p.forma] || 0) + p.valor)); if (n.troco) forma['01'] = r2((forma['01'] || 0) - n.troco); }
+    else forma[n.pag || '99'] = r2((forma[n.pag || '99'] || 0) + n.total);
+    n.itens.forEach(i => { const k = i.d; prod[k] = prod[k] || { d:i.d, q:0, v:0 }; prod[k].q = r2(prod[k].q + i.q); prod[k].v = r2(prod[k].v + i.t - (i.desc || 0)); });
+  });
+  return { ini, fim, vend, canc, dev, fat, devV, dia, forma, prod:Object.values(prod).sort((a, b) => b.v - a.v),
+    cupons:vend.filter(n => n.modelo === '65'), nfes:vend.filter(n => n.modelo === '55') };
+}
+function vRelatorio(){
+  const R = dadosRel(), maxDia = Math.max(1, ...Object.values(R.dia)), tk = R.vend.length ? r2(R.fat / R.vend.length) : 0;
+  const somaV = a => r2(a.reduce((s, n) => s + n.total, 0));
+  return `<h2 style="margin-top:22px">Relatório de vendas</h2>
+  <div class="seg" style="margin-bottom:10px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="card"><div class="small">${R.ini.split('-').reverse().join('/')} a ${R.fim.split('-').reverse().join('/')}</div>
+    <div class="stats"><div><b>${brl(R.fat)}</b>faturamento</div><div><b>${R.vend.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div></div>
+    ${linhaTot(`Cupons (${R.cupons.length})`, somaV(R.cupons), 'small')}${linhaTot(`NF-e (${R.nfes.length})`, somaV(R.nfes), 'small')}
+    ${R.devV ? linhaTot(`Devoluções (${R.dev.length})`, -R.devV, 'small') + linhaTot('Faturamento líquido', r2(R.fat - R.devV)) : ''}
+    ${R.canc.length ? linhaTot(`Canceladas (${R.canc.length})`, somaV(R.canc), 'small') : ''}
+    ${pode('relatorio') && S.dl ? '<div class="actions"><button class="btn" data-act="exportRel">Exportar planilha</button></div>' : ''}</div>
+  ${Object.keys(R.dia).length > 1 ? `<div class="card"><h3 style="margin-top:0">Por dia</h3>${Object.entries(R.dia).sort().map(([d, v]) => `<div style="margin:6px 0"><div class="total small"><span>${d.split('-').reverse().slice(0, 2).join('/')}</span><span class="num">${brl(v)}</span></div><div class="bar" style="width:${Math.max(2, v / maxDia * 100)}%"></div></div>`).join('')}</div>` : ''}
+  ${Object.keys(R.forma).length ? `<div class="card"><h3 style="margin-top:0">Por forma de pagamento</h3>${Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => linhaTot(esc(PAG_NOME[f] || (f === '90' ? 'Sem pagamento' : f)), v)).join('')}</div>` : ''}
+  ${R.prod.length ? `<div class="card"><h3 style="margin-top:0">Produtos mais vendidos</h3><div class="list">${R.prod.slice(0, 10).map((p, i) => `<div class="it"><div class="grow"><div class="t">${i + 1}. ${esc(p.d)}</div><div class="s">${String(p.q).replace('.', ',')} un.</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div></div>` : ''}
+  ${!R.vend.length ? '<div class="card empty">Nenhuma venda no período.</div>' : ''}`;
+}
+async function exportRel(){
+  const R = dadosRel();
+  try {
+    const X = await loadXlsx(), wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.vend.map(n => ({ data:fmtData(n.data), modelo:n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero, cliente:n.destNome || '', total:n.total }))), 'Vendas');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.prod.map(p => ({ produto:p.d, quantidade:p.q, valor:p.v }))), 'Produtos');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.entries(R.forma).map(([f, v]) => ({ forma:PAG_NOME[f] || f, valor:v }))), 'Pagamentos');
+    await salvarArquivo(`vendas-${R.ini}-a-${R.fim}.xlsx`, new Blob([X.write(wb, { bookType:'xlsx', type:'array' })]));
+  } catch(err){ toast(err.message || 'Não foi possível gerar a planilha.'); }
+}
+
+/* ---------- pacote mensal para a contabilidade ---------- */
+function formPacote(){
+  const h = isoNow().slice(0, 7), [y, m] = h.split('-').map(Number), ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  openModal(`${mhead('Pacote do mês para a contabilidade')}
+  <p class="small">Gera um ZIP com uma planilha de resumo (notas, totais por CFOP/CST, cancelamentos, cartas de correção e inutilizações) e os arquivos de cada nota, separados em autorizadas, canceladas e pendentes.</p>
+  <div class="msg warn">Enquanto a emissão é simulada, os arquivos das notas são os JSON de envio. Com a Focus ligada, entram os XMLs autorizados.</div>
+  <label for="pkMes">Mês</label><input id="pkMes" type="month" value="${ant}">
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="gerarPacote">Gerar pacote</button></div>`);
+}
+async function gerarPacote(){
+  const e = emp(), mes = val('pkMes'), ns = S.notas.filter(n => (n.data || '').slice(0, 7) === mes).sort((a, b) => a.data.localeCompare(b.data));
+  const inut = S.inutilizacoes.filter(i => (i.em || '').slice(0, 7) === mes);
+  if (!ns.length && !inut.length) return $('#errM').innerHTML = '<div class="msg err">Nenhuma nota ou inutilização nesse mês.</div>';
+  $('#errM').innerHTML = '<p class="small">Gerando…</p>';
+  try {
+    const [X, Z] = await Promise.all([loadXlsx(), loadZip()]), zip = new Z(), wb = X.utils.book_new();
+    ns.forEach(n => { const pasta = n.status === 'cancelada' ? 'canceladas' : n.status === 'contingencia' ? 'pendentes' : 'autorizadas';
+      zip.file(`${pasta}/${n.modelo === '65' ? 'nfce' : 'nfe'}-s${n.serie}-${String(n.numero).padStart(9, '0')}.json`, JSON.stringify({ chave:n.chave || null, ref:n.ref, status:n.status, eventos:n.eventos || [], payload:n.payload }, null, 2)); });
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(ns.map(n => ({ data:fmtData(n.data), modelo:n.modelo, serie:n.serie, numero:n.numero, chave:n.chave || '', operacao:n.op || 'venda',
+      destinatario:n.destNome || '', documento:n.destDoc || '', total:n.total, situacao:n.status }))), 'Notas');
+    const cf = {};
+    ns.filter(n => notaValida(n)).forEach(n => (n.payload.items || []).forEach(it => {
+      const k = `${n.modelo}|${it.cfop}|${it.icms_situacao_tributaria}`;
+      const o = cf[k] = cf[k] || { modelo:n.modelo, cfop:it.cfop, cst_csosn:it.icms_situacao_tributaria, valor_contabil:0, bc_icms:0, icms:0, bc_st:0, icms_st:0 };
+      o.valor_contabil = r2(o.valor_contabil + it.valor_bruto - (it.valor_desconto || 0) + (it.valor_frete || 0) + (it.valor_seguro || 0) + (it.valor_outras_despesas || 0) + (it.icms_valor_st || 0) + (it.fcp_valor_st || 0));
+      o.bc_icms = r2(o.bc_icms + (it.icms_base_calculo || 0)); o.icms = r2(o.icms + (it.icms_valor || 0));
+      o.bc_st = r2(o.bc_st + (it.icms_base_calculo_st || 0)); o.icms_st = r2(o.icms_st + (it.icms_valor_st || 0)); }));
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.values(cf).sort((a, b) => (a.modelo + a.cfop).localeCompare(b.modelo + b.cfop))), 'Por CFOP e CST');
+    const evs = []; ns.forEach(n => (n.eventos || []).forEach(ev => evs.push({ nota:`${n.modelo}-${n.serie}-${n.numero}`, tipo:ev.tipo === 'cce' ? 'Carta de correção' : 'Cancelamento', sequencia:ev.seq || '', data:fmtData(ev.em), texto:ev.texto })));
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(evs.length ? evs : [{ nota:'', tipo:'nenhum evento' }]), 'Eventos');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(inut.length ? inut.map(i => ({ modelo:i.modelo, serie:i.serie, inicial:i.ini, final:i.fim, data:fmtData(i.em), justificativa:i.justificativa })) : [{ modelo:'', serie:'nenhuma inutilização' }]), 'Inutilizações');
+    zip.file(`resumo-${mes}.xlsx`, X.write(wb, { bookType:'xlsx', type:'array' }));
+    zip.file('LEIA-ME.txt', `Pacote fiscal de ${mes.split('-').reverse().join('/')} — ${e.razao} (CNPJ ${fmtDoc(e.cnpj)})\r\nGerado em ${fmtData(isoNow())}.\r\n\r\nATENÇÃO: emissão em ambiente de homologação (simulada). Os arquivos .json são os dados de envio e as chaves de acesso são simuladas.\r\nQuando a emissão real estiver ligada, este pacote trará os XMLs autorizados pela SEFAZ.\r\n`);
+    const blob = await zip.generateAsync({ type:'blob' });
+    if (await salvarArquivo(`contabilidade-${dig(e.cnpj)}-${mes}.zip`, blob)) closeModal(); else $('#errM').innerHTML = '';
+  } catch(err){ $('#errM').innerHTML = `<div class="msg err">${esc(err.message || 'Não foi possível gerar o pacote.')}</div>`; }
+}
+
+/* ---------- impressão (arquivo pronto para 80 mm ou A4) ---------- */
+async function imprimir(n){
+  const e = emp(), cupom = n.modelo === '65', css = document.querySelector('style').textContent;
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${cupom ? 'Cupom' : 'DANFE'} ${n.numero}</title><style>${css}
+html,body{background:#fff}body{margin:0}@page{size:${cupom ? '80mm auto' : 'A4'};margin:${cupom ? '2mm' : '8mm'}}.cupom{border:0;max-width:76mm;margin:0;padding:0;background:#fff}.danfe{margin:0}</style></head>
+<body>${cupom ? cupomHtml(n, e) : danfeHtml(n, e)}<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`;
+  await salvarArquivo(`${cupom ? 'cupom' : 'danfe'}-${n.serie}-${n.numero}.html`, html);
+}
+
+/* ---------- perfis de tributação ---------- */
+const TAXMAP = { cfop:'pCfop', cst_csosn:'pCst', icms_aliq:'pAliq', icms_red:'pRed', st_mva:'pMva', st_aliq:'pAliqSt', st_fcp:'pFcpSt',
+  pis_cst:'pPisCst', pis_aliq:'pPisAl', cofins_cst:'pCofCst', cofins_aliq:'pCofAl', cst_ibscbs:'pCstR', cclasstrib:'pClass' };
+const TAX_NUM = ['icms_aliq','icms_red','st_mva','st_aliq','st_fcp','pis_aliq','cofins_aliq'];
+const vfmt = v => String(v ?? '').replace('.', ',');
+function taxFieldsHtml(p, simples, origHtml = ''){
+  return `<div class="row">${fld('pCfop','CFOP da venda interna *',p.cfop,'inputmode="numeric"')}${origHtml}</div>
+  <div class="row">${fld('pCst', simples ? 'CSOSN *' : 'CST ICMS *', p.cst_csosn, 'inputmode="numeric"')}${fld('pAliq', simples ? 'Alíquota ICMS própria (só p/ deduzir a ST) %' : 'Alíquota ICMS interna (%)', vfmt(p.icms_aliq), 'inputmode="decimal"')}${simples ? '' : fld('pRed','Redução da base (%) — CST 20/70', vfmt(p.icms_red || ''), 'inputmode="decimal"')}</div>
+  <h3>Substituição tributária <span class="small">(quando a empresa é a substituta: ${simples ? 'CSOSN 201, 202, 203' : 'CST 10, 30, 70'})</span></h3>
+  <div class="row">${fld('pMva','MVA original (%)', vfmt(p.st_mva || ''), 'inputmode="decimal"')}${fld('pAliqSt','Alíquota interna ST (%)', vfmt(p.st_aliq || ''), 'inputmode="decimal"')}${fld('pFcpSt','FCP-ST (%)', vfmt(p.st_fcp || ''), 'inputmode="decimal"')}</div>
+  <p class="small">Em venda interestadual o sistema calcula a MVA ajustada sozinho. Confira se há protocolo/convênio de ST com a UF de destino.</p>
+  <div class="row">${fld('pPisCst','CST PIS',p.pis_cst,'inputmode="numeric"')}${fld('pPisAl','Alíquota PIS (%)',vfmt(p.pis_aliq),'inputmode="decimal"')}</div>
+  <div class="row">${fld('pCofCst','CST COFINS',p.cofins_cst,'inputmode="numeric"')}${fld('pCofAl','Alíquota COFINS (%)',vfmt(p.cofins_aliq),'inputmode="decimal"')}</div>
+  <h3>Reforma tributária (IBS/CBS)</h3>
+  <div class="row">${fld('pCstR','CST IBS/CBS',p.cst_ibscbs,'inputmode="numeric"')}${fld('pClass','cClassTrib',p.cclasstrib,'inputmode="numeric"')}</div>`;
+}
+function readTax(){
+  const o = {}; Object.entries(TAXMAP).forEach(([k, id]) => { const v = val(id); o[k] = TAX_NUM.includes(k) ? numIn(v) : dig(v); });
+  o.cst_ibscbs = o.cst_ibscbs || '000'; o.cclasstrib = o.cclasstrib || '000001'; return o;
+}
+const taxOf = p => Object.fromEntries(Object.keys(TAXMAP).map(k => [k, p[k] ?? (TAX_NUM.includes(k) ? 0 : '')]));
+function perfilSelHtml(p){
+  if (!S.perfis.length) return '';
+  return `${sel('pPerfil','Perfil de tributação', p.perfil_id || '', [['','— sem perfil (preencher à mão) —'], ...[...S.perfis].sort((a, b) => a.nome.localeCompare(b.nome)).map(f => [f.id, f.nome])])}
+  <p class="small">Com perfil, os campos abaixo vêm dele, e mudanças no perfil atualizam este produto.</p>`;
+}
+function aplicarPerfilNoForm(id){
+  const f = S.perfis.find(x => x.id === id); if (!f) return;
+  Object.entries(TAXMAP).forEach(([k, el]) => { const i = document.getElementById(el); if (i) i.value = TAX_NUM.includes(k) ? vfmt(f[k] || '') : (f[k] || ''); });
+}
+function vPerfis(){
+  const ps = [...S.perfis].sort((a, b) => a.nome.localeCompare(b.nome)), simples = String(emp().regime) !== '3';
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Perfis de tributação</h2>${pode('produto') ? '<button class="btn pri" data-act="novoPerfil" style="flex:0 0 auto">+ Perfil</button>' : ''}</div>
+  ${segProd()}
+  <div class="card"><p class="small" style="margin-top:0">Um perfil guarda CFOP, ${simples ? 'CSOSN' : 'CST'}, ST, PIS/COFINS e IBS/CBS. Vincule produtos a ele: mudou a regra, muda no perfil e todos os produtos vinculados são atualizados.</p>
+  ${ps.length ? `<div class="list">${ps.map(f => { const n = S.produtos.filter(p => p.perfil_id === f.id).length;
+    return `<div class="it" data-act="editPerfil" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.nome)}</div><div class="s">CFOP ${esc(f.cfop)} · ${esc(f.cst_csosn)}${f.st_aliq ? ' · ST ' + vfmt(f.st_aliq) + '%' : ''} · IBS/CBS ${esc(f.cst_ibscbs)}</div></div><span class="tag">${n} produto(s)</span></div>`; }).join('')}</div>`
+    : `<div class="empty">Nenhum perfil ainda. Sugestões: "Revenda tributada", "Revenda com ST", "Cesta básica".</div>`}</div>`;
+}
+function segProd(){
+  return `<div class="seg" style="margin-bottom:12px">${[['produtos','Produtos'],['perfis','Perfis de tributação']].map(([k, l]) => `<button data-act="prodView" data-v="${k}" class="${(S.prodView || 'produtos') === k ? 'on' : ''}">${l}</button>`).join('')}
+    ${pode('produto') ? '<button data-act="importarXml">⤓ Importar XML de compra</button>' : ''}</div>`;
+}
+function formPerfil(f){
+  const e = emp(), simples = String(e.regime) !== '3';
+  f = f || { cfop:'5102', cst_csosn:simples ? '102' : '00', pis_cst:simples ? '49' : '01', cofins_cst:simples ? '49' : '01', pis_aliq:0, cofins_aliq:0, icms_aliq:simples ? 0 : 20.5, cst_ibscbs:'000', cclasstrib:'000001' };
+  const n = f.id ? S.produtos.filter(p => p.perfil_id === f.id).length : 0;
+  openModal(`${mhead(f.id ? 'Editar perfil' : 'Novo perfil')}${fld('fNome','Nome do perfil *', f.nome, 'placeholder="Ex.: Revenda com ST"')}
+  ${taxFieldsHtml(f, simples)}
+  ${n ? `<div class="msg info">Ao salvar, os ${n} produto(s) vinculados a este perfil são atualizados.</div>` : ''}
+  <div id="errM"></div>
+  <div class="actions">${f.id ? `<button class="btn bad" data-act="delPerfil" data-id="${esc(f.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarPerfil" data-id="${esc(f.id || '')}">Salvar</button></div>`);
+}
+async function salvarPerfil(id){
+  const e = emp(), simples = String(e.regime) !== '3', o = { nome:val('fNome'), ...readTax() }; if (id) o.id = id;
+  const errs = [];
+  if (!o.nome) errs.push('Dê um nome ao perfil.');
+  if (!/^5\d{3}$/.test(o.cfop)) errs.push('CFOP deve ser de saída interna (começando com 5).');
+  if (simples ? !CSOSN_OK.includes(o.cst_csosn) : !CST_OK.includes(o.cst_csosn)) errs.push(`${simples ? 'CSOSN' : 'CST'} inválido.`);
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  let salvo; if (!(await safe(async () => { salvo = await put('perfis', o); }))) return;
+  const vinc = S.produtos.filter(p => p.perfil_id === salvo.id);
+  for (let i = 0; i < vinc.length; i++){ $('#errM').innerHTML = `<p class="small">Atualizando produtos ${i + 1} de ${vinc.length}…</p>`; if (!(await safe(() => put('produtos', { ...clone(vinc[i]), ...taxOf(salvo) })))) return; }
+  toast(vinc.length ? `Perfil salvo e aplicado a ${vinc.length} produto(s).` : 'Perfil salvo.'); closeModal();
+}
+
+/* ---------- importar produtos pelo XML de compra ---------- */
+function parseNfeXml(txt){
+  const d = new DOMParser().parseFromString(txt, 'application/xml');
+  if (d.getElementsByTagName('parsererror').length) throw new Error('Arquivo não é um XML válido.');
+  const g = (el, t) => { const x = el && el.getElementsByTagName(t)[0]; return x ? x.textContent.trim() : ''; };
+  const emit = d.getElementsByTagName('emit')[0];
+  const itens = [...d.getElementsByTagName('det')].map(det => { const pr = det.getElementsByTagName('prod')[0], icms = det.getElementsByTagName('ICMS')[0];
+    return { cProd:g(pr, 'cProd'), cEAN:g(pr, 'cEAN'), xProd:g(pr, 'xProd'), ncm:g(pr, 'NCM'), cest:g(pr, 'CEST'), uCom:g(pr, 'uCom'), qCom:+g(pr, 'qCom') || 0, vUnCom:+g(pr, 'vUnCom') || 0, orig:icms ? g(icms, 'orig') : '0' }; });
+  if (!itens.length) throw new Error('Não encontrei produtos neste XML. Envie o XML de uma NF-e.');
+  return { forn:{ cnpj:g(emit, 'CNPJ') || g(emit, 'CPF'), nome:g(emit, 'xNome') }, nNF:g(d, 'nNF'), itens };
+}
+function formXml(){
+  openModal(`${mhead('Importar produtos do XML de compra')}
+  <p class="small">Envie o XML da NF-e do fornecedor (pode ser mais de um). Os produtos entram com descrição, NCM, CEST, código de barras e custo. Você define a margem e o perfil de tributação.</p>
+  <input type="file" id="xmlFile" accept=".xml" multiple>
+  <div class="row">${fld('xMarg','Margem sobre o custo (%)', '40', 'inputmode="decimal"')}${S.perfis.length ? sel('xPerf','Perfil de tributação', '', [['','— padrão —'], ...S.perfis.map(f => [f.id, f.nome])]) : ''}</div>
+  <div id="xmlPrev"></div><div id="errM"></div>`);
+}
+async function lerXml(files){
+  const all = [], erros = [];
+  for (const f of files){ try { const r = parseNfeXml(await f.text()); r.itens.forEach(i => all.push({ ...i, forn:r.forn, nNF:r.nNF })); } catch(err){ erros.push(`${esc(f.name)}: ${esc(err.message)}`); } }
+  all.forEach(i => { const gtin = gtinOk(i.cEAN) ? dig(i.cEAN) : ''; i.gtin = gtin; i.codForn = dig(i.forn.cnpj) + ':' + i.cProd;
+    i.existe = S.produtos.find(p => (gtin && p.gtin === gtin) || p.cod_forn === i.codForn) || null; i.sel = !i.existe; });
+  S.xmlImport = all; renderXmlPrev(erros);
+}
+function renderXmlPrev(erros = []){
+  const L = S.xmlImport || [];
+  $('#xmlPrev').innerHTML = (erros.length ? `<div class="msg err">${erros.join('<br>')}</div>` : '') + (L.length ? `
+    <div class="small" style="margin:8px 0">${L.length} item(ns) · ${L.filter(i => i.existe).length} já cadastrado(s)</div>
+    <div class="list">${L.map((i, k) => `<label class="it" style="cursor:pointer;margin:0;color:var(--ink)"><input type="checkbox" data-xi="${k}" ${i.sel ? 'checked' : ''} style="width:auto">
+      <div class="grow"><div class="t">${esc(i.xProd)}</div><div class="s">NCM ${fmtNcm(i.ncm)}${i.cest ? ' · CEST ' + esc(i.cest) : ''} · custo ${brl(i.vUnCom)}/${esc(i.uCom)}${i.existe ? ' · <b style="color:var(--warn)">já cadastrado</b>' : ''}</div></div></label>`).join('')}</div>
+    <button class="btn pri block" style="margin-top:10px" data-act="salvarXml">Cadastrar selecionados</button>` : '');
+}
+async function salvarXml(){
+  const e = emp(), simples = String(e.regime) !== '3', marg = numIn(val('xMarg')), perf = S.perfis.find(f => f.id === val('xPerf'));
+  const sel_ = (S.xmlImport || []).filter(i => i.sel); if (!sel_.length) return $('#errM').innerHTML = '<div class="msg err">Selecione pelo menos um item.</div>';
+  const base = perf ? taxOf(perf) : { cfop:'5102', cst_csosn:simples ? '102' : '00', icms_aliq:simples ? 0 : 20.5, icms_red:0, st_mva:0, st_aliq:0, st_fcp:0,
+    pis_cst:simples ? '49' : '01', pis_aliq:0, cofins_cst:simples ? '49' : '01', cofins_aliq:0, cst_ibscbs:'000', cclasstrib:'000001' };
+  let n = 0;
+  for (const i of sel_){
+    $('#errM').innerHTML = `<p class="small">Cadastrando ${++n} de ${sel_.length}…</p>`;
+    const p = { ...base, perfil_id:perf ? perf.id : '', descricao:i.xProd.toUpperCase(), codigo:'', gtin:i.gtin || 'SEM GTIN', custo:i.vUnCom, preco:r2(i.vUnCom * (1 + marg / 100)),
+      unidade:(i.uCom || 'UN').toUpperCase().slice(0, 6), ncm:dig(i.ncm), cest:dig(i.cest), origem:({ '1':'2', '6':'7' })[i.orig] || i.orig || '0', cod_forn:i.codForn };
+    if (i.existe) Object.assign(p, { id:i.existe.id, preco:i.existe.preco, codigo:i.existe.codigo || '' });
+    if (!(await safe(() => put('produtos', p)))) return;
+  }
+  S.xmlImport = null; closeModal(); S.prodView = 'produtos'; S.filtroProd = 'todos'; render();
+  toast(`${sel_.length} produto(s) cadastrado(s). Confira a conferência fiscal.`);
+}
+
+/* ---------- despacho dos novos eventos ---------- */
+async function acoesV4(a, t, id){
+  switch (a){
+    case 'cce': formCce(id); return true;
+    case 'salvarCce': salvarCce(id); return true;
+    case 'devolver': devolver(id); return true;
+    case 'inutilizar': formInut(t.dataset.m ? { modelo:t.dataset.m, serie:t.dataset.s, ini:t.dataset.i, fim:t.dataset.f } : {}); return true;
+    case 'salvarInut': salvarInut(); return true;
+    case 'pacote': formPacote(); return true;
+    case 'gerarPacote': t.disabled = true; await gerarPacote(); t.disabled = false; return true;
+    case 'transmitir': await transmitir([id]); verNota(S.notas.find(n => n.id === id)); return true;
+    case 'transmitirTodas': await transmitir(S.notas.filter(n => n.status === 'contingencia').map(n => n.id)); return true;
+    case 'imprimir': imprimir(S.notas.find(n => n.id === id)); return true;
+    case 'abrirCaixa': if (caixaAberto()) return true; await safe(() => put('caixas', { aberto_em:isoNow(), aberto_por:meuCaixaKey(), inicial:numIn(val('cxIni')), movs:[] }), 'Caixa aberto.'); return true;
+    case 'movCaixa': formMov(t.dataset.t); return true;
+    case 'salvarMov': salvarMov(t.dataset.t); return true;
+    case 'fecharCaixa': formFechar(); return true;
+    case 'confFechar': confFechar(); return true;
+    case 'verCaixa': verCaixa(id); return true;
+    case 'relPer': S.relPer = t.dataset.p; render(); return true;
+    case 'exportRel': exportRel(); return true;
+    case 'prodView': S.prodView = t.dataset.v; render(); return true;
+    case 'novoPerfil': formPerfil(); return true;
+    case 'editPerfil': formPerfil(clone(S.perfis.find(x => x.id === id))); return true;
+    case 'salvarPerfil': salvarPerfil(id); return true;
+    case 'delPerfil': confirmar('Excluir este perfil? Os produtos vinculados mantêm a tributação atual, só deixam de estar vinculados.', 'confDelPerfil', id); return true;
+    case 'confDelPerfil': if (await safe(() => del('perfis', id), 'Perfil excluído.')) closeModal(); return true;
+    case 'importarXml': formXml(); return true;
+    case 'salvarXml': salvarXml(); return true;
+    case 'contOn': S.conting = !S.conting; render(); return true;
+  }
+  return false;
+}
+function inputV4(t){
+  if (t.id === 'nfeRef'){ S.nfe.ref = dig(t.value); $('#refInfo').innerHTML = refInfo(S.nfe.ref); return true; }
+  if (t.id === 'cceTxt'){ $('#cceCnt').textContent = `${t.value.length} / 1000`; return true; }
+  if (t.id === 'cxCont'){ const cx = caixaAberto(); if (cx){ const d = r2(numIn(t.value) - resumoCaixa(cx).dinheiroEsperado); $('#cxDif').innerHTML = t.value === '' ? '' : `Diferença: ${difTag(d)}`; } return true; }
+  return false;
+}
+function changeV4(t){
+  if (t.id === 'nfeOp'){ const n = S.nfe; if (Object.values(NAT_OP).includes(n.natureza) || !n.natureza) n.natureza = NAT_OP[t.value]; n.op = t.value; if (t.value === 'venda') n.ref = ''; render(); return true; }
+  if (t.id === 'pPerfil'){ aplicarPerfilNoForm(t.value); return true; }
+  if (t.id === 'xmlFile'){ if (t.files.length) lerXml([...t.files]); return true; }
+  if (t.dataset.xi !== undefined){ S.xmlImport[+t.dataset.xi].sel = t.checked; return true; }
+  if (t.id === 'xMarg' || t.id === 'xPerf') return true;
+  return false;
+}
+window.addEventListener('offline', () => { toast('Sem internet.'); render(); });
+window.addEventListener('online', () => { const p = S.notas.filter(n => n.status === 'contingencia').length; if (p) toast(`Internet de volta. ${p} cupom(ns) em contingência para transmitir.`); render(); });
+
+/* ================== produção: Supabase, login, servidor (/api) ================== */
+let SB = null;
+const CONTINGENCIA_DISPONIVEL = false; // contingência offline real depende do programa local (fase futura)
+const notaValida = n => !['cancelada','rejeitada','erro_envio','denegada'].includes(n.status);
+Object.assign(ACT_PERM, { convidar:'usuarios', cancConvite:'usuarios', remMembro:'usuarios', consultarNota:'emitir' });
+
+// camada de dados: mesma interface do protótipo (doc/collection/onSnapshot) sobre a tabela "docs"
+function criarShim(sb){
+  const empOf = p => p.startsWith('empresas/') ? p.split('/')[1] : null;
+  const colDe = p => p.replace(/\/[^/]+$/, '');
+  const snap = (path, d) => ({ id:path.split('/').pop(), exists:d !== undefined, data:() => d, metadata:{ fromCache:false, hasPendingWrites:false } });
+  const erro = e => { const x = new Error(e.message || 'Erro'); x.code = /row-level security|permission|violates/i.test(e.message || '') ? 'invalid_argument' : 'unavailable'; return x; };
+  const ouvintes = {}; let canal = null;
+  const avisar = col => (ouvintes[col] || new Set()).forEach(f => f());
+  function ligarCanal(){
+    if (canal) return;
+    canal = sb.channel('docs-' + Math.random().toString(36).slice(2))
+      .on('postgres_changes', { event:'*', schema:'public', table:'docs' }, p => { const c = (p.new && p.new.col) || (p.old && p.old.col); if (c) avisar(c); else Object.keys(ouvintes).forEach(avisar); })
+      .subscribe();
+  }
+  function docRef(path){
+    if (path === 'config/app') return {
+      get:async () => { let d = {}; try { d = JSON.parse(localStorage.getItem('emissor-cfg-' + (S.meuId || '')) || '{}'); } catch(_){} return snap(path, d); },
+      set:async d => { try { localStorage.setItem('emissor-cfg-' + (S.meuId || ''), JSON.stringify(d)); } catch(_){} } };
+    return { id:path.split('/').pop(), path,
+      get:async () => { const { data, error } = await sb.from('docs').select('data').eq('path', path).maybeSingle(); if (error) throw erro(error); return snap(path, data ? data.data : undefined); },
+      set:async d => { const { error } = await sb.from('docs').upsert({ path, col:colDe(path), empresa_id:empOf(path), data:d }); if (error) throw erro(error); avisar(colDe(path)); },
+      update:async d => { const s = await docRef(path).get(); if (!s.exists) throw erro({ message:'Documento não existe' }); await docRef(path).set({ ...s.data(), ...d }); },
+      delete:async () => { const { error } = await sb.from('docs').delete().eq('path', path); if (error) throw erro(error); avisar(colDe(path)); },
+      collection:sub => colRef(path + '/' + sub) };
+  }
+  function colRef(col){
+    const ler = async () => {
+      const docs = [];
+      for (let de = 0; ; de += 1000){
+        const { data, error } = await sb.from('docs').select('path,data').eq('col', col).order('path').range(de, de + 999);
+        if (error) throw erro(error);
+        data.forEach(r => docs.push(snap(r.path, r.data)));
+        if (data.length < 1000) break;
+      }
+      return { docs, size:docs.length, empty:!docs.length, metadata:{ fromCache:false } };
+    };
+    return { path:col, doc:id => docRef(col + '/' + (id || uid())), get:ler,
+      add:async d => { const r = docRef(col + '/' + uid()); await r.set(d); return r; },
+      onSnapshot:(next, onErr) => {
+        ligarCanal(); let vivo = true, t = null;
+        const rodar = async () => { try { const s = await ler(); if (vivo) next(s); } catch(e){ if (vivo && onErr) onErr({ code:'unavailable', message:e.message }); } };
+        const adiar = () => { clearTimeout(t); t = setTimeout(rodar, 120); };
+        (ouvintes[col] = ouvintes[col] || new Set()).add(adiar); rodar();
+        return () => { vivo = false; ouvintes[col].delete(adiar); };
+      } };
+  }
+  return { doc:docRef, collection:colRef, fechar:() => { if (canal){ sb.removeChannel(canal); canal = null; } } };
+}
+
+// chamadas ao servidor
+async function api(rota, body){
+  const { data:{ session } } = await SB.auth.getSession();
+  if (!session) throw new Error('Sua sessão expirou. Entre de novo.');
+  let r;
+  try { r = await fetch('/api/' + rota, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + session.access_token }, body:JSON.stringify(body) }); }
+  catch(_){ throw new Error('Sem conexão com o servidor. Confira a internet.'); }
+  const j = await r.json().catch(() => ({ erro:'Resposta inválida do servidor (HTTP ' + r.status + ').' }));
+  if (!r.ok) throw new Error(j.erro || 'Erro ' + r.status);
+  return j;
+}
+async function emitirServidor(modelo, payload, nota, extras, alvo){
+  $(alvo).innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
+  try {
+    const r = await api('emitir', { empresa_id:S.empId, modelo, payload, nota, extras });
+    if (r.nota.status === 'rejeitada' || r.nota.status === 'erro_envio' || r.nota.status === 'denegada'){
+      $(alvo).innerHTML = `<div class="msg err"><b>${r.nota.status === 'erro_envio' ? 'Não enviada.' : 'Nota rejeitada.'}</b> ${esc(r.mensagem || '')}</div>`;
+      verNota(r.nota); return null;
+    }
+    $(alvo).innerHTML = ''; return r;
+  } catch(e){ $(alvo).innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return null; }
+}
+function baixarArquivo({ filename, data }){
+  const blob = data instanceof Blob ? data : new Blob([data]);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  return Promise.resolve({ status:'saved' });
+}
+
+// sessão e papéis
+async function iniciarProducao(){
+  render();
+  try {
+    const r = await fetch('/api/config'), cfg = await r.json();
+    if (!r.ok || !cfg.supabaseUrl) throw new Error(cfg.erro || 'configuração ausente');
+    S.ambiente = cfg.ambiente;
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    SB = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  } catch(e){ S.falha = 'Não foi possível iniciar o sistema: ' + e.message; S.carregando = false; render(); return; }
+  S.dl = { save:baixarArquivo };
+  SB.auth.onAuthStateChange((ev, session) => { if (ev === 'PASSWORD_RECOVERY') S.recuperando = true; setTimeout(() => aoMudarSessao(session), 0); });
+  const { data:{ session } } = await SB.auth.getSession();
+  aoMudarSessao(session);
+}
+async function aoMudarSessao(session){
+  const uidAtual = session && session.user ? session.user.id : null;
+  if (uidAtual && uidAtual === S.meuId && S.logado){ render(); return; }
+  S.carregando = false; S.meuId = uidAtual; S.meuEmail = uidAtual ? session.user.email : ''; S.logado = !!uidAtual;
+  unsubs.forEach(u => u()); unsubs = []; if (S.unsubEmp){ S.unsubEmp(); S.unsubEmp = null; } if (db && db.fechar) db.fechar();
+  S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null;
+  if (!uidAtual){ db = null; render(); renderBadge(); return; }
+  db = criarShim(SB); S.mode = 'db'; S.papel = 'gerente'; S.isAdmin = true;
+  await SB.rpc('aceitar_convites');
+  const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm;
+  startDb(); carregarNcm(); render(); renderBadge();
+}
+async function carregarPapel(id){
+  if (!SB || !id){ S.papel = 'gerente'; S.isAdmin = true; S.papelEmp = null; return; }
+  const { data } = await SB.rpc('meu_papel', { e:id });
+  if (S.empId !== id) return;
+  S.papelEmp = data; S.papel = data === 'operador' ? 'operador' : 'gerente'; S.isAdmin = data === 'dono';
+  if (data === 'dono' || data === 'gerente') carregarMembros();
+  render(); renderBadge();
+}
+async function carregarMembros(){
+  if (!SB || !S.empId) return;
+  const { data } = await SB.rpc('listar_membros', { e:S.empId });
+  S.membros = data || []; render();
+}
+function cardUsuarios(){
+  if (!SB) return '';
+  const nomePapel = { dono:'dono', gerente:'gerente', operador:'operador' };
+  const conta = `<div class="card"><h3 style="margin-top:0">Sua conta</h3><p>${esc(S.meuEmail)}${S.papelEmp ? ' · <b>' + nomePapel[S.papelEmp] + '</b> nesta empresa' : ''}</p>
+    <div class="actions"><button class="btn" data-act="sair">Sair</button></div></div>`;
+  if (!(S.papelEmp === 'dono' || S.papelEmp === 'gerente')) return conta;
+  const dono = S.papelEmp === 'dono', dt = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
+  return conta + `<div class="card"><h3 style="margin-top:0">Usuários desta empresa</h3>
+    ${dono ? `<p class="small">Convide pelo e-mail. Se a pessoa ainda não tem conta, ela cria uma com esse mesmo e-mail e o acesso aparece sozinho.</p>
+    <div class="row">${fld('cvEmail','E-mail', '', 'type="email" autocomplete="off"')}${sel('cvPapel','Papel', 'operador', [['operador','Operador'],['gerente','Gerente']])}</div>
+    <div id="errU"></div><div class="actions"><button class="btn pri" data-act="convidar">Convidar</button></div>` : '<p class="small">Só o dono convida pessoas e muda papéis.</p>'}
+    <div class="list" style="margin-top:8px">${(S.membros || []).map(m => `<div class="it"><div class="grow"><div class="t">${esc(m.email)}</div><div class="s">${m.pendente ? 'convite pendente desde ' : 'desde '}${dt(m.criado_em)}</div></div>
+      ${m.papel === 'dono' ? '<span class="tag">dono</span>'
+        : m.pendente ? `<span class="tag w">${esc(m.papel)}</span>${dono ? `<button class="x" data-act="cancConvite" data-email="${esc(m.email)}" aria-label="Cancelar convite">×</button>` : ''}`
+        : dono ? `<select data-membro="${esc(m.user_id)}" style="width:auto"><option value="operador" ${m.papel === 'operador' ? 'selected' : ''}>Operador</option><option value="gerente" ${m.papel === 'gerente' ? 'selected' : ''}>Gerente</option></select>
+            <button class="x" data-act="remMembro" data-id="${esc(m.user_id)}" aria-label="Remover">×</button>` : `<span class="tag">${esc(m.papel)}</span>`}</div>`).join('')}</div>
+    <p class="small" style="margin-top:8px"><b>Operador:</b> emite notas, cadastra clientes e usa o caixa. <b>Gerente:</b> tudo, inclusive cancelar, devolver e editar produtos. As permissões valem no banco de dados e no servidor.</p></div>`;
+}
+
+// tela de login
+function vLogin(){
+  if (S.recuperando) return `<div class="card" style="max-width:420px;margin:30px auto"><h2>Nova senha</h2>
+    ${fld('lgNova','Nova senha (mínimo 8 caracteres)', '', 'type="password" autocomplete="new-password"')}<div id="errL"></div>
+    <button class="btn pri block" data-act="novaSenha" style="margin-top:10px">Salvar nova senha</button></div>`;
+  const m = S.loginModo || 'entrar', tit = { entrar:'Entrar', criar:'Criar conta', esqueci:'Recuperar senha' }[m];
+  return `<div class="card" style="max-width:420px;margin:30px auto"><h2>${tit}</h2>
+    ${fld('lgEmail','E-mail', S.lgEmail || '', 'type="email" autocomplete="email"')}
+    ${m !== 'esqueci' ? fld('lgSenha', m === 'criar' ? 'Senha (mínimo 8 caracteres)' : 'Senha', '', `type="password" autocomplete="${m === 'criar' ? 'new-password' : 'current-password'}"`) : ''}
+    <div id="errL"></div>
+    <button class="btn pri block" data-act="${m === 'criar' ? 'criarConta' : m === 'esqueci' ? 'esqueci' : 'entrar'}" style="margin-top:12px">${m === 'criar' ? 'Criar conta' : m === 'esqueci' ? 'Enviar link' : 'Entrar'}</button>
+    <p class="small" style="text-align:center;margin-top:14px">${m === 'entrar' ? '<a href="#" data-act="modoLogin" data-m="criar">Criar conta</a> · <a href="#" data-act="modoLogin" data-m="esqueci">Esqueci a senha</a>'
+      : '<a href="#" data-act="modoLogin" data-m="entrar">Voltar para entrar</a>'}</p></div>`;
+}
+const msgL = (txt, tipo = 'err') => { $('#errL').innerHTML = `<div class="msg ${tipo}">${esc(txt)}</div>`; };
+async function acaoLogin(a, t){
+  const email = val('lgEmail').toLowerCase(), senha = val('lgSenha'); if (email) S.lgEmail = email;
+  if (a === 'modoLogin'){ S.loginModo = t.dataset.m; render(); return; }
+  if (a === 'entrar'){
+    const { error } = await SB.auth.signInWithPassword({ email, password:senha });
+    if (error) msgL(/confirm/i.test(error.message) ? 'Confirme seu e-mail pelo link que enviamos antes de entrar.' : 'E-mail ou senha incorretos.');
+  }
+  if (a === 'criarConta'){
+    if (senha.length < 8) return msgL('A senha precisa ter pelo menos 8 caracteres.');
+    const { data, error } = await SB.auth.signUp({ email, password:senha, options:{ emailRedirectTo:location.origin } });
+    if (error) return msgL(error.message);
+    if (!data.session) msgL('Conta criada. Enviamos um link de confirmação para ' + email + '.', 'info');
+  }
+  if (a === 'esqueci'){
+    const { error } = await SB.auth.resetPasswordForEmail(email, { redirectTo:location.origin });
+    msgL(error ? error.message : 'Se esse e-mail tiver conta, enviamos um link para criar uma nova senha.', error ? 'err' : 'info');
+  }
+  if (a === 'novaSenha'){
+    const nova = val('lgNova'); if (nova.length < 8) return msgL('A senha precisa ter pelo menos 8 caracteres.');
+    const { error } = await SB.auth.updateUser({ password:nova });
+    if (error) return msgL(error.message);
+    S.recuperando = false; toast('Senha alterada.'); render();
+  }
+}
+
+// status das notas vindas da Focus
+function tagStatus(n){
+  return ({ autorizada:'<span class="tag">autorizada</span>', processando:'<span class="tag w">processando</span>', rejeitada:'<span class="tag b">rejeitada</span>',
+    erro_envio:'<span class="tag b">não enviada</span>', denegada:'<span class="tag b">denegada</span>', simulada:'<span class="tag w">simulada</span>' })[n.status] || `<span class="tag w">${esc(n.status || '')}</span>`;
+}
+function statusMsg(n){
+  const f = n.focus || {}, m = esc(f.mensagem_sefaz ? `${f.status_sefaz ? f.status_sefaz + ' — ' : ''}${f.mensagem_sefaz}` : (f.mensagem || ''));
+  switch (n.status){
+    case 'autorizada': return `<div class="msg info">✓ Autorizada pela SEFAZ${n.ambiente !== 'producao' ? ' em homologação (sem valor fiscal)' : ''}${f.protocolo ? ' · protocolo ' + esc(f.protocolo) : ''}.</div>`;
+    case 'processando': return '<div class="msg warn">Em processamento na SEFAZ. Toque em "Consultar situação" em alguns segundos.</div>';
+    case 'rejeitada': return `<div class="msg err"><b>Rejeitada pela SEFAZ.</b> ${m || 'Veja os detalhes abaixo.'}<br>Corrija o problema e emita de novo. O número usado aparece em "Números pulados" para inutilizar.</div>`;
+    case 'erro_envio': return `<div class="msg err"><b>Não foi possível enviar.</b> ${m}<br>Toque em "Consultar situação" para conferir se ela chegou à SEFAZ.</div>`;
+    case 'denegada': return `<div class="msg err"><b>Uso denegado pela SEFAZ.</b> ${m}</div>`;
+    case 'cancelada': return `<div class="msg err">Cancelada: ${esc(n.justificativa || '')}</div>`;
+    default: return '<div class="msg info">Nota do protótipo (simulada).</div>';
+  }
+}
+function linksFocus(n){
+  const f = n.focus || {}, base = n.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+  const url = c => /^https?:/.test(c) ? c : base + c, L = [];
+  if (f.caminho_danfe) L.push(`<a class="btn" href="${esc(url(f.caminho_danfe))}" target="_blank" rel="noopener">${n.modelo === '65' ? 'Cupom oficial' : 'DANFE oficial'}</a>`);
+  if (f.caminho_xml_nota_fiscal) L.push(`<a class="btn" href="${esc(url(f.caminho_xml_nota_fiscal))}" target="_blank" rel="noopener">XML</a>`);
+  return L.join('');
+}
+function verNota(n){
+  if (!n) return; const e = emp(), ev = n.eventos || [], venda = (n.op || 'venda') === 'venda', aut = n.status === 'autorizada';
+  const tit = (n.op === 'dev_venda' ? 'Devolução de venda' : n.op === 'dev_compra' ? 'Devolução de compra' : n.modelo === '65' ? 'Cupom' : 'NF-e') + ' nº ' + n.numero;
+  const btn = (act, txt, cls = '') => `<button class="btn ${cls}" data-act="${act}" data-id="${esc(n.id)}">${txt}</button>`;
+  const erros = (n.focus && Array.isArray(n.focus.erros)) ? n.focus.erros : [];
+  openModal(`${mhead(tit)}${statusMsg(n)}
+  ${erros.length ? erros.map(x => `<div class="v erro">${esc(x.mensagem || JSON.stringify(x))}</div>`).join('') : ''}
+  ${(n.devolucoes || []).length ? `<div class="msg warn">Devolvida: ${n.devolucoes.map(d => `NF-e nº ${d.numero} (${brl(d.total)})`).join(', ')}</div>` : ''}
+  <div class="actions">
+    ${['processando','erro_envio'].includes(n.status) ? btn('consultarNota', 'Consultar situação', 'pri') : ''}
+    ${linksFocus(n)}
+    ${n.modelo === '55' && aut && pode('cce') ? btn('cce', 'Carta de correção') : ''}
+    ${venda && aut && pode('devolucao') ? btn('devolver', 'Fazer devolução') : ''}
+    ${aut && pode('cancelar') ? btn('cancelarNota', 'Cancelar nota', 'bad') : ''}
+  </div>
+  ${n.modelo === '65' ? cupomHtml(n, e) : danfeHtml(n, e)}
+  ${ev.length ? `<h3>Eventos</h3>${ev.map(x => `<div class="v ${x.tipo === 'cce' ? 'info' : 'erro'}"><b>${x.tipo === 'cce' ? `Carta de correção ${x.seq}ª` : 'Cancelamento'}</b> · ${fmtData(x.em)} — ${esc(x.texto)}</div>`).join('')}` : ''}
+  <div class="actions">${S.dl ? btn('imprimir', n.modelo === '65' ? 'Baixar prévia (80 mm)' : 'Baixar prévia do DANFE') : ''}</div>
+  <h3>Dados enviados <span class="small">(ref ${esc(n.ref)})</span></h3>
+  <pre class="json" id="jsonOut">${esc(JSON.stringify(n.payload, null, 2))}</pre>
+  <div class="actions"><button class="btn" data-act="copiar">Copiar JSON</button></div>`);
+}
+async function eventoServidor(body, ok){
+  try {
+    const r = await api('evento', { empresa_id:S.empId, ...body });
+    if (r.ok === false){ const el = $('#errM'); if (el) el.innerHTML = `<div class="msg err">${esc(r.mensagem || 'A SEFAZ não confirmou.')}</div>`; else toast(r.mensagem || 'A SEFAZ não confirmou.'); return null; }
+    if (ok) toast(ok); return r;
+  } catch(e){ const el = $('#errM'); if (el) el.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; else toast(e.message); return null; }
+}
+
+// ações novas
+async function acoesV5(a, t, id){
+  if (['entrar','criarConta','esqueci','modoLogin','novaSenha'].includes(a)){ t.disabled = true; await acaoLogin(a, t); t.disabled = false; return true; }
+  switch (a){
+    case 'sair': await SB.auth.signOut(); return true;
+    case 'consultarNota': { t.disabled = true; const r = await eventoServidor({ tipo:'consultar', ref:id }); t.disabled = false; if (r) verNota(r.nota); return true; }
+    case 'convidar': {
+      const email = val('cvEmail'), papel = val('cvPapel');
+      const { data, error } = await SB.rpc('convidar', { e:S.empId, p_email:email, p_papel:papel });
+      if (error){ $('#errU').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return true; }
+      toast(data === 'adicionado' ? 'Acesso liberado.' : 'Convite registrado. Peça para a pessoa criar a conta com esse e-mail.'); carregarMembros(); return true; }
+    case 'cancConvite': { const { error } = await SB.rpc('cancelar_convite', { e:S.empId, p_email:t.dataset.email }); toast(error ? error.message : 'Convite cancelado.'); carregarMembros(); return true; }
+    case 'remMembro': confirmar('Remover o acesso desta pessoa a esta empresa?', 'confRemMembro', id); return true;
+    case 'confRemMembro': { const { error } = await SB.rpc('remover_membro', { e:S.empId, uid:id }); toast(error ? error.message : 'Acesso removido.'); closeModal(); carregarMembros(); return true; }
+  }
+  return false;
+}
+
+/* ================== eventos ================== */
+document.addEventListener('click', async ev => {
+  const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal') closeModal(); return; }
+  if (t.dataset.tab){ S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
+  if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
+  const P = () => S.produtos.find(x => x.id === id);
+  if (await acoesV5(a, t, id)) return;
+  if (await acoesV4(a, t, id)) return;
+  switch (a){
+    case 'fechar': closeModal(); break;
+    case 'novaEmp': formEmpresa(); break;
+    case 'editEmp': formEmpresa(emp()); break;
+    case 'salvarEmp': salvarEmp(id); break;
+    case 'delEmp': confirmar('Excluir esta empresa? Os produtos, clientes e notas dela deixam de aparecer.', 'confDelEmp', id); break;
+    case 'confDelEmp': if (await safe(() => del('empresas', id), 'Empresa excluída.')){ closeModal(); setEmp((S.empresas.find(e => e.id !== id) || {}).id || null); } break;
+    case 'novoProd': formProduto(); break;
+    case 'editProd': formProduto(clone(P())); break;
+    case 'salvarProd': salvarProd(id, t.dataset.force === '1'); break;
+    case 'importarNcm': formNcm(); break;
+    case 'salvarNcm': salvarNcm(); break;
+    case 'filtroProd': S.filtroProd = t.dataset.f; render(); break;
+    case 'delProd': confirmar('Excluir este produto?', 'confDelProd', id); break;
+    case 'confDelProd': if (await safe(() => del('produtos', id), 'Produto excluído.')) closeModal(); break;
+    case 'novoCli': formCliente(); break;
+    case 'editCli': formCliente(clone(S.clientes.find(x => x.id === id))); break;
+    case 'salvarCli': salvarCli(id); break;
+    case 'delCli': confirmar('Excluir este cliente?', 'confDelCli', id); break;
+    case 'confDelCli': if (await safe(() => del('clientes', id), 'Cliente excluído.')) closeModal(); break;
+    case 'addCart': { const ex = S.cart.find(c => c.pid === id); if (ex) ex.qtd = r2(ex.qtd + 1); else S.cart.push({ pid:id, qtd:1 }); S.busca = ''; render(); const b = $('#busca'); if (b) b.focus(); break; }
+    case 'qtd': { const c = S.cart[+t.dataset.i]; c.qtd = r2(c.qtd + +t.dataset.d); if (c.qtd <= 0) S.cart.splice(+t.dataset.i, 1); render(); break; }
+    case 'addPag': { const T = totais(cartLinhas()), f = pagResumo(T.nota).falta; S.pags.push({ forma:t.dataset.c, valor:f > 0 ? String(f).replace('.', ',') : '' }); render();
+      const el = $('#pv' + (S.pags.length - 1)); if (el){ el.focus(); el.select(); } break; }
+    case 'rmPag': S.pags.splice(+t.dataset.i, 1); render(); break;
+    case 'descTipo': S.descTotal.tipo = t.dataset.t; render(); break;
+    case 'nDescTipo': S.nfe.descTotal.tipo = t.dataset.t; render(); break;
+    case 'descItem': formDescItem(+t.dataset.i); break;
+    case 'aplDescItem': aplDescItem(+t.dataset.i); break;
+    case 'remDescItem': S.cart[+t.dataset.i].desc = 0; closeModal(); render(); break;
+    case 'limpar': S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; render(); break;
+    case 'emitirNfce': t.disabled = true; await emitirNfce(); t.disabled = false; break;
+    case 'addNfe': { const p = P(); S.nfe.itens.push({ pid:id, qtd:1, preco:num(p.preco), desc:'' }); S.buscaNfe = ''; render(); break; }
+    case 'rmNfe': S.nfe.itens.splice(+t.dataset.i, 1); render(); break;
+    case 'limparNfe': S.nfe = nfeVazia(); render(); break;
+    case 'exportar': t.disabled = true; await exportar(); t.disabled = false; break;
+    case 'importarBackup': formBackup(); break;
+    case 'salvarBackup': salvarBackup(); break;
+    case 'emitirNfe': t.disabled = true; await emitirNfe(); t.disabled = false; break;
+    case 'filtro': S.filtroNotas = t.dataset.f; render(); break;
+    case 'verNota': verNota(S.notas.find(n => n.id === id)); break;
+    case 'copiar': { const txt = $('#jsonOut').textContent; try { await navigator.clipboard.writeText(txt); toast('JSON copiado.'); }
+      catch(_){ const r = document.createRange(); r.selectNodeContents($('#jsonOut')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selecionado — copie com o menu.'); } break; }
+    case 'cancelarNota': formCancelar(id); break;
+    case 'confCancelar': { const j = val('just'); if (j.length < 15) { $('#errM').innerHTML = '<div class="msg err">Mínimo de 15 caracteres.</div>'; break; }
+      t.disabled = true; $('#errM').innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
+      const n = S.notas.find(x => x.id === id), r = await eventoServidor({ tipo:'cancelar', ref:n.ref, justificativa:j }, 'Nota cancelada na SEFAZ.');
+      t.disabled = false; if (r) verNota(r.nota); break; }
+  }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target; if (inputV4(t)) return;
+  if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(S.busca, 'addCart'); }
+  else if (t.id === 'buscaNfe'){ S.buscaNfe = t.value; $('#resN').innerHTML = resultadosHtml(S.buscaNfe, 'addNfe'); }
+  else if (t.dataset.pv !== undefined){ S.pags[+t.dataset.pv].valor = t.value; }
+  else if (t.id === 'descTot'){ S.descTotal.v = t.value; }
+  else if (t.id === 'nDescTot'){ S.nfe.descTotal.v = t.value; }
+  else if (t.id === 'nFrete'){ S.nfe.vFrete = t.value; } else if (t.id === 'nSeguro'){ S.nfe.vSeguro = t.value; } else if (t.id === 'nOutras'){ S.nfe.vOutras = t.value; }
+  else if (t.id === 'dfAliq'){ S.nfe.difal.aliq = t.value; } else if (t.id === 'dfFcp'){ S.nfe.difal.fcp = t.value; }
+  else if (t.dataset.nd !== undefined){ S.nfe.itens[+t.dataset.nd].desc = t.value; }
+  else if (t.id === 'pNcm'){ $('#ncmInfo').innerHTML = ncmInfoHtml(t.value); }
+  else if (t.id === 'ncmBusca'){ S.ncmQ = t.value; $('#ncmRes').innerHTML = ncmBuscaHtml(S.ncmQ); }
+  else if (t.id === 'cpf'){ S.cpf = t.value; }
+  else if (t.id === 'nomeCons'){ S.nomeCons = t.value; }
+  else if (t.id === 'nfeNat'){ S.nfe.natureza = t.value; }
+  else if (t.id === 'nfeObs'){ S.nfe.obs = t.value; }
+});
+// re-renderiza depois que o foco já foi para o próximo campo (não perde o toque no celular)
+let laterT; const later = () => { clearTimeout(laterT); laterT = setTimeout(render, 0); };
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (changeV4(t)) return;
+  if (t.dataset.membro !== undefined){ SB.rpc('alterar_papel', { e:S.empId, uid:t.dataset.membro, p_papel:t.value }).then(({ error }) => { toast(error ? error.message : 'Papel alterado.'); carregarMembros(); }); return; }
+  if (t.id === 'ncmFile'){ if (t.files[0]) lerArquivoNcm(t.files[0]); return; }
+  if (t.id === 'empSel'){ if (t.value === '__nova'){ renderHeader(); formEmpresa(); } else if (t.value) setEmp(t.value); }
+  else if (t.dataset.qi !== undefined){ const q = numIn(t.value); const i = +t.dataset.qi; if (q > 0) S.cart[i].qtd = q; else S.cart.splice(i, 1); later(); }
+  else if (t.dataset.nq !== undefined){ S.nfe.itens[+t.dataset.nq].qtd = numIn(t.value); later(); }
+  else if (t.dataset.np !== undefined){ S.nfe.itens[+t.dataset.np].preco = numIn(t.value); later(); }
+  else if (t.dataset.pv !== undefined || ['descTot','nDescTot','nFrete','nSeguro','nOutras','dfAliq','dfFcp'].includes(t.id) || t.dataset.nd !== undefined){ later(); }
+  else if (t.id === 'dfMet'){ S.nfe.difal.metodo = t.value; render(); }
+  else if (t.id === 'nfeCli'){ selCliente(t.value); }
+  else if (t.dataset.papel !== undefined){ if (!pode('usuarios')) return; safe(() => db.collection('usuarios').doc(t.dataset.papel).update({ papel:t.value }), 'Papel alterado.'); }
+  else if (t.id === 'bkFile'){ if (t.files[0]) lerBackup(t.files[0]); }
+  else if (t.id === 'nfeFrete'){ S.nfe.frete = t.value; }
+  else if (t.id === 'nfePag'){ S.nfe.pag = t.value; }
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') closeModal();
+  if (ev.key === 'Enter' && ['lgEmail','lgSenha','lgNova'].includes(ev.target.id)){ const b = document.querySelector('#main .btn.pri'); if (b) b.click(); }
+  if (ev.key === 'Enter' && ev.target.id === 'busca'){ const f = document.querySelector('#resV .res'); if (f) f.click(); }
+});
+init();
+</script>
+</body>
+</html>
