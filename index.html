@@ -790,13 +790,14 @@ const val = id => { const el = document.getElementById(id); return el ? el.value
 const mhead = t => `<div class="mhead"><h2>${t}</h2><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>`;
 
 function formEmpresa(e){
-  e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1', municipio:'Teresina', cod_municipio:'2211001' };
+  e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1' };
   openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}
   <div class="row">${fld('eRazao','Razão social *',e.razao)}${fld('eFant','Nome fantasia',e.fantasia)}</div>
-  <div class="row">${fld('eCnpj','CNPJ *',fmtDoc(e.cnpj),'inputmode="numeric"')}${fld('eIe','Inscrição estadual *',e.ie,'inputmode="numeric"')}</div>
+  <div class="row">${fld('eCnpj','CNPJ * (preenche o resto sozinho)',fmtDoc(e.cnpj),'inputmode="numeric" autocomplete="off"')}${fld('eIe','Inscrição estadual *',e.ie,'inputmode="numeric"')}</div>
+  <div id="eAutoInfo" class="small" style="margin-top:4px">${e.id ? '' : 'Digite o CNPJ: razão social, endereço e município vêm da Receita Federal.'}</div>
   <div class="row">${sel('eReg','Regime tributário',e.regime,[['1','Simples Nacional'],['2','Simples — excesso de sublimite'],['3','Regime Normal (Presumido/Real)']])}${fld('eFone','Telefone',e.telefone,'inputmode="tel"')}</div>
   <div class="row">${fld('eLog','Logradouro *',e.logradouro)}${fld('eNum','Número *',e.numero)}</div>
-  <div class="row">${fld('eBai','Bairro *',e.bairro)}${fld('eCep','CEP *',e.cep,'inputmode="numeric"')}</div>
+  <div class="row">${fld('eBai','Bairro *',e.bairro)}${fld('eCep','CEP * (preenche o endereço)',e.cep,'inputmode="numeric" autocomplete="off"')}</div>
   <div class="row">${fld('eMun','Município *',e.municipio)}${fld('eCodMun','Código IBGE do município *',e.cod_municipio,'inputmode="numeric"')}${sel('eUf','UF',e.uf,UFS.map(u => [u,u]))}</div>
   <h3>Numeração e NFC-e</h3>
   <div class="row">${fld('eSNfce','Série NFC-e',e.serie_nfce,'inputmode="numeric"')}${fld('ePNfce','Próximo nº NFC-e',e.prox_nfce,'inputmode="numeric"')}</div>
@@ -868,13 +869,14 @@ async function salvarProd(id, force){
 }
 
 function formCliente(c){
-  c = c || { uf:'PI', ind_ie:'9', municipio:'Teresina', cod_municipio:'2211001' };
+  c = c || { uf:'PI', ind_ie:'9' };
   openModal(`${mhead(c.id ? 'Editar cliente' : 'Novo cliente')}
-  <div class="row">${fld('cDoc','CPF ou CNPJ *',fmtDoc(c.doc),'inputmode="numeric"')}${fld('cNome','Nome / razão social *',c.nome)}</div>
+  <div class="row">${fld('cDoc','CPF ou CNPJ *',fmtDoc(c.doc),'inputmode="numeric" autocomplete="off"')}${fld('cNome','Nome / razão social *',c.nome)}</div>
+  <div id="cAutoInfo" class="small" style="margin-top:4px">${c.id ? '' : 'Com CNPJ, os dados vêm da Receita. Com CPF, digite o CEP para preencher o endereço.'}</div>
   <div class="row">${sel('cInd','Indicador de IE',c.ind_ie,[['9','Não contribuinte'],['1','Contribuinte ICMS'],['2','Contribuinte isento']])}${fld('cIe','Inscrição estadual',c.ie,'inputmode="numeric"')}</div>
   ${fld('cEmail','E-mail (para envio da nota)',c.email,'type="email"')}
   <div class="row">${fld('cLog','Logradouro *',c.logradouro)}${fld('cNum','Número *',c.numero)}</div>
-  <div class="row">${fld('cBai','Bairro *',c.bairro)}${fld('cCep','CEP *',c.cep,'inputmode="numeric"')}</div>
+  <div class="row">${fld('cBai','Bairro *',c.bairro)}${fld('cCep','CEP * (preenche o endereço)',c.cep,'inputmode="numeric" autocomplete="off"')}</div>
   <div class="row">${fld('cMun','Município *',c.municipio)}${fld('cCodMun','Código IBGE *',c.cod_municipio,'inputmode="numeric"')}${sel('cUf','UF',c.uf,UFS.map(u => [u,u]))}</div>
   <div id="errM"></div>
   <div class="actions">${c.id ? `<button class="btn bad" data-act="delCli" data-id="${esc(c.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarCli" data-id="${esc(c.id || '')}">Salvar</button></div>`);
@@ -1814,9 +1816,69 @@ async function acoesV5(a, t, id){
   return false;
 }
 
+/* ---------- preenchimento automático por CNPJ (Receita, via BrasilAPI) e CEP (ViaCEP) ---------- */
+const AUTO = {
+  empresa:{ doc:'eCnpj', info:'eAutoInfo', nome:'eRazao', fantasia:'eFant', fone:'eFone', email:null, regime:'eReg', log:'eLog', num:'eNum', bai:'eBai', cep:'eCep', mun:'eMun', ibge:'eCodMun', uf:'eUf' },
+  cliente:{ doc:'cDoc', info:'cAutoInfo', nome:'cNome', fantasia:null, fone:null, email:'cEmail', regime:null, log:'cLog', num:'cNum', bai:'cBai', cep:'cCep', mun:'cMun', ibge:'cCodMun', uf:'cUf' }
+};
+const autoUltimo = {};
+function setCampo(id, v){ const el = id && document.getElementById(id); if (el && v !== undefined && v !== null && String(v).trim() !== '') el.value = String(v).trim(); }
+function autoMsg(f, html){ const el = document.getElementById(AUTO[f].info); if (el) el.innerHTML = html; }
+async function buscarCep(cep){
+  const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+  const j = await r.json(); if (!r.ok || j.erro) throw new Error('CEP não encontrado.');
+  return j;
+}
+async function preencherPorCep(f, cep, silencioso){
+  const m = AUTO[f];
+  try {
+    const j = await buscarCep(cep);
+    setCampo(m.log, j.logradouro); setCampo(m.bai, j.bairro); setCampo(m.mun, j.localidade); setCampo(m.ibge, j.ibge); setCampo(m.uf, j.uf);
+    if (!silencioso) autoMsg(f, `<span style="color:var(--ok)">✓ Endereço preenchido pelo CEP (${esc(j.localidade)}/${esc(j.uf)}). Confira o número.</span>`);
+    const n = document.getElementById(m.num); if (n && !n.value && !silencioso) n.focus();
+  } catch(e){ if (!silencioso) autoMsg(f, `<span style="color:var(--bad)">✕ ${esc(e.message)} Preencha o endereço à mão.</span>`); }
+}
+async function preencherPorCnpj(f, cnpj){
+  const m = AUTO[f];
+  autoMsg(f, 'Buscando dados na Receita Federal…');
+  try {
+    const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+    if (r.status === 404) throw new Error('CNPJ não encontrado na Receita.');
+    if (!r.ok) throw new Error('Consulta indisponível agora.');
+    const j = await r.json();
+    setCampo(m.nome, (j.razao_social || '').toUpperCase()); setCampo(m.fantasia, j.nome_fantasia);
+    setCampo(m.log, [j.descricao_tipo_de_logradouro, j.logradouro].filter(Boolean).join(' ')); setCampo(m.num, j.numero);
+    setCampo(m.bai, j.bairro); setCampo(m.cep, j.cep); setCampo(m.mun, j.municipio); setCampo(m.uf, j.uf); setCampo(m.ibge, j.codigo_municipio_ibge);
+    setCampo(m.fone, j.ddd_telefone_1); setCampo(m.email, j.email);
+    if (m.regime && j.opcao_pelo_simples === true) setCampo(m.regime, '1');
+    if (m.regime && j.opcao_pelo_simples === false) setCampo(m.regime, '3');
+    if (!j.codigo_municipio_ibge && j.cep) await preencherPorCep(f, dig(j.cep), true);
+    const sit = j.descricao_situacao_cadastral || '';
+    autoMsg(f, (sit && sit.toUpperCase() !== 'ATIVA' ? `<span style="color:var(--bad)">⚠ Situação na Receita: <b>${esc(sit)}</b>.</span><br>` : '')
+      + `<span style="color:var(--ok)">✓ Dados preenchidos pela Receita.</span> <b>Confira tudo e informe a inscrição estadual</b> — ela não vem nessa consulta.`
+      + (m.regime && j.opcao_pelo_simples == null ? ' Confira também o regime tributário.' : ''));
+  } catch(e){ autoMsg(f, `<span style="color:var(--bad)">✕ ${esc(e.message)}</span> Você pode preencher à mão.`); }
+}
+function autoPreencher(t){
+  const f = t.id === 'eCnpj' || t.id === 'eCep' ? 'empresa' : t.id === 'cDoc' || t.id === 'cCep' ? 'cliente' : null;
+  if (!f) return false;
+  const d = dig(t.value), chave = t.id + ':' + d;
+  if (autoUltimo[t.id] === chave) return true;
+  if ((t.id === 'eCnpj' || t.id === 'cDoc') && d.length === 14){
+    autoUltimo[t.id] = chave;
+    if (!cnpjOk(d)){ autoMsg(f, '<span style="color:var(--bad)">✕ CNPJ inválido. Confira os números.</span>'); return true; }
+    preencherPorCnpj(f, d);
+  }
+  if ((t.id === 'eCep' || t.id === 'cCep') && d.length === 8){ autoUltimo[t.id] = chave; preencherPorCep(f, d); }
+  return true;
+}
+
 /* ================== eventos ================== */
+// fecha o modal só se o clique começou no fundo escuro (selecionar texto e soltar fora não fecha mais)
+let cliqueNoFundo = false;
+document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
-  const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal') closeModal(); return; }
+  const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
   if (t.dataset.tab){ S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
@@ -1874,7 +1936,7 @@ document.addEventListener('click', async ev => {
   }
 });
 document.addEventListener('input', ev => {
-  const t = ev.target; if (inputV4(t)) return;
+  const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return;
   if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(S.busca, 'addCart'); }
   else if (t.id === 'buscaNfe'){ S.buscaNfe = t.value; $('#resN').innerHTML = resultadosHtml(S.buscaNfe, 'addNfe'); }
   else if (t.dataset.pv !== undefined){ S.pags[+t.dataset.pv].valor = t.value; }
