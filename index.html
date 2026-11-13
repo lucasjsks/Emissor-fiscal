@@ -19,6 +19,7 @@ header{position:sticky;top:0;z-index:5;background:var(--brand);color:#fff;paddin
 header h1{font-size:16px;margin:0;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header select{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 8px;max-width:45vw}
 header select option{color:#000}
+header select:disabled{opacity:1;cursor:default;-webkit-appearance:none;appearance:none}
 .badge{font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(255,255,255,.18);white-space:nowrap}
 .amb{background:var(--warn-soft);color:var(--warn);font-size:12.5px;padding:7px 16px;border-bottom:1px solid #f1d9b5}
 main{max-width:980px;margin:0 auto;padding:16px 14px 96px}
@@ -168,7 +169,7 @@ async function put(k, obj){
   obj = clone(obj);
   if (SB && db && k === 'empresas' && !obj.id){
     const { data, error } = await SB.rpc('criar_empresa', { dados:obj });
-    if (error){ const x = new Error(error.message); x.code = 'invalid_argument'; throw x; }
+    if (error){ const x = new Error(error.message); x.code = 'mensagem'; throw x; }
     obj.id = data; return obj;
   }
   if (!obj.id) obj.id = uid();
@@ -218,7 +219,7 @@ function renderBadge(){
 }
 async function safe(fn, okMsg){
   try { await fn(); if (okMsg) toast(okMsg); return true; }
-  catch(e){ const c = e && e.code; toast(c === 'quota_exceeded' ? 'Limite de armazenamento atingido.' : c === 'invalid_argument' ? 'Sem permissão para salvar aqui.' : 'Erro ao salvar. Tente de novo.'); return false; }
+  catch(e){ const c = e && e.code; if (c === 'mensagem') { toast(e.message); return false; } toast(c === 'quota_exceeded' ? 'Limite de armazenamento atingido.' : c === 'invalid_argument' ? 'Sem permissão para salvar aqui.' : 'Erro ao salvar. Tente de novo.'); return false; }
 }
 
 
@@ -561,8 +562,10 @@ function renderNav(){
 }
 function renderHeader(){
   const sel = $('#empSel');
-  sel.innerHTML = S.empresas.length ? S.empresas.map(e => `<option value="${esc(e.id)}" ${e.id === S.empId ? 'selected' : ''}>${esc(e.fantasia || e.razao)}</option>`).join('') + '<option value="__nova">+ Nova empresa</option>'
-    : '<option value="">Sem empresa</option><option value="__nova">+ Nova empresa</option>';
+  // cada conta tem uma única empresa: sem opção de "nova empresa" depois que ela existe
+  sel.innerHTML = S.empresas.length ? S.empresas.map(e => `<option value="${esc(e.id)}" ${e.id === S.empId ? 'selected' : ''}>${esc(e.fantasia || e.razao)}</option>`).join('')
+    : '<option value="">Sem empresa</option>';
+  sel.disabled = S.empresas.length <= 1;
 }
 
 /* ================== render principal ================== */
@@ -807,7 +810,7 @@ function formEmpresa(e){
   <p class="small">Confira o valor-limite de identificação do consumidor com a SEFAZ-PI.</p>
   <p class="small">O código CSC em si não é guardado aqui: ele vai direto no painel da Focus NFe.</p>
   <div id="errM"></div>
-  <div class="actions">${e.id ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar</button></div>`);
+  <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar</button></div>`);
 }
 async function salvarEmp(id){
   const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),

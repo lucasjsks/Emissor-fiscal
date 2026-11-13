@@ -12,6 +12,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 ## Regras
 - Notas e inutilizações só podem ser gravadas pelo servidor (RLS bloqueia o cliente). Numeração via RPC `proximo_numero`.
 - Segredos (token Focus, service_role) só em variáveis da Vercel. Nunca no código, nunca pedir no chat.
+- **Uma empresa por conta** (o sistema é vendido por empresa): `criar_empresa` recusa se o usuário já é dono de alguma; a tela não oferece "nova empresa". Empresa com notas não pode ser apagada.
 - Papéis: dono > gerente > operador. Checar no servidor (`papelDe`) e no RLS (`pode_gravar`/`pode_apagar`), não só na tela.
 - Rodar `npm test` antes de enviar. Testes usam fetch simulado (`test/api.test.js`).
 - Validado em homologação (12/11/2026, empresa piloto em Campo Maior/PI, Simples): emissão de NFC-e, cupom oficial e XML, cancelamento, pagamento dividido/troco, NF-e com consulta de situação e fechamento de caixa — tudo autorizado pela SEFAZ-PI.
