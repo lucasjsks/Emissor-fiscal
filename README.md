@@ -73,4 +73,5 @@ Testa as rotas do servidor com Supabase e Focus simulados (emissão, rejeição,
 - [ ] Mapear os campos de IBS/CBS no layout da Focus
 - [ ] Pacote mensal com os XMLs autorizados (hoje leva os dados de envio)
 - [ ] Contingência offline e impressão direta (programa local no caixa)
-- [ ] Estoque e financeiro
+- [x] Estoque: compras por XML ou manual, baixa automática nas vendas, inventário e fornecedores
+- [ ] Financeiro
