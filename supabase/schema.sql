@@ -78,7 +78,9 @@ language sql stable security definer set search_path = public as $$
   select case
     when p_col = 'ncm' then public.eh_admin()
     when p_empresa is null then false
+    -- empresa com notas não pode ser apagada (guarda fiscal obrigatória)
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) = 'dono', false)
+      and not exists (select 1 from public.docs d where d.col = 'empresas/' || p_empresa || '/notas')
     when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     else false
   end
@@ -94,6 +96,18 @@ end $$;
 drop trigger if exists docs_carimbo on public.docs;
 create trigger docs_carimbo before insert or update on public.docs
   for each row execute function public.docs_carimbo();
+
+-- ao apagar uma empresa, remove os acessos dela (assim o dono pode cadastrar outra)
+create or replace function public.empresa_apagada() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.membros where empresa_id = old.empresa_id;
+  delete from public.convites where empresa_id = old.empresa_id;
+  return old;
+end $$;
+drop trigger if exists empresa_apagada on public.docs;
+create trigger empresa_apagada after delete on public.docs
+  for each row when (old.col = 'empresas') execute function public.empresa_apagada();
 
 -- ---------- segurança por linha (RLS) ----------
 alter table public.docs enable row level security;
@@ -128,6 +142,11 @@ language plpgsql security definer set search_path = public as $$
 declare novo text := gen_random_uuid()::text;
 begin
   if auth.uid() is null then raise exception 'Faça login para cadastrar a empresa.'; end if;
+  -- cada conta pode ser dona de UMA empresa (o sistema é vendido por empresa)
+  perform pg_advisory_xact_lock(hashtext('criar_empresa:' || auth.uid()::text));
+  if exists (select 1 from public.membros where user_id = auth.uid() and papel = 'dono') then
+    raise exception 'Sua conta já tem uma empresa cadastrada. Cada conta pode ter apenas uma empresa.';
+  end if;
   insert into public.docs (path, col, empresa_id, data)
     values ('empresas/' || novo, 'empresas', novo, coalesce(dados, '{}'::jsonb) || jsonb_build_object('id', novo));
   insert into public.membros (empresa_id, user_id, papel) values (novo, auth.uid(), 'dono');
