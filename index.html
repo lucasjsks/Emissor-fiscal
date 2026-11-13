@@ -133,7 +133,7 @@ code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);
 html,body{font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
 ::selection{background:#bfe6d6}
 /* cabeçalho */
-header{background:rgba(255,255,255,.86);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);color:var(--ink);border-bottom:1px solid var(--line);padding:10px 16px;min-height:60px}
+header{background:#fff;color:var(--ink);border-bottom:1px solid var(--line);padding:10px 16px;min-height:60px}
 header h1{font-size:16.5px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
 header h1::before{content:"";flex:0 0 32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#14a073,#0a6047) center/18px no-repeat;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 3h7l4 4v14H7z'/%3E%3Cpath d='M10 13l2 2 3-4'/%3E%3C/svg%3E"),linear-gradient(135deg,#14a073,#0a6047);box-shadow:0 2px 6px rgba(14,122,90,.35)}
@@ -179,7 +179,7 @@ header select:disabled{background-image:none;padding-right:12px}
 details>summary{list-style:none}details>summary::-webkit-details-marker{display:none}
 details>summary::before{content:"›";display:inline-block;margin-right:8px;transition:transform .15s;color:var(--muted)}details[open]>summary::before{transform:rotate(90deg)}
 /* modal */
-#modal{background:rgba(16,24,40,.42);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#modal{background:rgba(16,24,40,.5)}
 #modal.on{animation:fadeIn .15s ease}
 #modal .box{border-radius:22px 22px 0 0;padding:20px 18px 24px;box-shadow:var(--shadow-lg);animation:sobe .2s cubic-bezier(.2,.8,.2,1)}
 @media(min-width:700px){#modal .box{border-radius:20px;padding:22px 24px 26px}}
@@ -196,7 +196,7 @@ a{color:var(--brand);font-weight:600;text-decoration:none}a:hover{text-decoratio
 .login-tit{font-size:24px;font-weight:750;letter-spacing:-.03em}
 .login-card{max-width:420px;margin:0 auto;padding:24px}
 /* navegação: barra inferior no celular */
-nav{background:rgba(255,255,255,.92);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+nav{background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 nav button{border-radius:12px;padding:6px 2px 6px;gap:2px;font-weight:550;transition:color .15s}
 nav button svg{width:24px;height:24px;padding:2px 10px;box-sizing:content-box;border-radius:99px;transition:background .15s}
 nav button.on{color:var(--brand-ink)}nav button.on svg{background:var(--brand-soft)}
@@ -2085,15 +2085,18 @@ function vNotasCompra(){
   if (mes) L = L.filter(c => String(c.data_emissao || '').slice(0, 7) === mes);
   if (q) L = L.filter(c => norm(c.fornecedor_nome).includes(q) || String(c.numero || '') === (S.cpBusca || '').trim() || (dig(q).length >= 4 && dig(c.fornecedor_cnpj).includes(dig(q))));
   const val = L.filter(c => c.status !== 'estornada'), tot = r2(val.reduce((a, c) => a + num(c.total_nota), 0));
+  const nEst = L.length - val.length, lim = S.cpLim || 60, mais = L.length - lim; L = L.slice(0, lim);
+  const tagC = c => { if (c.status === 'estornada') return '<span class="tag b">estornada</span>'; const d = situacaoDev(c);
+    return d === 'total' ? '<span class="tag w">devolvida</span>' : d === 'parcial' ? '<span class="tag w">devolução parcial</span>' : '<span class="tag">lançada</span>'; };
   return `${pode('produto') ? `<div class="actions" style="margin:0 0 12px"><label class="btn pri" style="flex:1">⤓ Importar XML (pode escolher vários)<input type="file" id="compraXml" accept=".xml" multiple hidden></label>
       <button class="btn" data-act="novaCompra">+ Lançar nota manualmente</button></div>` : ''}
     <div class="card"><div class="row"><div><label for="cpBusca">Buscar</label><input id="cpBusca" placeholder="Fornecedor, número ou CNPJ" value="${esc(S.cpBusca || '')}" autocomplete="off"></div>
       <div><label for="cpMes">Mês de emissão</label><input id="cpMes" type="month" value="${esc(mes)}"></div></div>
-      <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${L.length - val.length}</b>estornadas</div></div></div>
+      <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${nEst}</b>estornadas</div></div></div>
     <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
       <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></div>
       <div class="s">${dataBR(c.data_emissao)} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${c.status === 'estornada' ? '<span class="tag b">estornada</span>' : situacaoDev(c) === 'total' ? '<span class="tag w">devolvida</span>' : situacaoDev(c) === 'parcial' ? '<span class="tag w">devolução parcial</span>' : '<span class="tag">lançada</span>'}</div></div>`).join('')}</div>`
+      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 60)} (faltam ${mais})</button></div>` : ''}`
       : `<div class="empty">${S.compras.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
 }
 
@@ -2523,7 +2526,18 @@ async function gerarDanfeCompra(id, btn){
 
 /* ---------- devolução de compra (NF-e de saída para o fornecedor) ---------- */
 const CFOP_ST_COMPRA = ['5401','5402','5403','5405','6401','6402','6403','6404'];
-const devsDaCompra = cid => S.notas.filter(n => n.op === 'dev_compra' && n.compra_id === cid && notaValida(n));
+// índice compra → devoluções, refeito só quando a lista de notas muda (antes varria todas as notas para cada compra)
+let _idxDev = { ref:null, len:-1, sig:'', map:new Map() };
+function indiceDev(){
+  const N = S.notas, sig = N.length ? N[N.length - 1].id + (N[N.length - 1].status || '') : '';
+  if (_idxDev.ref !== N || _idxDev.len !== N.length || _idxDev.sig !== sig){
+    const m = new Map();
+    for (const n of N) if (n.op === 'dev_compra' && n.compra_id && notaValida(n)){ let a = m.get(n.compra_id); if (!a) m.set(n.compra_id, a = []); a.push(n); }
+    _idxDev = { ref:N, len:N.length, sig, map:m };
+  }
+  return _idxDev.map;
+}
+const devsDaCompra = cid => indiceDev().get(cid) || [];
 function devolvidoPorItem(cid){
   const q = {}; devsDaCompra(cid).forEach(n => (n.dev_itens || []).forEach(d => q[d.i] = rq((q[d.i] || 0) + num(d.q)))); return q;
 }
@@ -2625,11 +2639,12 @@ async function verEstoque(id){
 
 /* ---------- fornecedores ---------- */
 function vFornecedores(){
-  const L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  const L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || '')), porCnpj = {};
+  S.compras.forEach(c => { if (c.status === 'estornada') return; const x = porCnpj[c.fornecedor_cnpj] || (porCnpj[c.fornecedor_cnpj] = { n:0, v:0 }); x.n++; x.v += num(c.total_nota); });
   return `${pode('produto') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="novoFornecedor">+ Fornecedor</button></div>' : ''}
-    <div class="card">${L.length ? `<div class="list">${L.map(f => { const cs = S.compras.filter(c => c.fornecedor_cnpj === f.cnpj && c.status !== 'estornada');
+    <div class="card">${L.length ? `<div class="list">${L.map(f => { const cs = porCnpj[f.cnpj] || { n:0, v:0 };
       return `<div class="it" data-act="editFornecedor" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.fantasia || f.nome)}</div>
-        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><div style="text-align:right"><b class="num">${brl(cs.reduce((a, c) => a + num(c.total_nota), 0))}</b><br><span class="small">${cs.length} compra(s)</span></div></div>`; }).join('')}</div>`
+        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><div style="text-align:right"><b class="num">${brl(cs.v)}</b><br><span class="small">${cs.n} compra(s)</span></div></div>`; }).join('')}</div>`
       : '<div class="empty">Os fornecedores entram sozinhos quando você importa uma nota de compra.</div>'}</div>`;
 }
 function formFornecedor(f){
@@ -2661,6 +2676,7 @@ async function salvarFornecedor(id){
 async function acoesEstoque(a, t, id){
   switch (a){
     case 'cpView': S.cpView = t.dataset.v; render(); return true;
+    case 'cpMais': S.cpLim = (S.cpLim || 60) + 60; render(); return true;
         case 'verCompra': verCompra(id); return true;
     case 'imprimirCompra': await gerarDanfeCompra(id, t); return true;
     case 'baixarXmlCompra': baixarXmlCompra(id); return true;
@@ -2705,7 +2721,7 @@ async function acoesEstoque(a, t, id){
 }
 function inputEstoque(t){
   if (t.id === 'estBusca'){ S.estBusca = t.value; later(); return true; }
-  if (t.id === 'cpBusca'){ S.cpBusca = t.value; later(); return true; }
+  if (t.id === 'cpBusca'){ S.cpBusca = t.value; S.cpLim = 60; later(); return true; }
   if (t.dataset.dq !== undefined && S.dc){ S.dc.q[+t.dataset.dq] = t.value; const D = calcDevCompra(), el = $('#dcTot');
     if (el) el.innerHTML = D.linhas.length ? `${D.ipi ? linhaTot('IPI devolvido', D.ipi, 'small') : ''}${D.st ? linhaTot('ICMS-ST devolvido', D.st, 'small') : ''}${linhaTot('Total da devolução', D.total, 'big')}` : '<div class="small">Nenhum item marcado.</div>';
     const b = $('[data-act=emitirDevCompra]'); if (b) b.disabled = !D.linhas.length; return true; }
@@ -2724,7 +2740,7 @@ function inputEstoque(t){
 }
 function changeEstoque(t){
   if (t.id === 'compraXml'){ if (t.files.length) importarXmls([...t.files]); t.value = ''; return true; }
-  if (t.id === 'cpMes'){ S.cpMes = t.value; render(); return true; }
+  if (t.id === 'cpMes'){ S.cpMes = t.value; S.cpLim = 60; render(); return true; }
   if (t.dataset.ci !== undefined){ const it = S.compraImport.itens[+t.dataset.ci]; it.produto_id = t.value; it.como = ''; renderCompraImport(); return true; }
   if (t.id === 'ciPerf'){ S.ciPerf = t.value; return true; }
   if (t.dataset.cm !== undefined && S.cm){ S.cm[t.dataset.cm] = t.value; if (['modelo','pagamento','fornecedor_id'].includes(t.dataset.cm)) renderCompraManual(); return true; }
