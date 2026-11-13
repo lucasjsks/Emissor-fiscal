@@ -109,6 +109,10 @@ code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);
 .chk{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:14px;margin:12px 0 4px}.chk input{width:auto}
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#1c2321;color:#fff;padding:10px 16px;border-radius:99px;font-size:13.5px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
+.atalhos{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.atalhos button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 6px;min-height:58px;font:inherit;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;gap:4px;text-align:left;color:var(--ink)}
+.atalhos button:active{transform:scale(.97)}.atalhos button b{font-size:12px}
+.teclas{margin-top:8px;display:none}@media(pointer:fine) and (min-width:700px){.teclas{display:block}}
 </style>
 </head>
 <body>
@@ -616,11 +620,12 @@ function vVenda(){
   <div class="grid2"><div>
     <div class="card"><label for="busca">Buscar produto (nome, código ou código de barras)</label>
       <input id="busca" autocomplete="off" placeholder="Digite ou passe o leitor…" value="${esc(S.busca)}">
-      <div class="results" id="resV">${resultadosHtml(S.busca, 'addCart')}</div></div>
+      <div class="results" id="resV">${resultadosHtml(separarMult(S.busca).q, 'addCart')}</div>${TECLAS_CUPOM}</div>
+    ${atalhosHtml()}
     <div class="card"><h3 style="margin-top:0">Itens</h3>
       ${L.length ? `<div class="list">${L.map((l, i) => `<div class="it"><div class="grow" data-act="descItem" data-i="${i}" style="cursor:pointer"><div class="t">${esc(l.p.descricao)}</div>
         <div class="s">${brl(l.preco)} / ${esc(l.p.unidade || 'UN')}${temSaldo(l.p) && l.p.estoque - l.qtd < 0 ? ` · <b style="color:var(--bad)">estoque ${qtdTxt(l.p.estoque)}</b>` : ''}${l.descItem ? ` · <span style="color:var(--bad)">desc. −${brl(l.descItem)}</span>` : ' · <u>desconto</u>'}</div></div>
-        <div class="qty"><button data-act="qtd" data-i="${i}" data-d="-1">−</button><input id="q${i}" data-qi="${i}" inputmode="decimal" value="${l.qtd}"><button data-act="qtd" data-i="${i}" data-d="1">+</button></div>
+        <div class="qty"><button data-act="qtd" data-i="${i}" data-d="-1">−</button><input id="q${i}" data-qi="${i}" inputmode="decimal" value="${String(l.qtd).replace('.', ',')}"><button data-act="qtd" data-i="${i}" data-d="1">+</button></div>
         <b class="num" style="min-width:76px;text-align:right">${brl(r2(l.c.bruto - l.descItem))}</b></div>`).join('')}</div>` : '<div class="empty">Nenhum item ainda.</div>'}
     </div></div>
     <div><div class="card">
@@ -785,6 +790,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardBalanca()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
     <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}
@@ -796,7 +802,7 @@ function vEmpresa(){
 
 /* ================== formulários (modal) ================== */
 function openModal(html){ $('#mbox').innerHTML = html; $('#modal').classList.add('on'); }
-function closeModal(){ $('#modal').classList.remove('on'); $('#mbox').innerHTML = ''; }
+function closeModal(){ $('#modal').classList.remove('on'); $('#mbox').innerHTML = ''; if (S.tab === 'venda' && typeof ponteiroFino === 'function' && ponteiroFino()) setTimeout(() => { const b = $('#busca'); if (b) b.focus(); }, 30); }
 const fld = (id, label, v, extra = '') => `<div><label for="${id}">${label}</label><input id="${id}" value="${esc(v ?? '')}" ${extra}></div>`;
 const sel = (id, label, v, opts) => `<div><label for="${id}">${label}</label><select id="${id}">${opts.map(([c, t]) => `<option value="${esc(c)}" ${String(v) === String(c) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -828,7 +834,7 @@ async function salvarEmp(id){
     serie_nfce:dig(val('eSNfce')) || '1', prox_nfce:parseInt(dig(val('ePNfce'))) || 1, serie_nfe:dig(val('eSNfe')) || '1', prox_nfe:parseInt(dig(val('ePNfe'))) || 1,
     csc_id:dig(val('eCsc')), ambiente:'homologacao', limite_cpf_nfce:numIn(val('eLim')) || 10000 };
   const antigo = id ? S.empresas.find(x => x.id === id) : null;
-  if (antigo){ if (antigo.difal_uf) o.difal_uf = clone(antigo.difal_uf); }
+  if (antigo){ if (antigo.difal_uf) o.difal_uf = clone(antigo.difal_uf); if (antigo.balanca) o.balanca = clone(antigo.balanca); }
   const errs = [];
   if (!o.razao) errs.push('Informe a razão social.');
   if (!cnpjOk(o.cnpj)) errs.push('CNPJ inválido.');
@@ -849,6 +855,8 @@ function formProduto(p){
   ${fld('pDesc','Descrição *',p.descricao)}
   <div class="row">${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
   <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','inputmode="decimal" placeholder="0,00"')}${fld('pUn','Unidade',p.unidade)}</div>
+  <label class="chk"><input type="checkbox" id="pFav" ${p.favorito ? 'checked' : ''}> Mostrar como atalho no cupom (botão de toque rápido)</label>
+  <p class="small">Produto vendido na balança: o <b>Código interno</b> deve ser o mesmo código cadastrado na balança.</p>
   <h3>Tributação</h3>
   <div class="row">${fld('pNcm','NCM * (8 dígitos)',p.ncm,'inputmode="numeric"')}${fld('pCest','CEST',p.cest,'inputmode="numeric"')}</div>
   <div id="ncmInfo" class="small" style="margin-top:4px">${ncmInfoHtml(p.ncm)}</div>
@@ -865,7 +873,7 @@ function formProduto(p){
 }
 async function salvarProd(id, force){
   const o = { descricao:val('pDesc').toUpperCase(), codigo:val('pCod'), gtin:val('pGtin') || 'SEM GTIN', preco:numIn(val('pPreco')), unidade:(val('pUn') || 'UN').toUpperCase(),
-    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), estoque_min:numIn(val('pEstMin')) };
+    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), estoque_min:numIn(val('pEstMin')), favorito:!!($('#pFav') && $('#pFav').checked) };
   const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn','estoque','custo_medio'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
   const pf = S.perfis.find(f => f.id === o.perfil_id);
   if (pf && Object.entries(taxOf(pf)).some(([k, v]) => String(v) !== String(o[k]))) o.perfil_id = '';
@@ -1038,7 +1046,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -1053,7 +1061,7 @@ function loadXlsx(){
     sc.onload = () => res(window.XLSX); sc.onerror = () => { XLSXP = null; rej(new Error('Não foi possível carregar a biblioteca de planilhas.')); }; document.head.appendChild(sc); });
   return XLSXP;
 }
-const PROD_COLS = ['id','codigo','descricao','gtin','preco','estoque','estoque_min','custo','custo_medio','unidade','ncm','cest','cfop','origem','cst_csosn','icms_aliq','icms_red','st_mva','st_aliq','st_fcp','pis_cst','pis_aliq','cofins_cst','cofins_aliq','cst_ibscbs','cclasstrib'];
+const PROD_COLS = ['id','codigo','descricao','gtin','preco','favorito','estoque','estoque_min','custo','custo_medio','unidade','ncm','cest','cfop','origem','cst_csosn','icms_aliq','icms_red','st_mva','st_aliq','st_fcp','pis_cst','pis_aliq','cofins_cst','cofins_aliq','cst_ibscbs','cclasstrib'];
 const CLI_COLS = ['id','doc','nome','ind_ie','ie','email','logradouro','numero','bairro','cep','municipio','cod_municipio','uf'];
 async function exportar(){
   const e = emp();
@@ -2530,6 +2538,81 @@ function changeEstoque(t){
   return false;
 }
 
+/* ================== CUPOM RÁPIDO ================== */
+// leitor de código de barras, etiqueta de balança, multiplicador (3*código), atalhos e teclas de função
+const rq = n => Math.round((Number(n) || 0) * 10000) / 10000;
+const ponteiroFino = () => window.matchMedia && matchMedia('(pointer:fine)').matches;
+function bip(ok){
+  try { const A = window.__ac || (window.__ac = new (window.AudioContext || window.webkitAudioContext)()), o = A.createOscillator(), g = A.createGain();
+    o.frequency.value = ok ? 1500 : 220; g.gain.value = 0.08; o.connect(g); g.connect(A.destination); o.start(); o.stop(A.currentTime + (ok ? 0.06 : 0.35)); } catch(_){}
+}
+function limparBusca(){ S.busca = ''; render(); const b = $('#busca'); if (b){ b.value = ''; $('#resV').innerHTML = ''; if (ponteiroFino()) b.focus(); } }
+const separarMult = txt => { const m = String(txt || '').trim().match(/^(\d+(?:[.,]\d+)?)\s*[*xX]\s*(.+)$/); return m ? { mult:numIn(m[1]), q:m[2].trim() } : { mult:1, q:String(txt || '').trim() }; };
+// etiqueta de balança: 13 dígitos começando com 2 → 2 | código (4 ou 5) | valor (6 dígitos, posições 7 a 12) | verificador
+function lerBalanca(cod){
+  const b = (emp() || {}).balanca, c = dig(cod);
+  if (!b || !b.ativo || c.length !== 13 || c[0] !== '2' || c !== String(cod).trim()) return null;
+  const codigo = +c.slice(1, b.digitos === 5 ? 6 : 5), valor = +c.slice(6, 12);
+  const p = S.produtos.find(x => dig(x.codigo) && +dig(x.codigo) === codigo);
+  if (!p) return { erro:`Etiqueta de balança: nenhum produto com código interno ${codigo}. Confira o "Código interno" no cadastro do produto.` };
+  if (b.tipo === 'peso') return { p, qtd:rq(valor / 1000) };
+  if (!(num(p.preco) > 0)) return { erro:`${p.descricao} está sem preço de venda.` };
+  return { p, qtd:rq(valor / 100 / num(p.preco)) };
+}
+function addItem(pid, qtd = 1){
+  const p = S.produtos.find(x => x.id === pid); if (!p) return;
+  if (!(qtd > 0)) return toast('Quantidade inválida.');
+  const ex = S.cart.find(c => c.pid === pid);
+  if (ex) ex.qtd = rq(ex.qtd + qtd); else S.cart.push({ pid, qtd:rq(qtd) });
+  limparBusca(); bip(true);
+  const tot = (ex || S.cart.find(c => c.pid === pid)).qtd;
+  if (temSaldo(p) && p.estoque - tot < 0) toast(`Atenção: ${p.descricao} está sem estoque suficiente (saldo ${qtdTxt(p.estoque)}).`);
+}
+// Enter na busca: código exato, etiqueta de balança ou primeiro resultado
+function entradaBusca(txt){
+  const { mult, q } = separarMult(txt); if (!q) return;
+  const bal = lerBalanca(q);
+  if (bal){ if (bal.erro){ bip(false); toast(bal.erro); limparBusca(); } else addItem(bal.p.id, rq(bal.qtd * mult)); return; }
+  const ql = q.toLowerCase(), d = dig(q);
+  const exato = S.produtos.find(p => (p.codigo && p.codigo.toLowerCase() === ql) || (d === q && d.length >= 8 && p.gtin === d));
+  if (exato) return addItem(exato.id, mult);
+  if (d === q && d.length >= 8){ bip(false); toast(`Código ${d} não cadastrado.`); limparBusca(); return; }
+  const f = document.querySelector('#resV .res'); if (f) addItem(f.dataset.id, mult);
+}
+function atalhosHtml(){
+  const F = S.produtos.filter(p => p.favorito).sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')).slice(0, 30);
+  if (!F.length) return '';
+  return `<div class="card"><h3 style="margin-top:0">Atalhos</h3><div class="atalhos">${F.map(p => `<button data-act="addCart" data-id="${esc(p.id)}"><span>${esc(p.descricao)}</span><b>${brl(p.preco)}</b></button>`).join('')}</div></div>`;
+}
+const TECLAS_CUPOM = '<div class="small teclas"><b>F2</b> buscar · <b>F4</b> dinheiro · <b>F6</b> PIX · <b>F7</b> débito · <b>F8</b> crédito · <b>F9</b> emitir · <b>3*código</b> multiplica · <b>Del</b> remove o último item</div>';
+function teclaCupom(ev){
+  if (S.tab !== 'venda' || $('#modal').classList.contains('on')) return false;
+  const k = ev.key, clique = sel => { const b = document.querySelector(sel); if (b && !b.disabled) b.click(); };
+  const formas = { F4:'01', F6:'17', F7:'04', F8:'03' };
+  if (k === 'F2'){ const b = $('#busca'); if (b){ b.focus(); b.select(); } }
+  else if (formas[k]) clique(`[data-act=addPag][data-c="${formas[k]}"]`);
+  else if (k === 'F9') clique('[data-act=emitirNfce]');
+  else if (k === 'Delete' && ev.target.id === 'busca' && !ev.target.value && S.cart.length){ S.cart.pop(); render(); $('#busca').focus(); }
+  else return false;
+  ev.preventDefault(); return true;
+}
+// balança: configuração na aba Empresa
+function cardBalanca(){
+  const b = (emp() || {}).balanca || {};
+  return `<div class="card"><h3 style="margin-top:0">Balança (etiquetas de peso)</h3>
+    <p class="small">Para vender carne, frios e outros itens pesados na balança que imprime etiqueta. A etiqueta tem 13 números começando com 2. O sistema acha o produto pelo <b>Código interno</b> do cadastro.</p>
+    ${pode('empresa') ? `<label class="chk"><input type="checkbox" id="balAtivo" ${b.ativo ? 'checked' : ''}> Ler etiquetas de balança no cupom</label>
+    <div class="row">${sel('balDig', 'Código do produto na etiqueta', String(b.digitos || 4), [['4','4 dígitos (2 CCCC 0 VVVVVV D)'],['5','5 dígitos (2 CCCCC VVVVVV D)']])}
+      ${sel('balTipo', 'A etiqueta traz', b.tipo || 'preco', [['preco','O valor total em R$'],['peso','O peso em kg']])}</div>
+    <div class="actions"><button class="btn" data-act="salvarBalanca">Salvar balança</button></div>
+    <p class="small">Na dúvida, veja na própria balança ou passe uma etiqueta no cupom e confira se o valor bateu.</p>`
+    : `<p>${b.ativo ? `Ativa · código de ${b.digitos || 4} dígitos · etiqueta com ${b.tipo === 'peso' ? 'peso' : 'valor'}` : 'Desativada'}</p>`}</div>`;
+}
+async function salvarBalanca(){
+  const e = clone(emp()); e.balanca = { ativo:$('#balAtivo').checked, digitos:+val('balDig') === 5 ? 5 : 4, tipo:val('balTipo') === 'peso' ? 'peso' : 'preco' };
+  await safe(() => put('empresas', e), 'Configuração da balança salva.');
+}
+
 /* ================== eventos ================== */
 // fecha o modal só se o clique começou no fundo escuro (selecionar texto e soltar fora não fecha mais)
 let cliqueNoFundo = false;
@@ -2548,6 +2631,7 @@ document.addEventListener('click', async ev => {
     case 'novaEmp': formEmpresa(); break;
     case 'editEmp': formEmpresa(emp()); break;
     case 'salvarEmp': salvarEmp(id); break;
+    case 'salvarBalanca': salvarBalanca(); break;
     case 'delEmp': confirmar('Excluir esta empresa? Os produtos, clientes e notas dela deixam de aparecer.', 'confDelEmp', id); break;
     case 'confDelEmp': if (await safe(() => del('empresas', id), 'Empresa excluída.')){ closeModal(); setEmp((S.empresas.find(e => e.id !== id) || {}).id || null); } break;
     case 'novoProd': formProduto(); break;
@@ -2563,11 +2647,8 @@ document.addEventListener('click', async ev => {
     case 'salvarCli': salvarCli(id); break;
     case 'delCli': confirmar('Excluir este cliente?', 'confDelCli', id); break;
     case 'confDelCli': if (await safe(() => del('clientes', id), 'Cliente excluído.')) closeModal(); break;
-    case 'addCart': { const ex = S.cart.find(c => c.pid === id); if (ex) ex.qtd = r2(ex.qtd + 1); else S.cart.push({ pid:id, qtd:1 }); S.busca = ''; render(); const b = $('#busca'); if (b) b.focus();
-      const p = S.produtos.find(x => x.id === id), q = (ex || S.cart.find(c => c.pid === id)).qtd;
-      if (p && temSaldo(p) && p.estoque - q < 0) toast(`Atenção: ${p.descricao} está sem estoque suficiente (saldo ${qtdTxt(p.estoque)}).`);
-      break; }
-    case 'qtd': { const c = S.cart[+t.dataset.i]; c.qtd = r2(c.qtd + +t.dataset.d); if (c.qtd <= 0) S.cart.splice(+t.dataset.i, 1); render(); break; }
+    case 'addCart': addItem(id, separarMult(S.busca).mult); break;
+    case 'qtd': { const c = S.cart[+t.dataset.i]; c.qtd = rq(c.qtd + +t.dataset.d); if (c.qtd <= 0) S.cart.splice(+t.dataset.i, 1); render(); break; }
     case 'addPag': { const T = totais(cartLinhas()), f = pagResumo(T.nota).falta; S.pags.push({ forma:t.dataset.c, valor:f > 0 ? String(f).replace('.', ',') : '' }); render();
       const el = $('#pv' + (S.pags.length - 1)); if (el){ el.focus(); el.select(); } break; }
     case 'rmPag': S.pags.splice(+t.dataset.i, 1); render(); break;
@@ -2598,7 +2679,7 @@ document.addEventListener('click', async ev => {
 });
 document.addEventListener('input', ev => {
   const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return; if (inputEstoque(t)) return;
-  if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(S.busca, 'addCart'); }
+  if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(separarMult(S.busca).q, 'addCart'); }
   else if (t.id === 'buscaNfe'){ S.buscaNfe = t.value; $('#resN').innerHTML = resultadosHtml(S.buscaNfe, 'addNfe'); }
   else if (t.dataset.pv !== undefined){ S.pags[+t.dataset.pv].valor = t.value; }
   else if (t.id === 'descTot'){ S.descTotal.v = t.value; }
@@ -2636,7 +2717,8 @@ document.addEventListener('change', ev => {
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') closeModal();
   if (ev.key === 'Enter' && ['lgEmail','lgSenha','lgNova'].includes(ev.target.id)){ const b = document.querySelector('#main .btn.pri'); if (b) b.click(); }
-  if (ev.key === 'Enter' && ev.target.id === 'busca'){ const f = document.querySelector('#resV .res'); if (f) f.click(); }
+  if (ev.key === 'Enter' && ev.target.id === 'busca'){ ev.preventDefault(); entradaBusca(ev.target.value); return; }
+  if (teclaCupom(ev)) return;
 });
 init();
 </script>
