@@ -113,6 +113,15 @@ code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);
 .atalhos button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 6px;min-height:58px;font:inherit;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;gap:4px;text-align:left;color:var(--ink)}
 .atalhos button:active{transform:scale(.97)}.atalhos button b{font-size:12px}
 .teclas{margin-top:8px;display:none}@media(pointer:fine) and (min-width:700px){.teclas{display:block}}
+.ini-acoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:12px 0}
+.ini-acoes button{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 8px;font:inherit;font-weight:600;font-size:13.5px;color:var(--ink);cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center}
+.ini-acoes button b{color:var(--brand);font-size:17px}
+.ini-barras{display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px;padding-top:6px}
+.ini-barras>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%}
+.ini-barras i{display:block;width:100%;max-width:34px;background:#cfe1d9;border-radius:5px 5px 2px 2px}
+.ini-barras span{font-size:10px;color:var(--muted)}.ini-barras small{font-size:10.5px;color:var(--muted)}
+.ini-forma{display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px;padding:5px 0;font-size:13.5px}
+.ini-forma i{display:block;height:10px;background:var(--brand);border-radius:5px;opacity:.75}
 </style>
 </head>
 <body>
@@ -159,7 +168,7 @@ const PAG_NOME = Object.fromEntries(PAGAMENTOS);
 const CBS_2026 = 0.9, IBS_2026 = 0.1; // alíquotas de teste de 2026 (destaque informativo)
 
 /* ================== estado e armazenamento ================== */
-const S = { tab:'venda', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
+const S = { tab:'inicio', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
   nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estFiltro:'todos', estBusca:'', cpView:'notas', cpBusca:'', cpMes:'', cm:null, conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
 let db = null, unsubs = [], local = {};
 const LS = 'emissor-fiscal-v1';
@@ -560,6 +569,7 @@ function linhaTot(rot, v, cls = ''){ return `<div class="total ${cls}"><span>${r
 
 /* ================== navegação ================== */
 const ICON = {
+  inicio:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
   venda:'<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4M8 9h3M8 12h6"/>',
   nfe:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>',
   notas:'<path d="M5 5h14M5 10h14M5 15h9M5 20h6"/>',
@@ -570,7 +580,7 @@ const ICON = {
   estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
   compras:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2h11.8L22 7H6.2"/>'
 };
-const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
+const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
 function renderNav(){
   $('#nav').innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${l}</button>`).join('');
 }
@@ -595,7 +605,7 @@ function render(){
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
-  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
+  } else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -728,7 +738,7 @@ function selCliente(id){
 function vNotas(){
   const f = S.filtroNotas, pend = S.notas.filter(n => n.status === 'contingencia'), gaps = buracos(), agora = new Date();
   const lista = S.notas.filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
-    || (f === 'pend' && n.status === 'contingencia') || (f === 'dev' && n.op && n.op !== 'venda')).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+    || (f === 'pend' && n.status === 'contingencia') || (f === 'prob' && notaProblema(n)) || (f === 'dev' && n.op && n.op !== 'venda')).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const tot = lista.filter(n => notaValida(n) && (n.op || 'venda') === 'venda').reduce((s, n) => s + (n.total || 0), 0);
   const nome = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '65' ? 'Cupom' : 'NF-e';
   const tag = n => n.status === 'cancelada' ? '<span class="tag b">cancelada</span>' : n.status === 'contingencia' ? '<span class="tag b">contingência</span>'
@@ -740,7 +750,7 @@ function vNotas(){
     ${gaps.map(g => `<div class="it"><div class="grow">${g.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(g.serie)}: nº ${g.ini}${g.fim > g.ini ? ' a ' + g.fim : ''}</div>
       <button class="btn sm" data-act="inutilizar" data-m="${g.modelo}" data-s="${esc(g.serie)}" data-i="${g.ini}" data-f="${g.fim}">Inutilizar</button></div>`).join('')}</div>` : ''}
   ${pode('inutilizar') || pode('backup') ? `<div class="actions" style="margin:0 0 12px">${pode('inutilizar') ? '<button class="btn" data-act="inutilizar">Inutilizar numeração</button>' : ''}${pode('backup') ? '<button class="btn" data-act="pacote">Pacote do mês p/ contador</button>' : ''}</div>` : ''}
-  <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],...(S.notas.some(notaProblema) || f === 'prob' ? [['prob','Com problema']] : []),['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas</div><div class="list">${lista.map(n => `
     <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${nome(n)} nº ${n.numero} <span class="small">série ${n.serie}</span></div>
       <div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</div></div>
@@ -1842,7 +1852,7 @@ async function acoesV5(a, t, id){
         ${temCaixa ? '<div class="msg warn">Seu caixa continua aberto. Se terminou o expediente, feche o caixa antes de sair.</div>' : ''}
         <div class="actions"><button class="btn" data-act="fechar">Continuar no sistema</button><button class="btn bad" data-act="sair">Sair</button></div>`);
       return true; }
-    case 'sair': closeModal(); await SB.auth.signOut(); S.tab = 'venda'; return true;
+    case 'sair': closeModal(); await SB.auth.signOut(); S.tab = 'inicio'; return true;
     case 'consultarNota': { t.disabled = true; const r = await eventoServidor({ tipo:'consultar', ref:id }); t.disabled = false; if (r) verNota(r.nota); return true; }
     case 'convidar': {
       const email = val('cvEmail'), papel = val('cvPapel');
@@ -2602,13 +2612,85 @@ async function salvarBalanca(){
   await safe(() => put('empresas', e), 'Configuração da balança salva.');
 }
 
+/* ================== PAINEL INICIAL ================== */
+const notaProblema = n => ['rejeitada','erro_envio','processando','denegada'].includes(n.status);
+const diaMais = (iso, k) => { const [y, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10); };
+const DIAS_SEM = ['dom','seg','ter','qua','qui','sex','sáb'];
+function vendasDe(ini, fim){
+  const v = S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim && notaValida(n) && (n.op || 'venda') === 'venda'; });
+  return { v, total:r2(v.reduce((a, n) => a + (n.total || 0), 0)) };
+}
+function variacao(atual, antes){
+  if (!antes) return atual ? '<span class="small" style="color:var(--ok)">primeiras vendas</span>' : '';
+  const p = Math.round((atual - antes) / antes * 100);
+  return `<span class="small" style="color:${p >= 0 ? 'var(--ok)' : 'var(--bad)'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
+}
+function alertasInicio(){
+  const A = [], hoje = isoNow().slice(0, 10), em7 = diaMais(hoje, 7), e = emp(), P = S.produtos;
+  const add = (nivel, txt, act, extra = '') => A.push({ nivel, txt, act, extra });
+  const prob = S.notas.filter(notaProblema);
+  if (prob.length) add('bad', `${prob.length} nota(s) com problema (rejeitada, com erro ou ainda processando)`, 'irPara', 'data-tab="notas" data-fn="prob"');
+  const cont = S.notas.filter(n => n.status === 'contingencia');
+  if (cont.length) add('bad', `${cont.length} cupom(ns) em contingência para transmitir (prazo de 24 h)`, 'irPara', 'data-tab="notas" data-fn="pend"');
+  const gaps = buracos();
+  if (gaps.length && pode('inutilizar')) add('warn', `${gaps.reduce((a, g) => a + g.fim - g.ini + 1, 0)} número(s) de nota pulado(s) para inutilizar`, 'irPara', 'data-tab="notas"');
+  const cx = caixaAberto();
+  if (pode('caixa') && !cx) add('info', 'Seu caixa está fechado. Abra o caixa para vender no cupom.', 'irPara', 'data-tab="caixa"');
+  else if (cx && String(cx.aberto_em || '').slice(0, 10) < hoje) add('warn', `Seu caixa está aberto desde ${dataBR(cx.aberto_em)}. Feche o caixa do dia anterior.`, 'irPara', 'data-tab="caixa"');
+  const neg = P.filter(p => temSaldo(p) && p.estoque < 0).length, baixo = P.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min) && p.estoque >= 0).length;
+  if (neg) add('bad', `${neg} produto(s) com estoque negativo`, 'irPara', 'data-tab="produtos" data-fp="neg"');
+  if (baixo) add('warn', `${baixo} produto(s) abaixo do estoque mínimo`, 'irPara', 'data-tab="produtos" data-fp="baixo"');
+  if (pode('produto')){
+    const err = P.filter(p => temErro(validarProduto(p, e))).length;
+    if (err) add('bad', `${err} produto(s) com erro fiscal no cadastro (podem dar rejeição)`, 'irPara', 'data-tab="produtos" data-fp="erro"');
+    const semPreco = P.filter(p => !(num(p.preco) > 0)).length;
+    if (semPreco) add('warn', `${semPreco} produto(s) sem preço de venda`, 'irPara', 'data-tab="produtos"');
+    const parc = []; S.compras.filter(c => c.status !== 'estornada').forEach(c => (c.duplicatas || []).forEach(d => { if (d.venc >= hoje && d.venc <= em7) parc.push({ c, d }); }));
+    if (parc.length) add('info', `${parc.length} parcela(s) de compra vencendo nos próximos 7 dias: ${brl(parc.reduce((a, x) => a + num(x.d.valor), 0))}`, 'irPara', 'data-tab="compras"');
+  }
+  return A;
+}
+function vInicio(){
+  const hoje = isoNow().slice(0, 10), ontem = diaMais(hoje, -1), mesIni = hoje.slice(0, 8) + '01';
+  const H = vendasDe(hoje, hoje), O = vendasDe(ontem, ontem), M = vendasDe(mesIni, hoje);
+  const [y, m, d] = hoje.split('-').map(Number), antIni = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);
+  const antFim = new Date(Date.UTC(y, m - 2, Math.min(d, new Date(Date.UTC(y, m - 1, 0)).getUTCDate()))).toISOString().slice(0, 10), MA = vendasDe(antIni, antFim);
+  const dias = Array.from({ length:7 }, (_, k) => { const dd = diaMais(hoje, k - 6); return { dd, t:vendasDe(dd, dd).total }; }), max = Math.max(1, ...dias.map(x => x.t));
+  const forma = {}; H.v.forEach(n => { (n.pags || []).forEach(p => forma[p.forma] = r2((forma[p.forma] || 0) + p.valor)); if (n.troco) forma['01'] = r2((forma['01'] || 0) - n.troco); });
+  const formas = Object.entries(forma).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), maxF = Math.max(1, ...formas.map(x => x[1]));
+  const prod = {}; M.v.forEach(n => (n.itens || []).forEach(i => { const k = i.pid || i.d; prod[k] = prod[k] || { d:i.d, u:i.u, q:0, v:0 }; prod[k].q = rq(prod[k].q + num(i.q)); prod[k].v = r2(prod[k].v + num(i.t) - num(i.desc)); }));
+  const top = Object.values(prod).sort((a, b) => b.v - a.v).slice(0, 5);
+  const A = alertasInicio(), hora = +isoNow().slice(11, 13), saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
+  const tk = H.v.length ? r2(H.total / H.v.length) : 0;
+  return `<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
+  <div class="ini-acoes">${pode('emitir') ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe"><b>＋</b>Nova NF-e</button>' : ''}
+    ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
+  <div class="grid2"><div>
+    <div class="card"><div class="small">Vendas de hoje</div>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><b class="num" style="font-size:30px">${brl(H.total)}</b>${variacao(H.total, O.total)}<span class="small">ontem ${brl(O.total)}</span></div>
+      <div class="stats"><div><b>${H.v.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div><div><b>${H.v.filter(n => n.modelo === '65').length}/${H.v.filter(n => n.modelo === '55').length}</b>cupons / NF-e</div></div>
+      <div class="ini-barras">${dias.map(x => `<div title="${dataBR(x.dd)}: ${brl(x.t)}"><span class="num">${x.t ? (x.t >= 1000 ? (x.t / 1000).toFixed(1).replace('.', ',') + 'k' : Math.round(x.t)) : ''}</span><i style="height:${Math.max(2, Math.round(x.t / max * 64))}px;${x.dd === hoje ? 'background:var(--brand)' : ''}"></i><small>${x.dd === hoje ? 'hoje' : DIAS_SEM[new Date(x.dd + 'T12:00:00').getDay()]}</small></div>`).join('')}</div>
+      <div class="small" style="text-align:center">últimos 7 dias</div></div>
+    <div class="card"><div class="small">Vendas do mês</div>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><b class="num" style="font-size:24px">${brl(M.total)}</b>${variacao(M.total, MA.total)}<span class="small">mesmo período do mês passado ${brl(MA.total)}</span></div>
+      <div class="small">${M.v.length} venda(s)</div></div>
+    ${formas.length ? `<div class="card"><h3 style="margin-top:0">Recebido hoje por forma</h3>${formas.map(([f, v]) => `<div class="ini-forma"><span>${esc(PAG_NOME[f] || 'Outros')}</span><i style="width:${Math.round(v / maxF * 100)}%"></i><b class="num">${brl(v)}</b></div>`).join('')}</div>` : ''}
+  </div><div>
+    <div class="card"><h3 style="margin-top:0">Atenção</h3>${A.length ? `<div class="list">${A.map(a => `<div class="it" data-act="${a.act}" ${a.extra} style="cursor:pointer"><span style="color:${cor[a.nivel]};font-size:14px;width:16px">${ico[a.nivel]}</span><div class="grow">${a.txt}</div><span class="small">ver ›</span></div>`).join('')}</div>`
+      : '<div class="empty" style="padding:14px">Tudo em ordem por aqui. ✓</div>'}</div>
+    <div class="card"><h3 style="margin-top:0">Mais vendidos do mês</h3>${top.length ? `<div class="list">${top.map((p, k) => `<div class="it" style="padding:7px 0"><b style="width:18px;color:var(--muted)">${k + 1}</b><div class="grow"><div class="t">${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u || 'UN')}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>`
+      : '<div class="empty" style="padding:14px">Ainda sem vendas neste mês.</div>'}</div>
+  </div></div>`;
+}
+
 /* ================== eventos ================== */
 // fecha o modal só se o clique começou no fundo escuro (selecionar texto e soltar fora não fecha mais)
 let cliqueNoFundo = false;
 document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
-  if (t.dataset.tab){ S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab){ if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
