@@ -29,7 +29,8 @@ main{max-width:980px;margin:0 auto;padding:16px 14px 96px}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:6;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;max-width:140px;background:none;border:0;padding:9px 2px 8px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
-@media(max-width:440px){nav button{font-size:10px;padding:8px 0 7px}nav button svg{width:20px;height:20px}}
+nav{overflow-x:auto;scrollbar-width:none}nav::-webkit-scrollbar{display:none}
+@media(max-width:700px){nav{justify-content:flex-start}nav button{flex:0 0 auto;min-width:64px;font-size:10.5px;padding:8px 2px 7px}nav button svg{width:20px;height:20px}}
 nav button.on{color:var(--brand);font-weight:600}
 h2{font-size:19px;margin:4px 0 12px}
 h3{font-size:15px;margin:18px 0 8px}
@@ -155,13 +156,14 @@ const CBS_2026 = 0.9, IBS_2026 = 0.1; // alíquotas de teste de 2026 (destaque i
 
 /* ================== estado e armazenamento ================== */
 const S = { tab:'venda', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
-  nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estView:'compras', estFiltro:'todos', estBusca:'', conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
+  nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estFiltro:'todos', estBusca:'', cpView:'notas', cpBusca:'', cpMes:'', cm:null, conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
 let db = null, unsubs = [], local = {};
 const LS = 'emissor-fiscal-v1';
 S.nfe = { op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } };
 function lsLoad(){ try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch(e){ return {}; } }
 function lsSave(){ try { localStorage.setItem(LS, JSON.stringify(local)); } catch(e){} }
 const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes','fornecedores','compras','vinculos'];
+// compras_xml (XML original das notas de compra) é lido só sob demanda
 const colOf = k => k === 'empresas' ? 'empresas' : `empresas/${S.empId}/${k}`;
 const emp = () => S.empresas.find(e => e.id === S.empId) || null;
 
@@ -561,9 +563,10 @@ const ICON = {
   clientes:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
   empresa:'<path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/>',
   caixa:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3M8 6V4h8v2"/>',
-  estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>'
+  estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
+  compras:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2h11.8L22 7H6.2"/>'
 };
-const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['estoque','Estoque'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
+const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['estoque','Estoque'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
 function renderNav(){
   $('#nav').innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${l}</button>`).join('');
 }
@@ -588,7 +591,7 @@ function render(){
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
-  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, estoque:vEstoque, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
+  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vEstoque, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -1450,7 +1453,7 @@ function vPerfis(){
 }
 function segProd(){
   return `<div class="seg" style="margin-bottom:12px">${[['produtos','Produtos'],['perfis','Perfis de tributação']].map(([k, l]) => `<button data-act="prodView" data-v="${k}" class="${(S.prodView || 'produtos') === k ? 'on' : ''}">${l}</button>`).join('')}
-    ${pode('produto') ? '<button data-act="importarXml">⤓ Entrada por XML de compra</button>' : ''}</div>`;
+</div>`;
 }
 function formPerfil(f){
   const e = emp(), simples = String(e.regime) !== '3';
@@ -1552,7 +1555,6 @@ async function acoesV4(a, t, id){
     case 'salvarPerfil': salvarPerfil(id); return true;
     case 'delPerfil': confirmar('Excluir este perfil? Os produtos vinculados mantêm a tributação atual, só deixam de estar vinculados.', 'confDelPerfil', id); return true;
     case 'confDelPerfil': if (await safe(() => del('perfis', id), 'Perfil excluído.')) closeModal(); return true;
-    case 'importarXml': S.tab = 'estoque'; S.estView = 'compras'; render(); { const f = $('#compraXml'); if (f) f.click(); } return true;
     case 'salvarXml': salvarXml(); return true;
     case 'contOn': S.conting = !S.conting; render(); return true;
   }
@@ -1893,15 +1895,19 @@ function autoPreencher(t){
   return true;
 }
 
-/* ================== ESTOQUE E COMPRAS ================== */
-Object.assign(ACT_PERM, { novaCompraManual:'produto', lancarCompraXml:'produto', lancarCompraManual:'produto', estornarCompra:'produto', confEstornar:'produto',
+/* ================== COMPRAS E ESTOQUE ================== */
+Object.assign(ACT_PERM, { novaCompra:'produto', corrigirCompra:'produto', lancarCompraXml:'produto', salvarCompra:'produto', confEstornar:'produto',
   salvarAjuste:'produto', salvarMinimo:'produto', novoFornecedor:'produto', editFornecedor:'produto', salvarFornecedor:'produto', delFornecedor:'produto', confDelFornecedor:'produto' });
 AUTO.fornecedor = { doc:'fnCnpj', info:'fnAutoInfo', nome:'fnNome', fantasia:'fnFant', fone:'fnFone', email:'fnEmail', regime:null, log:'fnLog', num:'fnNum', bai:'fnBai', cep:'fnCep', mun:'fnMun', ibge:'fnIbge', uf:'fnUf' };
 const temSaldo = p => typeof p.estoque === 'number';
-const qtdTxt = q => (Math.round(q * 1000) / 1000).toLocaleString('pt-BR');
+const qtdTxt = q => (Math.round((Number(q) || 0) * 1000) / 1000).toLocaleString('pt-BR');
 const hoje = () => isoNow().slice(0, 10);
+const dataBR = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
 const chaveVinc = (cnpj, cProd) => (dig(cnpj) + '_' + String(cProd)).replace(/[^A-Za-z0-9_.-]/g, '-').slice(0, 180);
 const nomeProd = id => { const p = S.produtos.find(x => x.id === id); return p ? p.descricao : '(produto removido)'; };
+const v2 = v => String(v ?? '').replace('.', ',');
+const MODELOS_COMPRA = [['55','NF-e (modelo 55)'],['65','NFC-e (modelo 65)'],['papel','Nota de papel / recibo']];
+const PAG_COMPRA = [['avista','À vista'],['prazo','A prazo (parcelas)'],['outros','Outros / bonificação']];
 
 /* ---------- leitura completa do XML da NF-e de compra ---------- */
 function parseCompraXml(txt){
@@ -1913,38 +1919,346 @@ function parseCompraXml(txt){
   if (!inf) throw new Error('Este XML não é de uma NF-e.');
   const ide = d.getElementsByTagName('ide')[0], emit = d.getElementsByTagName('emit')[0], dest = d.getElementsByTagName('dest')[0];
   const ender = emit && emit.getElementsByTagName('enderEmit')[0], tot = d.getElementsByTagName('ICMSTot')[0];
+  const cobr = d.getElementsByTagName('cobr')[0], adic = d.getElementsByTagName('infAdic')[0];
   const chave = dig(inf.getAttribute('Id') || '') || dig(g(d, 'chNFe'));
   const itens = [...d.getElementsByTagName('det')].map(det => {
-    const pr = det.getElementsByTagName('prod')[0], imp = det.getElementsByTagName('imposto')[0], icms = imp && imp.getElementsByTagName('ICMS')[0], ipi = imp && imp.getElementsByTagName('IPI')[0];
-    const vProd = n(pr, 'vProd'), custoTotal = r2(vProd - n(pr, 'vDesc') + n(pr, 'vFrete') + n(pr, 'vSeg') + n(pr, 'vOutro') + n(ipi, 'vIPI') + n(icms, 'vICMSST') + n(icms, 'vFCPST'));
-    return { cProd:g(pr, 'cProd'), ean:g(pr, 'cEAN'), xProd:g(pr, 'xProd'), ncm:g(pr, 'NCM'), cest:g(pr, 'CEST'), cfop:g(pr, 'CFOP'), uCom:(g(pr, 'uCom') || 'UN').toUpperCase(),
-      qCom:n(pr, 'qCom'), vUnCom:n(pr, 'vUnCom'), vProd, custoTotal, orig:icms ? g(icms, 'orig') : '0' };
+    const pr = det.getElementsByTagName('prod')[0], imp = det.getElementsByTagName('imposto')[0];
+    const icmsW = imp && imp.getElementsByTagName('ICMS')[0], ic = icmsW && icmsW.firstElementChild, ipi = imp && imp.getElementsByTagName('IPI')[0];
+    const orig = g(ic, 'orig') || '0', cst = g(ic, 'CSOSN') ? orig + g(ic, 'CSOSN') : g(ic, 'CST') ? orig + g(ic, 'CST') : '';
+    const it = { cProd:g(pr, 'cProd'), ean:g(pr, 'cEAN'), xProd:g(pr, 'xProd'), ncm:g(pr, 'NCM'), cest:g(pr, 'CEST'), cfop:g(pr, 'CFOP'), cst, orig,
+      uCom:(g(pr, 'uCom') || 'UN').toUpperCase(), qCom:n(pr, 'qCom'), vUnCom:n(pr, 'vUnCom'), vProd:n(pr, 'vProd'),
+      vDesc:n(pr, 'vDesc'), vFrete:n(pr, 'vFrete'), vSeg:n(pr, 'vSeg'), vOutro:n(pr, 'vOutro'),
+      vBC:n(ic, 'vBC'), pICMS:n(ic, 'pICMS'), vICMS:n(ic, 'vICMS'), vBCST:n(ic, 'vBCST'), vICMSST:n(ic, 'vICMSST') + n(ic, 'vFCPST'), vIPI:n(ipi, 'vIPI') };
+    it.custoTotal = r2(it.vProd - it.vDesc + it.vFrete + it.vSeg + it.vOutro + it.vIPI + it.vICMSST);
+    return it;
   });
   if (!itens.length) throw new Error('Não encontrei produtos neste XML.');
-  return { chave, numero:g(ide, 'nNF'), serie:g(ide, 'serie'), data_emissao:(g(ide, 'dhEmi') || g(ide, 'dEmi')).slice(0, 10),
+  return { chave, modelo:g(ide, 'mod') || '55', numero:g(ide, 'nNF'), serie:g(ide, 'serie'), natureza:g(ide, 'natOp'), data_emissao:(g(ide, 'dhEmi') || g(ide, 'dEmi')).slice(0, 10),
     fornecedor:{ cnpj:g(emit, 'CNPJ') || g(emit, 'CPF'), nome:g(emit, 'xNome'), fantasia:g(emit, 'xFant'), ie:g(emit, 'IE'),
       logradouro:g(ender, 'xLgr'), numero:g(ender, 'nro'), bairro:g(ender, 'xBairro'), municipio:g(ender, 'xMun'), cod_municipio:g(ender, 'cMun'), uf:g(ender, 'UF'), cep:g(ender, 'CEP'), telefone:g(ender, 'fone') },
-    destCnpj:g(dest, 'CNPJ') || g(dest, 'CPF'), total_produtos:n(tot, 'vProd'), total_nota:n(tot, 'vNF'), itens };
+    destinatario:{ cnpj:g(dest, 'CNPJ') || g(dest, 'CPF'), nome:g(dest, 'xNome') },
+    totais:{ vBC:n(tot, 'vBC'), vICMS:n(tot, 'vICMS'), vBCST:n(tot, 'vBCST'), vST:n(tot, 'vST'), vProd:n(tot, 'vProd'), vFrete:n(tot, 'vFrete'), vSeg:n(tot, 'vSeg'),
+      vDesc:n(tot, 'vDesc'), vIPI:n(tot, 'vIPI'), vOutro:n(tot, 'vOutro'), vNF:n(tot, 'vNF') },
+    duplicatas:[...(cobr ? cobr.getElementsByTagName('dup') : [])].map(x => ({ n:g(x, 'nDup'), venc:g(x, 'dVenc'), valor:n(x, 'vDup') })),
+    obs:g(adic, 'infCpl'), itens };
 }
 
-/* ---------- tela principal ---------- */
+/* ---------- aba Compras ---------- */
+function vCompras(){
+  const v = S.cpView || 'notas';
+  return `<h2>Compras</h2><div class="seg" style="margin-bottom:12px">${[['notas','Notas de compra'],['fornecedores','Fornecedores']].map(([k, l]) => `<button data-act="cpView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
+    + (v === 'notas' ? vNotasCompra() : vFornecedores());
+}
+function vNotasCompra(){
+  const q = norm(S.cpBusca || ''), mes = S.cpMes || '';
+  let L = [...S.compras].sort((a, b) => String(b.data_emissao || '').localeCompare(String(a.data_emissao || '')) || String(b.lancado_em || '').localeCompare(String(a.lancado_em || '')));
+  if (mes) L = L.filter(c => String(c.data_emissao || '').slice(0, 7) === mes);
+  if (q) L = L.filter(c => norm(c.fornecedor_nome).includes(q) || String(c.numero || '') === (S.cpBusca || '').trim() || (dig(q).length >= 4 && dig(c.fornecedor_cnpj).includes(dig(q))));
+  const val = L.filter(c => c.status !== 'estornada'), tot = r2(val.reduce((a, c) => a + num(c.total_nota), 0));
+  return `${pode('produto') ? `<div class="actions" style="margin:0 0 12px"><label class="btn pri" style="flex:1">⤓ Importar XML (pode escolher vários)<input type="file" id="compraXml" accept=".xml" multiple hidden></label>
+      <button class="btn" data-act="novaCompra">+ Lançar nota manualmente</button></div>` : ''}
+    <div class="card"><div class="row"><div><label for="cpBusca">Buscar</label><input id="cpBusca" placeholder="Fornecedor, número ou CNPJ" value="${esc(S.cpBusca || '')}" autocomplete="off"></div>
+      <div><label for="cpMes">Mês de emissão</label><input id="cpMes" type="month" value="${esc(mes)}"></div></div>
+      <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${L.length - val.length}</b>estornadas</div></div></div>
+    <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
+      <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></div>
+      <div class="s">${dataBR(c.data_emissao)} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</div></div>
+      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${c.status === 'estornada' ? '<span class="tag b">estornada</span>' : '<span class="tag">lançada</span>'}</div></div>`).join('')}</div>`
+      : `<div class="empty">${S.compras.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
+}
+
+/* ---------- importação de XML (uma ou várias notas) ---------- */
+async function importarXmls(files){
+  S.filaXml = [...files]; S.filaTotal = files.length; S.filaFeitas = 0; proximoXml();
+}
+async function proximoXml(){
+  const f = (S.filaXml || []).shift();
+  if (!f){ if (S.filaTotal > 1) toast(`${S.filaFeitas} de ${S.filaTotal} nota(s) lançadas.`); S.compraImport = null; return; }
+  let x, txt;
+  try { txt = await f.text(); x = parseCompraXml(txt); } catch(e){ toast(`${f.name}: ${e.message}`); return proximoXml(); }
+  const e = emp(), fc = dig(x.fornecedor.cnpj);
+  x.xmlTexto = txt; x.arquivo = f.name; x.erros = [];
+  if (x.destinatario.cnpj && dig(x.destinatario.cnpj) !== dig(e.cnpj)) x.erros.push(`Esta nota foi emitida para outro CNPJ (${fmtDoc(x.destinatario.cnpj)}), não para ${esc(e.razao)}.`);
+  if (x.chave && S.compras.some(c => c.chave === x.chave && c.status !== 'estornada')) x.erros.push('Esta nota de compra já foi lançada.');
+  x.itens.forEach(it => {
+    const v = S.vinculos.find(v => dig(v.fornecedor_cnpj) === fc && String(v.cProd) === it.cProd && S.produtos.some(p => p.id === v.produto_id));
+    const porGtin = gtinOk(it.ean) ? S.produtos.find(p => p.gtin === dig(it.ean)) : null;
+    it.produto_id = v ? v.produto_id : porGtin ? porGtin.id : 'novo';
+    it.como = v ? 'lembrado' : porGtin ? 'código de barras' : '';
+    it.fator = v ? num(v.fator) || 1 : 1; it.preco = '';
+  });
+  S.compraImport = x; renderCompraImport();
+}
+function linhaEntrada(it){
+  const q = Math.round(it.qCom * (num(it.fator) || 0) * 1000) / 1000, cu = q > 0 ? Math.round(it.custoTotal / q * 10000) / 10000 : 0;
+  const un = it.produto_id === 'novo' ? (num(it.fator) > 1 ? 'UN' : it.uCom) : (S.produtos.find(p => p.id === it.produto_id) || {}).unidade || 'UN';
+  return `Entra no estoque: <b>${qtdTxt(q)} ${esc(un)}</b> a <b>${brl(cu)}</b> cada`;
+}
+function renderCompraImport(){
+  const x = S.compraImport, prods = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || ''));
+  const novos = x.itens.filter(i => i.produto_id === 'novo').length, pos = S.filaTotal > 1 ? ` (${S.filaTotal - S.filaXml.length} de ${S.filaTotal})` : '';
+  openModal(`${mhead('Entrada de nota de compra' + pos)}
+  <div class="card" style="margin:0 0 10px"><b>${esc(x.fornecedor.fantasia || x.fornecedor.nome)}</b> <span class="small">${fmtDoc(x.fornecedor.cnpj)}</span><br>
+    <span class="small">NF-e nº ${esc(x.numero)} série ${esc(x.serie)} · emissão ${dataBR(x.data_emissao)} · ${esc(x.natureza)}</span><br>
+    <span class="small">Produtos ${brl(x.totais.vProd)}${x.totais.vIPI ? ' · IPI ' + brl(x.totais.vIPI) : ''}${x.totais.vST ? ' · ICMS-ST ' + brl(x.totais.vST) : ''}${x.totais.vFrete ? ' · frete ' + brl(x.totais.vFrete) : ''}${x.totais.vDesc ? ' · desconto ' + brl(x.totais.vDesc) : ''} · <b>total ${brl(x.totais.vNF)}</b>${x.duplicatas.length ? ' · ' + x.duplicatas.length + ' parcela(s)' : ''}</span></div>
+  ${x.erros.length ? `<div class="msg err">${x.erros.join('<br>')}</div>` : ''}
+  <p class="small">Confira o produto de cada item. Os reconhecidos vêm marcados; para os demais, escolha um produto que você já tem ou deixe "cadastrar como novo". O sistema lembra a escolha nas próximas compras deste fornecedor. O custo inclui IPI, ST, frete e outras despesas, menos descontos.</p>
+  ${x.itens.map((it, i) => `<div class="card" style="margin:0 0 8px;padding:10px">
+    <div class="t" style="font-weight:600">${esc(it.xProd)}</div>
+    <div class="small">cód. ${esc(it.cProd)} · NCM ${fmtNcm(it.ncm)} · CFOP ${esc(it.cfop)} · ${qtdTxt(it.qCom)} ${esc(it.uCom)} × ${brl(it.vUnCom)} · custo total ${brl(it.custoTotal)}${it.como ? ` · <span style="color:var(--ok)">✓ reconhecido pelo ${it.como}</span>` : ''}</div>
+    <label>Produto no meu cadastro</label>
+    <select data-ci="${i}"><option value="novo" ${it.produto_id === 'novo' ? 'selected' : ''}>➕ Cadastrar como produto novo</option>${prods.map(p => `<option value="${esc(p.id)}" ${p.id === it.produto_id ? 'selected' : ''}>${esc(p.descricao)}</option>`).join('')}</select>
+    <div class="row" style="align-items:flex-end">
+      <div><label>Conversão: 1 ${esc(it.uCom)} =</label><input data-cf="${i}" inputmode="decimal" value="${v2(it.fator)}"></div>
+      ${it.produto_id === 'novo' ? `<div><label>Preço de venda (R$)</label><input data-cp="${i}" inputmode="decimal" placeholder="obrigatório para vender" value="${esc(it.preco)}"></div>` : ''}
+    </div>
+    <div class="small" id="cix-${i}" style="margin-top:6px">${linhaEntrada(it)}</div></div>`).join('')}
+  ${novos ? `${S.perfis.length ? sel('ciPerf', `Perfil de tributação para os ${novos} produto(s) novo(s)`, S.ciPerf || '', [['','— padrão do regime —'], ...S.perfis.map(f => [f.id, f.nome])]) : ''}
+    <p class="small">Produtos novos entram com NCM, CEST e código de barras da nota. Confira a tributação deles depois na aba Produtos.</p>` : ''}
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="cancelarFila">Cancelar${S.filaXml && S.filaXml.length ? ' todas' : ''}</button>${S.filaXml && S.filaXml.length ? '<button class="btn" data-act="pularXml">Pular esta nota</button>' : ''}
+    <button class="btn pri" data-act="lancarCompraXml" ${x.erros.length ? 'disabled' : ''}>Dar entrada no estoque</button></div>`);
+}
+async function garantirFornecedor(f){
+  const c = dig(f.cnpj); if (!c) return null;
+  const ex = S.fornecedores.find(x => x.cnpj === c); if (ex) return ex.id;
+  const o = await put('fornecedores', { cnpj:c, nome:(f.nome || '').toUpperCase(), fantasia:f.fantasia || '', ie:dig(f.ie), logradouro:f.logradouro || '', numero:f.numero || '',
+    bairro:f.bairro || '', municipio:f.municipio || '', cod_municipio:dig(f.cod_municipio), uf:f.uf || '', cep:dig(f.cep), telefone:f.telefone || '' });
+  return o.id;
+}
+function tribPadrao(){
+  const simples = String(emp().regime) !== '3', perf = S.perfis.find(f => f.id === S.ciPerf);
+  return perf ? { ...taxOf(perf), perfil_id:perf.id } : { cfop:'5102', cst_csosn:simples ? '102' : '00', icms_aliq:simples ? 0 : 20.5, icms_red:0, st_mva:0, st_aliq:0, st_fcp:0,
+    pis_cst:simples ? '49' : '01', pis_aliq:0, cofins_cst:simples ? '49' : '01', cofins_aliq:0, cst_ibscbs:'000', cclasstrib:'000001', perfil_id:'' };
+}
+// grava a compra: cria produtos novos, chama o banco (entrada no estoque) e guarda o XML original
+async function gravarCompra(compra, novos, xmlTexto){
+  const base = tribPadrao();
+  for (const it of novos){
+    const p = await put('produtos', { ...base, descricao:(it.novoDesc || it.xProd).toUpperCase(), codigo:'', gtin:gtinOk(it.ean) ? dig(it.ean) : 'SEM GTIN',
+      preco:numIn(it.preco), unidade:(num(it.fator) > 1 ? 'UN' : it.uCom || 'UN').slice(0, 6), ncm:dig(it.ncm), cest:dig(it.cest), origem:({ '1':'2', '6':'7' })[it.orig] || it.orig || '0' });
+    it.produto_id = p.id; it.eraNovo = true;
+  }
+  compra.itens = compra.itens.map(it => { const q = Math.round(num(it.qCom) * num(it.fator) * 1000) / 1000;
+    return { ...it, qtd_estoque:q, custo_unit:q > 0 ? Math.round(num(it.custoTotal) / q * 10000) / 10000 : 0, custo_total:r2(num(it.custoTotal)) }; });
+  compra.tem_xml = !!xmlTexto || !!compra.xml_id;
+  const { data:cid, error } = await SB.rpc('lancar_compra', { e:S.empId, compra });
+  if (error) throw new Error(error.message);
+  if (xmlTexto) await put('compras_xml', { id:cid, arquivo:compra.arquivo || '', xml:xmlTexto });
+  return cid;
+}
+async function lancarCompraXml(btn){
+  const x = S.compraImport, errs = [];
+  x.itens.forEach(it => { if (!(num(it.fator) > 0)) errs.push(`Conversão inválida em ${esc(it.xProd)}.`); });
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Lançando…</div>';
+  try {
+    const fornecedor_id = await garantirFornecedor(x.fornecedor);
+    const itens = x.itens.map(it => ({ ...it, vinc_chave:chaveVinc(x.fornecedor.cnpj, it.cProd) }));
+    const novos = itens.filter(it => it.produto_id === 'novo');
+    const compra = { origem:'xml', modelo:x.modelo, chave:x.chave, numero:x.numero, serie:x.serie, natureza:x.natureza, data_emissao:x.data_emissao, data_entrada:hoje(),
+      fornecedor_id, fornecedor_cnpj:dig(x.fornecedor.cnpj), fornecedor_nome:(x.fornecedor.fantasia || x.fornecedor.nome || '').toUpperCase(), fornecedor:x.fornecedor,
+      destinatario:x.destinatario, totais:x.totais, total_produtos:x.totais.vProd, total_nota:x.totais.vNF, duplicatas:x.duplicatas,
+      pagamento:x.duplicatas.length ? 'prazo' : 'avista', obs:x.obs, arquivo:x.arquivo, itens };
+    await gravarCompra(compra, novos, x.xmlTexto);
+    const semPreco = novos.filter(i => !(numIn(i.preco) > 0)).length;
+    S.filaFeitas = (S.filaFeitas || 0) + 1; closeModal();
+    toast(`Nota ${x.numero} lançada: ${itens.length} item(ns) no estoque.${semPreco ? ' Defina o preço dos produtos novos.' : ''}`);
+    proximoXml();
+  } catch(err){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+}
+
+/* ---------- lançamento manual (com todos os dados da nota) ---------- */
+const itemVazio = () => ({ produto_id:'', novoDesc:'', ncm:'', cfop:'', cst:'', uCom:'UN', fator:1, qCom:'1', vUnCom:'', vDesc:'', vBC:'', pICMS:'', vICMS:'', vICMSST:'', vIPI:'', preco:'', cProd:'' });
+function novaCompra(base){
+  S.cm = base || { modelo:'55', chave:'', numero:'', serie:'1', natureza:'COMPRA PARA COMERCIALIZAÇÃO', data_emissao:hoje(), data_entrada:hoje(), fornecedor_id:'',
+    itens:[], frete:'', seguro:'', outras:'', pagamento:'avista', duplicatas:[], obs:'', busca:'' };
+  renderCompraManual();
+}
+function cfopCompra(){ const f = S.fornecedores.find(x => x.id === S.cm.fornecedor_id), e = emp(); return f && f.uf && e && f.uf !== e.uf ? '2102' : '1102'; }
+function calcCompraManual(){
+  const c = S.cm, its = c.itens.map(i => ({ ...i, vProd:r2(numIn(i.qCom) * numIn(i.vUnCom)) }));
+  const pesos = its.map(i => i.vProd), rF = ratear(numIn(c.frete), pesos), rS = ratear(numIn(c.seguro), pesos), rO = ratear(numIn(c.outras), pesos);
+  its.forEach((i, k) => { i.vFrete = rF[k]; i.vSeg = rS[k]; i.vOutro = rO[k]; i.custoTotal = r2(i.vProd - numIn(i.vDesc) + rF[k] + rS[k] + rO[k] + numIn(i.vIPI) + numIn(i.vICMSST)); });
+  const s = k => r2(its.reduce((a, i) => a + numIn(i[k]), 0));
+  const t = { vProd:r2(its.reduce((a, i) => a + i.vProd, 0)), vDesc:s('vDesc'), vIPI:s('vIPI'), vST:s('vICMSST'), vBC:s('vBC'), vICMS:s('vICMS'),
+    vFrete:r2(numIn(c.frete)), vSeg:r2(numIn(c.seguro)), vOutro:r2(numIn(c.outras)) };
+  t.vNF = r2(t.vProd - t.vDesc + t.vFrete + t.vSeg + t.vOutro + t.vIPI + t.vST);
+  return { its, t };
+}
+function totaisCompraHtml(){
+  const { t } = calcCompraManual(), dup = r2(S.cm.duplicatas.reduce((a, d) => a + numIn(d.valor), 0));
+  return `${linhaTot('Produtos', t.vProd, 'small')}${t.vDesc ? linhaTot('Descontos', -t.vDesc, 'small') : ''}${t.vFrete ? linhaTot('Frete', t.vFrete, 'small') : ''}${t.vSeg ? linhaTot('Seguro', t.vSeg, 'small') : ''}
+    ${t.vOutro ? linhaTot('Outras despesas', t.vOutro, 'small') : ''}${t.vIPI ? linhaTot('IPI', t.vIPI, 'small') : ''}${t.vST ? linhaTot('ICMS-ST', t.vST, 'small') : ''}${t.vICMS ? linhaTot('ICMS (informativo)', t.vICMS, 'small') : ''}
+    ${linhaTot('Total da nota', t.vNF, 'big')}
+    ${S.cm.pagamento === 'prazo' ? `<div class="total small"><span>Soma das parcelas</span><span class="num" style="color:${Math.abs(dup - t.vNF) > 0.05 ? 'var(--bad)' : 'var(--ok)'}">${brl(dup)}</span></div>` : ''}`;
+}
+function renderCompraManual(){
+  const c = S.cm, forn = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  const campo = (k, rot, extra = '') => fld('cm_' + k, rot, c[k], `data-cm="${k}" ${extra}`);
+  openModal(`${mhead(c.corrige ? 'Corrigir nota de compra' : 'Lançar nota de compra')}
+  ${c.corrige ? '<div class="msg warn">A nota original já foi estornada. Corrija os dados e lance de novo.</div>' : ''}
+  <h3 style="margin-top:4px">Fornecedor</h3>
+  ${sel('cm_fornecedor_id', 'Fornecedor', c.fornecedor_id, [['','— selecione —'], ...forn.map(f => [f.id, (f.fantasia || f.nome) + ' · ' + fmtDoc(f.cnpj)])]).replace('<select ', '<select data-cm="fornecedor_id" ')}
+  <p class="small">Fornecedor novo? Cadastre antes em Compras → Fornecedores (o CNPJ preenche tudo sozinho).</p>
+  <h3>Dados da nota</h3>
+  <div class="row">${sel('cm_modelo', 'Tipo', c.modelo, MODELOS_COMPRA).replace('<select ', '<select data-cm="modelo" ')}${campo('numero', 'Número *', 'inputmode="numeric"')}${campo('serie', 'Série', 'inputmode="numeric"')}</div>
+  ${c.modelo !== 'papel' ? `${campo('chave', 'Chave de acesso (44 dígitos)', 'inputmode="numeric" autocomplete="off"')}<div class="small" id="cmChaveInfo">${c.chave ? (chaveOk(c.chave) ? '<span style="color:var(--ok)">✓ chave válida</span>' : '<span style="color:var(--bad)">✕ chave inválida</span>') : ''}</div>` : ''}
+  ${campo('natureza', 'Natureza da operação')}
+  <div class="row">${campo('data_emissao', 'Data de emissão *', 'type="date"')}${campo('data_entrada', 'Data de entrada', 'type="date"')}</div>
+  <h3>Itens</h3>
+  <label for="cmBusca">Adicionar produto do cadastro</label><input id="cmBusca" autocomplete="off" placeholder="Buscar produto…" value="${esc(c.busca)}"><div class="results" id="cmRes">${resultadosHtml(c.busca, 'cmAdd')}</div>
+  <button class="btn sm" data-act="cmNovoItem" style="margin-top:6px">+ Item com produto novo</button>
+  ${c.itens.map((i, k) => `<div class="card" style="margin:8px 0 0;padding:10px">
+    <div style="display:flex;gap:8px;align-items:center"><div class="grow" style="flex:1;font-weight:600">${i.produto_id === 'novo' ? 'Produto novo' : esc(nomeProd(i.produto_id))}</div><button class="x" data-act="cmRem" data-i="${k}" aria-label="Remover item">×</button></div>
+    ${i.produto_id === 'novo' ? `<div class="row">${fld('ci' + k + 'd', 'Descrição *', i.novoDesc, `data-it="${k}:novoDesc"`)}${fld('ci' + k + 'n', 'NCM *', i.ncm, `data-it="${k}:ncm" inputmode="numeric"`)}${fld('ci' + k + 'p', 'Preço de venda', i.preco, `data-it="${k}:preco" inputmode="decimal"`)}</div>` : ''}
+    <div class="g3"><div><label>Quantidade</label><input data-it="${k}:qCom" inputmode="decimal" value="${esc(i.qCom)}"></div>
+      <div><label>Unidade</label><input data-it="${k}:uCom" value="${esc(i.uCom)}"></div>
+      <div><label>Valor unitário</label><input data-it="${k}:vUnCom" inputmode="decimal" value="${esc(i.vUnCom)}"></div></div>
+    <div class="g3" style="margin-top:4px"><div><label>1 ${esc(i.uCom || 'UN')} = (un. no estoque)</label><input data-it="${k}:fator" inputmode="decimal" value="${v2(i.fator)}"></div>
+      <div><label>Desconto (R$)</label><input data-it="${k}:vDesc" inputmode="decimal" value="${esc(i.vDesc)}"></div>
+      <div><label>Total do item</label><div class="num" style="padding:10px 0" id="cmIt${k}">${brl(r2(numIn(i.qCom) * numIn(i.vUnCom)))}</div></div></div>
+    <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Impostos do item (CFOP, CST, ICMS, ST, IPI)</summary>
+      <div class="g3">${['cfop:CFOP','cst:CST/CSOSN','vBC:BC ICMS','pICMS:Alíq. ICMS %','vICMS:Valor ICMS','vICMSST:ICMS-ST (R$)','vIPI:IPI (R$)'].map(s => { const [f, l] = s.split(':');
+        return `<div><label>${l}</label><input data-it="${k}:${f}" inputmode="decimal" value="${esc(i[f])}" ${f === 'cfop' ? `placeholder="${cfopCompra()}"` : ''}></div>`; }).join('')}</div>
+      <p class="small">ST e IPI entram no custo do produto. O ICMS é só informativo.</p></details></div>`).join('')}
+  <h3>Valores da nota</h3>
+  <div class="row">${campo('frete', 'Frete (R$)', 'inputmode="decimal"')}${campo('seguro', 'Seguro (R$)', 'inputmode="decimal"')}${campo('outras', 'Outras despesas (R$)', 'inputmode="decimal"')}</div>
+  <p class="small">Frete, seguro e outras despesas são rateados entre os itens e entram no custo.</p>
+  <div id="cmTotais" style="margin-top:6px">${totaisCompraHtml()}</div>
+  <h3>Pagamento</h3>
+  ${sel('cm_pagamento', 'Forma', c.pagamento, PAG_COMPRA).replace('<select ', '<select data-cm="pagamento" ')}
+  ${c.pagamento === 'prazo' ? `<div class="row" style="align-items:flex-end"><div><label>Gerar parcelas</label><input id="cmNParc" inputmode="numeric" placeholder="Nº de parcelas" value=""></div>
+      <div><label>Intervalo (dias)</label><input id="cmIntParc" inputmode="numeric" value="30"></div><div style="flex:0 0 auto"><button class="btn" data-act="cmGerarParc">Gerar</button></div></div>
+    ${c.duplicatas.map((d, k) => `<div class="g3" style="margin-top:6px"><div><label>Parcela</label><input data-dp="${k}:n" value="${esc(d.n)}"></div><div><label>Vencimento</label><input type="date" data-dp="${k}:venc" value="${esc(d.venc)}"></div>
+      <div><label>Valor</label><div style="display:flex;gap:4px"><input data-dp="${k}:valor" inputmode="decimal" value="${esc(d.valor)}"><button class="x" data-act="cmRemParc" data-i="${k}" aria-label="Remover parcela">×</button></div></div></div>`).join('')}
+    <button class="btn sm" data-act="cmAddParc" style="margin-top:6px">+ Parcela</button>` : ''}
+  <label for="cm_obs">Observações / informações complementares</label><textarea id="cm_obs" data-cm="obs" rows="2">${esc(c.obs)}</textarea>
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="salvarCompra">Lançar nota e dar entrada no estoque</button></div>`);
+}
+async function salvarCompra(btn){
+  const c = S.cm, { its, t } = calcCompraManual(), errs = [];
+  const f = S.fornecedores.find(x => x.id === c.fornecedor_id);
+  if (!f) errs.push('Selecione o fornecedor.');
+  if (c.modelo !== 'papel' && !dig(c.numero)) errs.push('Informe o número da nota.');
+  if (c.chave && !c.xml_id && !chaveOk(c.chave)) errs.push('A chave de acesso está inválida.');
+  if (c.chave && S.compras.some(x => x.chave === dig(c.chave) && x.status !== 'estornada')) errs.push('Já existe uma compra lançada com essa chave de acesso.');
+  if (!c.data_emissao) errs.push('Informe a data de emissão.');
+  if (!its.length) errs.push('Adicione pelo menos um item.');
+  its.forEach((i, k) => {
+    const nome = i.produto_id === 'novo' ? (i.novoDesc || `item ${k + 1}`) : nomeProd(i.produto_id);
+    if (i.produto_id === 'novo' && !i.novoDesc.trim()) errs.push(`Item ${k + 1}: informe a descrição do produto novo.`);
+    if (i.produto_id === 'novo' && dig(i.ncm).length !== 8) errs.push(`Item ${k + 1}: NCM deve ter 8 dígitos.`);
+    if (!(numIn(i.qCom) > 0)) errs.push(`${esc(nome)}: quantidade inválida.`);
+    if (!(numIn(i.vUnCom) >= 0) || i.vUnCom === '') errs.push(`${esc(nome)}: informe o valor unitário.`);
+    if (!(numIn(i.fator) > 0)) errs.push(`${esc(nome)}: conversão inválida.`);
+  });
+  if (c.pagamento === 'prazo'){
+    if (!c.duplicatas.length) errs.push('Informe as parcelas ou mude a forma de pagamento.');
+    else if (!c.xml_id && Math.abs(r2(c.duplicatas.reduce((a, d) => a + numIn(d.valor), 0)) - t.vNF) > 0.05) errs.push('A soma das parcelas não bate com o total da nota.');
+  }
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Lançando…</div>';
+  const e = emp(), fcfop = cfopCompra();
+  const itens = its.map((i, k) => ({ cProd:i.cProd || String(k + 1), xProd:i.produto_id === 'novo' ? i.novoDesc.toUpperCase() : nomeProd(i.produto_id), ncm:dig(i.ncm) || (S.produtos.find(p => p.id === i.produto_id) || {}).ncm || '',
+    cfop:dig(i.cfop) || fcfop, cst:dig(i.cst), uCom:(i.uCom || 'UN').toUpperCase(), qCom:numIn(i.qCom), vUnCom:numIn(i.vUnCom), vProd:i.vProd, vDesc:numIn(i.vDesc),
+    vFrete:i.vFrete, vSeg:i.vSeg, vOutro:i.vOutro, vBC:numIn(i.vBC), pICMS:numIn(i.pICMS), vICMS:numIn(i.vICMS), vICMSST:numIn(i.vICMSST), vIPI:numIn(i.vIPI),
+    custoTotal:i.custoTotal, produto_id:i.produto_id, fator:numIn(i.fator), novoDesc:i.novoDesc, preco:i.preco, ean:i.ean || '', ...(i.vinc_chave ? { vinc_chave:i.vinc_chave } : {}) }));
+  const compra = { origem:'manual', modelo:c.modelo, chave:dig(c.chave), numero:dig(c.numero) || c.numero, serie:c.serie, natureza:c.natureza, data_emissao:c.data_emissao, data_entrada:c.data_entrada || hoje(),
+    fornecedor_id:f.id, fornecedor_cnpj:f.cnpj, fornecedor_nome:(f.fantasia || f.nome || '').toUpperCase(), fornecedor:f, destinatario:{ cnpj:e.cnpj, nome:e.razao },
+    totais:{ ...t, vBCST:0 }, total_produtos:t.vProd, total_nota:t.vNF, pagamento:c.pagamento,
+    duplicatas:c.pagamento === 'prazo' ? c.duplicatas.map(d => ({ n:d.n, venc:d.venc, valor:numIn(d.valor) })) : [], obs:c.obs, xml_id:c.xml_id || null, corrige:c.corrige || null, itens };
+  try {
+    await gravarCompra(compra, itens.filter(i => i.produto_id === 'novo'), null);
+    S.cm = null; closeModal(); toast(`Nota lançada: ${itens.length} item(ns) entraram no estoque.`);
+  } catch(err){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+}
+
+/* ---------- visualização, impressão e XML ---------- */
+function danfeCompraHtml(c){
+  const e = emp(), f = c.fornecedor || {}, t = c.totais || { vProd:c.total_produtos, vNF:c.total_nota }, d = c.destinatario || { cnpj:e.cnpj, nome:e.razao };
+  const cel = (l, v) => `<td><div class="lb">${l}</div>${brl(v || 0)}</td>`;
+  return `<div class="danfe">
+  ${c.status === 'estornada' ? '<div class="semvalor">COMPRA ESTORNADA NO ESTOQUE</div>' : ''}
+  <div class="bx"><div class="lb">Emitente (fornecedor)</div><b>${esc(f.nome || c.fornecedor_nome || '')}</b>${f.fantasia ? ' — ' + esc(f.fantasia) : ''}<br>
+    ${esc(f.logradouro || '')}${f.numero ? ', ' + esc(f.numero) : ''}${f.bairro ? ' - ' + esc(f.bairro) : ''} ${f.municipio ? '- ' + esc(f.municipio) + '/' + esc(f.uf || '') : ''}<br>CNPJ ${fmtDoc(f.cnpj || c.fornecedor_cnpj)}${f.ie ? ' · IE ' + esc(f.ie) : ''}</div>
+  <div class="bx"><div class="lb">${({ '55':'NF-e', '65':'NFC-e', papel:'Nota de papel / recibo' })[c.modelo] || 'Nota'} de compra · nº ${esc(c.numero || '—')} · série ${esc(c.serie || '—')}</div>
+    Natureza: ${esc(c.natureza || '')} · Emissão ${dataBR(c.data_emissao)} · Entrada ${dataBR(c.data_entrada)}${c.chave ? `<br>Chave de acesso: ${fmtChave(c.chave)}` : ''}</div>
+  <div class="bx"><div class="lb">Destinatário</div><b>${esc(d.nome || (e && e.razao) || '')}</b> — ${fmtDoc(d.cnpj)}</div>
+  <div class="bx" style="overflow-x:auto"><div class="lb">Cálculo do imposto</div><table><tr>${cel('BC ICMS', t.vBC)}${cel('ICMS', t.vICMS)}${cel('BC ICMS-ST', t.vBCST)}${cel('ICMS-ST', t.vST)}${cel('Total produtos', t.vProd)}</tr>
+    <tr>${cel('Frete', t.vFrete)}${cel('Seguro', t.vSeg)}${cel('Desconto', t.vDesc)}${cel('Outras desp.', t.vOutro)}${cel('IPI', t.vIPI)}<td><div class="lb">Total da nota</div><b>${brl(t.vNF ?? c.total_nota)}</b></td></tr></table></div>
+  ${(c.duplicatas || []).length ? `<div class="bx"><div class="lb">Fatura / duplicatas</div>${c.duplicatas.map(x => `${esc(x.n)} · venc. ${dataBR(x.venc)} · ${brl(x.valor)}`).join(' &nbsp;|&nbsp; ')}</div>`
+    : `<div class="bx"><div class="lb">Pagamento</div>${esc(({ avista:'À vista', prazo:'A prazo', outros:'Outros / bonificação' })[c.pagamento] || 'À vista')}</div>`}
+  <div class="bx" style="overflow-x:auto"><div class="lb">Produtos</div><table><tr><th>Cód.</th><th>Descrição</th><th>NCM</th><th>CST</th><th>CFOP</th><th>Un</th><th>Qtd</th><th>V. unit.</th><th>V. total</th><th>BC ICMS</th><th>ICMS</th><th>Alíq.</th><th>IPI</th></tr>
+  ${(c.itens || []).map(i => `<tr><td>${esc(i.cProd || '')}</td><td>${esc(i.xProd || nomeProd(i.produto_id))}</td><td>${esc(i.ncm || '')}</td><td>${esc(i.cst || '')}</td><td>${esc(i.cfop || '')}</td><td>${esc(i.uCom || '')}</td>
+    <td>${qtdTxt(i.qCom)}</td><td>${brl(i.vUnCom)}</td><td>${brl(i.vProd)}</td><td>${brl(i.vBC)}</td><td>${brl(i.vICMS)}</td><td>${v2(i.pICMS || 0)}</td><td>${brl(i.vIPI)}</td></tr>`).join('')}</table></div>
+  ${c.obs ? `<div class="bx"><div class="lb">Informações complementares</div>${esc(c.obs)}</div>` : ''}
+  <div class="bx" style="overflow-x:auto"><div class="lb">Entrada no estoque (controle interno)</div><table><tr><th>Item da nota</th><th>Produto no cadastro</th><th>Conversão</th><th>Qtd. no estoque</th><th>Custo unit.</th></tr>
+  ${(c.itens || []).map(i => `<tr><td>${esc(i.xProd || '')}</td><td>${esc(nomeProd(i.produto_id))}</td><td>${num(i.fator) !== 1 ? '1 ' + esc(i.uCom) + ' = ' + qtdTxt(i.fator) : '—'}</td><td>${qtdTxt(i.qtd_estoque)}</td><td>${brl(i.custo_unit)}</td></tr>`).join('')}</table></div>
+  <div class="small" style="margin-top:6px">Documento auxiliar gerado pelo Emissor Fiscal${c.origem === 'xml' ? ' a partir do XML da nota' : ' a partir do lançamento manual'} · lançada em ${fmtData(c.lancado_em)}.</div></div>`;
+}
+function imprimirHtml(titulo, corpo){
+  const css = document.querySelector('style').textContent, f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+  const d = f.contentDocument;
+  d.open(); d.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${css}
+html,body{background:#fff}body{margin:0;padding:0;font-size:12px}@page{size:A4;margin:8mm}.danfe{margin:0;border:0;padding:0}</style></head><body>${corpo}</body></html>`); d.close();
+  setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch(_){ toast('Não foi possível abrir a impressão.'); } setTimeout(() => f.remove(), 60000); }, 300);
+}
+function verCompra(id){
+  const c = S.compras.find(x => x.id === id); if (!c) return;
+  const ger = pode('produto'), ativa = c.status !== 'estornada';
+  openModal(`${mhead('Nota de compra nº ' + esc(c.numero || '—'))}
+  ${c.status === 'estornada' ? `<div class="msg err">Estornada em ${fmtData(c.estornado_em)}${c.motivo_estorno ? ': ' + esc(c.motivo_estorno) : ''}</div>` : ''}
+  <div class="actions" style="margin-top:0">
+    <button class="btn pri" data-act="imprimirCompra" data-id="${esc(id)}">🖨 Imprimir / salvar PDF</button>
+    ${c.tem_xml ? `<button class="btn" data-act="baixarXmlCompra" data-id="${esc(id)}">⤓ Baixar XML</button>` : ''}
+    ${ativa && ger ? `<button class="btn" data-act="corrigirCompra" data-id="${esc(id)}">Corrigir</button>` : ''}
+  </div>
+  <p class="small">Para salvar em PDF: clique em Imprimir e escolha "Salvar como PDF" no destino da impressora.</p>
+  ${danfeCompraHtml(c)}
+  ${ativa && ger ? `<h3>Estornar</h3><p class="small">Desfaz a entrada no estoque (por exemplo, nota lançada por engano ou devolvida inteira).</p>
+    <input id="motEst" placeholder="Motivo do estorno"><div id="errM"></div>
+    <div class="actions"><button class="btn bad" data-act="confEstornar" data-id="${esc(c.id)}">Estornar compra</button></div>` : '<div id="errM"></div>'}`);
+}
+async function baixarXmlCompra(id){
+  const c = S.compras.find(x => x.id === id), xid = (c && c.xml_id) || id;
+  const s = await db.collection(colOf('compras_xml')).doc(xid).get();
+  if (!s.exists) return toast('O XML desta nota não está guardado.');
+  const d = s.data(); if (await salvarArquivo(d.arquivo || `NFe-compra-${(c && c.numero) || xid}.xml`, new Blob([d.xml], { type:'application/xml' }))) toast('XML baixado.');
+}
+async function confEstornar(id, motivoFixo){
+  const m = motivoFixo || val('motEst');
+  if (m.length < 5){ $('#errM').innerHTML = '<div class="msg err">Escreva o motivo do estorno.</div>'; return false; }
+  const { error } = await SB.rpc('estornar_compra', { e:S.empId, cid:id, motivo:m });
+  if (error){ $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return false; }
+  if (!motivoFixo){ closeModal(); toast('Compra estornada: os itens saíram do estoque.'); }
+  return true;
+}
+function formCorrigir(id){
+  openModal(`${mhead('Corrigir nota de compra')}<p>Para corrigir, o sistema <b>estorna</b> esta compra (tira os itens do estoque) e abre o lançamento com os mesmos dados para você ajustar e lançar de novo.</p>
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="verCompra" data-id="${esc(id)}">Voltar</button><button class="btn pri" data-act="confCorrigir" data-id="${esc(id)}">Estornar e corrigir</button></div>`);
+}
+async function confCorrigir(id){
+  const c = clone(S.compras.find(x => x.id === id));
+  if (!(await confEstornar(id, 'Correção do lançamento'))) return;
+  novaCompra({ modelo:c.modelo || '55', chave:c.chave || '', numero:c.numero || '', serie:c.serie || '', natureza:c.natureza || '', data_emissao:c.data_emissao || hoje(), data_entrada:c.data_entrada || hoje(),
+    fornecedor_id:c.fornecedor_id || '', frete:v2((c.totais || {}).vFrete || ''), seguro:v2((c.totais || {}).vSeg || ''), outras:v2((c.totais || {}).vOutro || ''),
+    pagamento:c.pagamento || 'avista', duplicatas:(c.duplicatas || []).map(d => ({ n:d.n, venc:d.venc, valor:v2(d.valor) })), obs:c.obs || '', busca:'',
+    xml_id:c.tem_xml ? (c.xml_id || c.id) : null, corrige:c.id,
+    itens:(c.itens || []).map(i => ({ ...itemVazio(), produto_id:S.produtos.some(p => p.id === i.produto_id) ? i.produto_id : 'novo', novoDesc:i.xProd || '', ncm:i.ncm || '', cProd:i.cProd || '', ean:i.ean || '', vinc_chave:i.vinc_chave || '',
+      cfop:i.cfop || '', cst:i.cst || '', uCom:i.uCom || 'UN', fator:i.fator || 1, qCom:v2(i.qCom), vUnCom:v2(i.vUnCom), vDesc:i.vDesc ? v2(i.vDesc) : '',
+      vBC:i.vBC ? v2(i.vBC) : '', pICMS:i.pICMS ? v2(i.pICMS) : '', vICMS:i.vICMS ? v2(i.vICMS) : '', vICMSST:i.vICMSST ? v2(i.vICMSST) : '', vIPI:i.vIPI ? v2(i.vIPI) : '' })) });
+}
+
+/* ---------- aba Estoque: saldo e inventário ---------- */
 function vEstoque(){
-  const v = S.estView || 'compras', P = S.produtos;
+  const P = S.produtos;
   const valor = r2(P.filter(temSaldo).reduce((a, p) => a + Math.max(p.estoque, 0) * num(p.custo_medio || p.custo || 0), 0));
   const baixo = P.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min)).length, neg = P.filter(p => temSaldo(p) && p.estoque < 0).length;
-  const seg = `<div class="seg" style="margin-bottom:12px">${[['compras','Compras'],['saldo','Saldo de estoque'],['fornecedores','Fornecedores']].map(([k, l]) => `<button data-act="estView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const stats = `<div class="stats"><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${baixo}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${neg}</b>com saldo negativo</div></div>`;
-  return `<h2>Estoque</h2>${seg}${stats}` + ({ compras:vCompras, saldo:vSaldo, fornecedores:vFornecedores })[v]();
-}
-function vCompras(){
-  const L = [...S.compras].sort((a, b) => String(b.lancado_em || '').localeCompare(String(a.lancado_em || '')));
-  return `${pode('produto') ? `<div class="actions" style="margin:0 0 12px"><label class="btn pri" style="flex:1">⤓ Importar XML da nota de compra<input type="file" id="compraXml" accept=".xml" hidden></label>
-      <button class="btn" data-act="novaCompraManual">+ Compra manual</button></div>` : ''}
-    <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
-      <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}</span></div>
-      <div class="s">${(c.data_emissao || '').split('-').reverse().join('/')} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}</div></div>
-      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${c.status === 'estornada' ? '<span class="tag b">estornada</span>' : '<span class="tag">lançada</span>'}</div></div>`).join('')}</div>`
-      : '<div class="empty">Nenhuma compra lançada. Importe o XML da nota do fornecedor para dar entrada no estoque.</div>'}</div>`;
+  return `<h2>Estoque</h2><div class="stats"><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${baixo}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${neg}</b>com saldo negativo</div></div>
+    <p class="small">As entradas vêm da aba <b>Compras</b>; as saídas, das vendas. Toque num produto para ver o histórico ou fazer inventário.</p>${vSaldo()}`;
 }
 function vSaldo(){
   const f = S.estFiltro || 'todos', q = norm(S.estBusca || '');
@@ -1960,157 +2274,12 @@ function vSaldo(){
       <div class="s">${temSaldo(p) ? `custo médio ${brl(p.custo_medio || 0)}${num(p.estoque_min) > 0 ? ' · mínimo ' + qtdTxt(num(p.estoque_min)) : ''}` : 'ainda sem entrada no estoque'}</div></div>
       <div style="text-align:right"><b class="num" style="color:${cor(p)}">${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</b> <span class="small">${esc(p.unidade || 'UN')}</span></div></div>`).join('')}</div>` : '<div class="empty">Nenhum produto neste filtro.</div>'}</div>`;
 }
-function vFornecedores(){
-  const L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-  return `${pode('produto') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="novoFornecedor">+ Fornecedor</button></div>' : ''}
-    <div class="card">${L.length ? `<div class="list">${L.map(f => { const n = S.compras.filter(c => c.fornecedor_cnpj === f.cnpj && c.status !== 'estornada').length;
-      return `<div class="it" data-act="editFornecedor" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.fantasia || f.nome)}</div>
-        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><span class="tag">${n} compra(s)</span></div>`; }).join('')}</div>`
-      : '<div class="empty">Os fornecedores entram sozinhos quando você importa uma nota de compra.</div>'}</div>`;
-}
-
-/* ---------- importação do XML ---------- */
-async function lerCompraXml(file){
-  let x;
-  try { x = parseCompraXml(await file.text()); } catch(e){ toast(e.message); return; }
-  const e = emp(), fc = dig(x.fornecedor.cnpj);
-  x.erros = [];
-  if (x.destCnpj && dig(x.destCnpj) !== dig(e.cnpj)) x.erros.push(`Esta nota foi emitida para outro CNPJ (${fmtDoc(x.destCnpj)}), não para ${esc(e.razao)}.`);
-  if (x.chave && S.compras.some(c => c.chave === x.chave && c.status !== 'estornada')) x.erros.push('Esta nota de compra já foi lançada no estoque.');
-  x.itens.forEach(it => {
-    const v = S.vinculos.find(v => dig(v.fornecedor_cnpj) === fc && String(v.cProd) === it.cProd && S.produtos.some(p => p.id === v.produto_id));
-    const porGtin = gtinOk(it.ean) ? S.produtos.find(p => p.gtin === dig(it.ean)) : null;
-    it.produto_id = v ? v.produto_id : porGtin ? porGtin.id : 'novo';
-    it.como = v ? 'lembrado' : porGtin ? 'código de barras' : '';
-    it.fator = v ? num(v.fator) || 1 : 1; it.preco = '';
-  });
-  S.compraImport = x; renderCompraImport();
-}
-function linhaEntrada(it){
-  const q = r2(it.qCom * (num(it.fator) || 0) * 1000) / 1000, cu = q > 0 ? Math.round(it.custoTotal / q * 10000) / 10000 : 0;
-  const un = it.produto_id === 'novo' ? (num(it.fator) > 1 ? 'UN' : it.uCom) : (S.produtos.find(p => p.id === it.produto_id) || {}).unidade || 'UN';
-  return `Entra no estoque: <b>${qtdTxt(q)} ${esc(un)}</b> a <b>${brl(cu)}</b> cada`;
-}
-function renderCompraImport(){
-  const x = S.compraImport, prods = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || ''));
-  const novos = x.itens.filter(i => i.produto_id === 'novo').length;
-  openModal(`${mhead('Entrada de compra')}
-  <div class="card" style="margin:0 0 10px"><b>${esc(x.fornecedor.fantasia || x.fornecedor.nome)}</b> <span class="small">${fmtDoc(x.fornecedor.cnpj)}</span><br>
-    <span class="small">NF-e nº ${esc(x.numero)} série ${esc(x.serie)} · emissão ${x.data_emissao.split('-').reverse().join('/')} · total ${brl(x.total_nota)}</span></div>
-  ${x.erros.length ? `<div class="msg err">${x.erros.join('<br>')}</div>` : ''}
-  <p class="small">Confira o produto de cada item. Os reconhecidos vêm marcados; para os demais, escolha um produto que você já tem ou deixe "cadastrar como novo". O sistema lembra a escolha nas próximas compras deste fornecedor. O custo inclui IPI, ST, frete e outras despesas da nota, menos descontos.</p>
-  ${x.itens.map((it, i) => `<div class="card" style="margin:0 0 8px;padding:10px">
-    <div class="t" style="font-weight:600">${esc(it.xProd)}</div>
-    <div class="small">cód. ${esc(it.cProd)} · NCM ${fmtNcm(it.ncm)} · ${qtdTxt(it.qCom)} ${esc(it.uCom)} × ${brl(it.vUnCom)} · custo total ${brl(it.custoTotal)}${it.como ? ` · <span style="color:var(--ok)">✓ reconhecido pelo ${it.como}</span>` : ''}</div>
-    <label>Produto no meu cadastro</label>
-    <select data-ci="${i}"><option value="novo" ${it.produto_id === 'novo' ? 'selected' : ''}>➕ Cadastrar como produto novo</option>${prods.map(p => `<option value="${esc(p.id)}" ${p.id === it.produto_id ? 'selected' : ''}>${esc(p.descricao)}</option>`).join('')}</select>
-    <div class="row" style="align-items:flex-end">
-      <div><label>Conversão: 1 ${esc(it.uCom)} =</label><input data-cf="${i}" inputmode="decimal" value="${String(it.fator).replace('.', ',')}"></div>
-      ${it.produto_id === 'novo' ? `<div><label>Preço de venda (R$)</label><input data-cp="${i}" inputmode="decimal" placeholder="obrigatório para vender" value="${esc(it.preco)}"></div>` : ''}
-    </div>
-    <div class="small" id="cix-${i}" style="margin-top:6px">${linhaEntrada(it)}</div></div>`).join('')}
-  ${novos ? `${S.perfis.length ? sel('ciPerf', `Perfil de tributação para os ${novos} produto(s) novo(s)`, S.ciPerf || '', [['','— padrão do regime —'], ...S.perfis.map(f => [f.id, f.nome])]) : ''}
-    <p class="small">Produtos novos entram com NCM, CEST e código de barras da nota. Confira a tributação deles depois na aba Produtos.</p>` : ''}
-  <div id="errM"></div>
-  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="lancarCompraXml" ${x.erros.length ? 'disabled' : ''}>Dar entrada no estoque</button></div>`);
-}
-async function garantirFornecedor(f){
-  const c = dig(f.cnpj); if (!c) return null;
-  const ex = S.fornecedores.find(x => x.cnpj === c); if (ex) return ex.id;
-  const o = await put('fornecedores', { cnpj:c, nome:(f.nome || '').toUpperCase(), fantasia:f.fantasia || '', ie:dig(f.ie), logradouro:f.logradouro || '', numero:f.numero || '',
-    bairro:f.bairro || '', municipio:f.municipio || '', cod_municipio:dig(f.cod_municipio), uf:f.uf || '', cep:dig(f.cep), telefone:f.telefone || '' });
-  return o.id;
-}
-async function lancarCompraXml(btn){
-  const x = S.compraImport, e = emp(), simples = String(e.regime) !== '3';
-  const errs = []; x.itens.forEach(it => { if (!(num(it.fator) > 0)) errs.push(`Conversão inválida em ${esc(it.xProd)}.`); });
-  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
-  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Lançando…</div>';
-  try {
-    const fornecedor_id = await garantirFornecedor(x.fornecedor);
-    const perf = S.perfis.find(f => f.id === S.ciPerf);
-    const base = perf ? taxOf(perf) : { cfop:'5102', cst_csosn:simples ? '102' : '00', icms_aliq:simples ? 0 : 20.5, icms_red:0, st_mva:0, st_aliq:0, st_fcp:0,
-      pis_cst:simples ? '49' : '01', pis_aliq:0, cofins_cst:simples ? '49' : '01', cofins_aliq:0, cst_ibscbs:'000', cclasstrib:'000001' };
-    for (const it of x.itens){
-      if (it.produto_id !== 'novo') continue;
-      it.eraNovo = true;
-      const p = await put('produtos', { ...base, perfil_id:perf ? perf.id : '', descricao:it.xProd.toUpperCase(), codigo:'', gtin:gtinOk(it.ean) ? dig(it.ean) : 'SEM GTIN',
-        preco:numIn(it.preco), unidade:(num(it.fator) > 1 ? 'UN' : it.uCom).slice(0, 6), ncm:dig(it.ncm), cest:dig(it.cest), origem:({ '1':'2', '6':'7' })[it.orig] || it.orig || '0' });
-      it.produto_id = p.id;
-    }
-    const itens = x.itens.map(it => { const q = Math.round(it.qCom * num(it.fator) * 1000) / 1000;
-      return { cProd:it.cProd, xProd:it.xProd, ean:it.ean, ncm:it.ncm, cfop:it.cfop, uCom:it.uCom, qCom:it.qCom, vUnCom:it.vUnCom, vProd:it.vProd, custo_total:it.custoTotal,
-        produto_id:it.produto_id, fator:num(it.fator), qtd_estoque:q, custo_unit:Math.round(it.custoTotal / q * 10000) / 10000, vinc_chave:chaveVinc(x.fornecedor.cnpj, it.cProd) }; });
-    const compra = { origem:'xml', chave:x.chave, numero:x.numero, serie:x.serie, data_emissao:x.data_emissao, data_entrada:hoje(), fornecedor_id,
-      fornecedor_cnpj:dig(x.fornecedor.cnpj), fornecedor_nome:(x.fornecedor.fantasia || x.fornecedor.nome || '').toUpperCase(), total_produtos:x.total_produtos, total_nota:x.total_nota, itens };
-    const { error } = await SB.rpc('lancar_compra', { e:S.empId, compra });
-    if (error) throw new Error(error.message);
-    const semPreco = x.itens.filter(i => i.eraNovo && !(numIn(i.preco) > 0)).length;
-    S.compraImport = null; closeModal();
-    toast(`Compra lançada: ${itens.length} item(ns) entraram no estoque.${semPreco ? ' Defina o preço dos produtos novos.' : ''}`);
-  } catch(err){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
-}
-
-/* ---------- compra manual ---------- */
-function novaCompraManual(){ S.compraManual = { fornecedor_id:'', numero:'', data:hoje(), itens:[], busca:'' }; renderCompraManual(); }
-function renderCompraManual(){
-  const c = S.compraManual, total = r2(c.itens.reduce((a, i) => a + numIn(i.qtd) * numIn(i.custo), 0));
-  openModal(`${mhead('Compra manual')}
-  <p class="small">Para compras sem XML (nota de papel, recibo, produtor rural). Para nota eletrônica, prefira importar o XML.</p>
-  ${sel('cmForn','Fornecedor', c.fornecedor_id, [['','— sem fornecedor —'], ...[...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || '')).map(f => [f.id, (f.fantasia || f.nome) + ' · ' + fmtDoc(f.cnpj)])])}
-  <div class="row">${fld('cmNum','Número do documento', c.numero)}${fld('cmData','Data', c.data, 'type="date"')}</div>
-  <label for="cmBusca">Adicionar produto</label><input id="cmBusca" autocomplete="off" placeholder="Buscar produto…" value="${esc(c.busca)}"><div class="results" id="cmRes">${resultadosHtml(c.busca, 'cmAdd')}</div>
-  ${c.itens.length ? `<div class="list" style="margin-top:8px">${c.itens.map((i, k) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${esc(nomeProd(i.pid))}</div></div>
-    <div class="g3"><div><label>Quantidade</label><input data-mq="${k}" inputmode="decimal" value="${esc(i.qtd)}"></div><div><label>Custo unitário</label><input data-mc="${k}" inputmode="decimal" value="${esc(i.custo)}"></div>
-    <div style="align-self:end"><button class="btn sm bad" data-act="cmRem" data-i="${k}">Remover</button></div></div></div>`).join('')}</div>` : ''}
-  <div class="total big" style="margin-top:10px"><span>Total</span><span class="num" id="cmTot">${brl(total)}</span></div>
-  <div id="errM"></div>
-  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="lancarCompraManual" ${c.itens.length ? '' : 'disabled'}>Dar entrada no estoque</button></div>`);
-}
-async function lancarCompraManual(btn){
-  const c = S.compraManual, errs = [];
-  c.itens.forEach(i => { if (!(numIn(i.qtd) > 0)) errs.push(`Quantidade inválida em ${esc(nomeProd(i.pid))}.`); if (!(numIn(i.custo) >= 0)) errs.push(`Custo inválido em ${esc(nomeProd(i.pid))}.`); });
-  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
-  const f = S.fornecedores.find(x => x.id === c.fornecedor_id);
-  const itens = c.itens.map(i => ({ produto_id:i.pid, xProd:nomeProd(i.pid), qtd_estoque:numIn(i.qtd), custo_unit:numIn(i.custo), fator:1, custo_total:r2(numIn(i.qtd) * numIn(i.custo)) }));
-  const compra = { origem:'manual', numero:c.numero, data_emissao:c.data, data_entrada:hoje(), fornecedor_id:f ? f.id : '', fornecedor_cnpj:f ? f.cnpj : '', fornecedor_nome:f ? (f.fantasia || f.nome) : '',
-    total_produtos:r2(itens.reduce((a, i) => a + i.custo_total, 0)), total_nota:r2(itens.reduce((a, i) => a + i.custo_total, 0)), itens };
-  btn.disabled = true;
-  const { error } = await SB.rpc('lancar_compra', { e:S.empId, compra });
-  if (error){ btn.disabled = false; return $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; }
-  S.compraManual = null; closeModal(); toast(`Compra lançada: ${itens.length} item(ns) entraram no estoque.`);
-}
-
-/* ---------- detalhes da compra e estorno ---------- */
-function verCompra(id){
-  const c = S.compras.find(x => x.id === id); if (!c) return;
-  openModal(`${mhead('Compra ' + (c.numero ? 'nº ' + esc(c.numero) : ''))}
-  ${c.status === 'estornada' ? `<div class="msg err">Estornada em ${fmtData(c.estornado_em)}${c.motivo_estorno ? ': ' + esc(c.motivo_estorno) : ''}</div>` : ''}
-  <p><b>${esc(c.fornecedor_nome || 'Sem fornecedor')}</b> ${c.fornecedor_cnpj ? '<span class="small">' + fmtDoc(c.fornecedor_cnpj) + '</span>' : ''}<br>
-  <span class="small">Emissão ${(c.data_emissao || '').split('-').reverse().join('/')} · lançada em ${fmtData(c.lancado_em)} · ${c.origem === 'xml' ? 'importada do XML' : 'lançamento manual'}</span>
-  ${c.chave ? `<br><span class="small">Chave ${fmtChave(c.chave)}</span>` : ''}</p>
-  <div class="list">${(c.itens || []).map(i => `<div class="it"><div class="grow"><div class="t">${esc(nomeProd(i.produto_id))}</div>
-    <div class="s">${i.xProd && i.xProd !== nomeProd(i.produto_id) ? 'na nota: ' + esc(i.xProd) + ' · ' : ''}${i.fator && i.fator !== 1 ? `${qtdTxt(i.qCom)} ${esc(i.uCom)} × ${qtdTxt(i.fator)} = ` : ''}${qtdTxt(i.qtd_estoque)} un. a ${brl(i.custo_unit)}</div></div>
-    <b class="num">${brl(i.custo_total || i.qtd_estoque * i.custo_unit)}</b></div>`).join('')}</div>
-  <div class="total big"><span>Total da nota</span><span class="num">${brl(c.total_nota || 0)}</span></div>
-  ${c.status !== 'estornada' && pode('produto') ? `<label for="motEst">Estornar (desfazer a entrada)</label><input id="motEst" placeholder="Motivo do estorno">
-    <div id="errM"></div><div class="actions"><button class="btn bad" data-act="confEstornar" data-id="${esc(c.id)}">Estornar compra</button></div>` : ''}`);
-}
-async function confEstornar(id){
-  const m = val('motEst');
-  if (m.length < 5) return $('#errM').innerHTML = '<div class="msg err">Escreva o motivo do estorno.</div>';
-  const { error } = await SB.rpc('estornar_compra', { e:S.empId, cid:id, motivo:m });
-  if (error) return $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`;
-  closeModal(); toast('Compra estornada: os itens saíram do estoque.');
-}
-
-/* ---------- ficha de estoque do produto ---------- */
 const TIPO_MOV = { compra:'Compra', venda:'Venda', cancelamento:'Cancelamento de venda', devolucao_venda:'Devolução de cliente', devolucao_compra:'Devolução ao fornecedor', ajuste:'Ajuste (inventário)', estorno_compra:'Estorno de compra' };
 async function verEstoque(id){
   const p = S.produtos.find(x => x.id === id); if (!p) return;
   openModal(`${mhead(esc(p.descricao))}
   <div class="stats"><div><b>${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</b>saldo (${esc(p.unidade || 'UN')})</div><div><b>${brl(p.custo_medio || 0)}</b>custo médio</div><div><b>${brl(p.custo || 0)}</b>último custo</div></div>
-  ${pode('produto') ? `<div class="row">${fld('ajMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}<div style="align-self:end;flex:0 0 auto"><button class="btn" data-act="salvarMinimo" data-id="${esc(id)}">Salvar mínimo</button></div></div>
+  ${pode('produto') ? `<div class="row">${fld('ajMin','Estoque mínimo (alerta)', p.estoque_min ? v2(p.estoque_min) : '', 'inputmode="decimal"')}<div style="align-self:end;flex:0 0 auto"><button class="btn" data-act="salvarMinimo" data-id="${esc(id)}">Salvar mínimo</button></div></div>
   <h3>Ajuste de inventário</h3><p class="small">Contou o produto na prateleira? Informe a quantidade real; o sistema registra a diferença.</p>
   <div class="row">${fld('ajSaldo','Quantidade contada', '', 'inputmode="decimal"')}${fld('ajMot','Motivo', 'Inventário')}</div>
   <div id="errM"></div><div class="actions"><button class="btn pri" data-act="salvarAjuste" data-id="${esc(id)}">Ajustar saldo</button></div>` : ''}
@@ -2124,6 +2293,14 @@ async function verEstoque(id){
 }
 
 /* ---------- fornecedores ---------- */
+function vFornecedores(){
+  const L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  return `${pode('produto') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="novoFornecedor">+ Fornecedor</button></div>' : ''}
+    <div class="card">${L.length ? `<div class="list">${L.map(f => { const cs = S.compras.filter(c => c.fornecedor_cnpj === f.cnpj && c.status !== 'estornada');
+      return `<div class="it" data-act="editFornecedor" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.fantasia || f.nome)}</div>
+        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><div style="text-align:right"><b class="num">${brl(cs.reduce((a, c) => a + num(c.total_nota), 0))}</b><br><span class="small">${cs.length} compra(s)</span></div></div>`; }).join('')}</div>`
+      : '<div class="empty">Os fornecedores entram sozinhos quando você importa uma nota de compra.</div>'}</div>`;
+}
 function formFornecedor(f){
   f = f || { uf:'PI' };
   openModal(`${mhead(f.id ? 'Editar fornecedor' : 'Novo fornecedor')}
@@ -2149,18 +2326,34 @@ async function salvarFornecedor(id){
   if (await safe(() => put('fornecedores', o), 'Fornecedor salvo.')) closeModal();
 }
 
-/* ---------- eventos do estoque ---------- */
+/* ---------- eventos ---------- */
 async function acoesEstoque(a, t, id){
   switch (a){
-    case 'estView': S.estView = t.dataset.v; render(); return true;
+    case 'cpView': S.cpView = t.dataset.v; render(); return true;
     case 'estFiltro': S.estFiltro = t.dataset.f; render(); return true;
     case 'verCompra': verCompra(id); return true;
+    case 'imprimirCompra': { const c = S.compras.find(x => x.id === id); imprimirHtml(`Compra ${c.numero || ''} - ${c.fornecedor_nome || ''}`, danfeCompraHtml(c)); return true; }
+    case 'baixarXmlCompra': baixarXmlCompra(id); return true;
+    case 'corrigirCompra': formCorrigir(id); return true;
+    case 'confCorrigir': t.disabled = true; await confCorrigir(id); return true;
     case 'confEstornar': t.disabled = true; await confEstornar(id); t.disabled = false; return true;
     case 'lancarCompraXml': await lancarCompraXml(t); return true;
-    case 'novaCompraManual': novaCompraManual(); return true;
-    case 'cmAdd': { const p = S.produtos.find(x => x.id === id); S.compraManual.itens.push({ pid:id, qtd:'1', custo:p && p.custo ? String(p.custo).replace('.', ',') : '' }); S.compraManual.busca = ''; renderCompraManual(); return true; }
-    case 'cmRem': S.compraManual.itens.splice(+t.dataset.i, 1); renderCompraManual(); return true;
-    case 'lancarCompraManual': await lancarCompraManual(t); return true;
+    case 'pularXml': closeModal(); proximoXml(); return true;
+    case 'cancelarFila': S.filaXml = []; S.compraImport = null; closeModal(); return true;
+    case 'novaCompra': novaCompra(); return true;
+    case 'cmAdd': { const p = S.produtos.find(x => x.id === id); S.cm.itens.push({ ...itemVazio(), produto_id:id, uCom:p.unidade || 'UN', ncm:p.ncm || '', vUnCom:p.custo ? v2(p.custo) : '' }); S.cm.busca = ''; renderCompraManual(); return true; }
+    case 'cmNovoItem': S.cm.itens.push({ ...itemVazio(), produto_id:'novo' }); renderCompraManual(); return true;
+    case 'cmRem': S.cm.itens.splice(+t.dataset.i, 1); renderCompraManual(); return true;
+    case 'cmAddParc': S.cm.duplicatas.push({ n:String(S.cm.duplicatas.length + 1).padStart(3, '0'), venc:hoje(), valor:'' }); renderCompraManual(); return true;
+    case 'cmRemParc': S.cm.duplicatas.splice(+t.dataset.i, 1); renderCompraManual(); return true;
+    case 'cmGerarParc': {
+      const n = parseInt(val('cmNParc')), dias = parseInt(val('cmIntParc')) || 30, tot = calcCompraManual().t.vNF;
+      if (!(n >= 1 && n <= 60)) { toast('Informe o número de parcelas (1 a 60).'); return true; }
+      const base = Math.floor(tot / n * 100) / 100, d0 = new Date((S.cm.data_emissao || hoje()) + 'T12:00:00');
+      S.cm.duplicatas = Array.from({ length:n }, (_, k) => { const d = new Date(d0); d.setDate(d.getDate() + dias * (k + 1));
+        return { n:String(k + 1).padStart(3, '0'), venc:d.toISOString().slice(0, 10), valor:v2(k === n - 1 ? r2(tot - base * (n - 1)) : base) }; });
+      renderCompraManual(); return true; }
+    case 'salvarCompra': await salvarCompra(t); return true;
     case 'verEstoque': verEstoque(id); return true;
     case 'salvarMinimo': { const p = S.produtos.find(x => x.id === id); if (await safe(() => put('produtos', { ...clone(p), estoque_min:numIn(val('ajMin')) }), 'Estoque mínimo salvo.')) closeModal(); return true; }
     case 'salvarAjuste': {
@@ -2178,21 +2371,25 @@ async function acoesEstoque(a, t, id){
 }
 function inputEstoque(t){
   if (t.id === 'estBusca'){ S.estBusca = t.value; later(); return true; }
-  if (t.id === 'cmBusca'){ S.compraManual.busca = t.value; $('#cmRes').innerHTML = resultadosHtml(t.value, 'cmAdd'); return true; }
-  if (t.dataset.mq !== undefined || t.dataset.mc !== undefined){
-    const c = S.compraManual, i = +(t.dataset.mq ?? t.dataset.mc); c.itens[i][t.dataset.mq !== undefined ? 'qtd' : 'custo'] = t.value;
-    $('#cmTot').textContent = brl(r2(c.itens.reduce((a, x) => a + numIn(x.qtd) * numIn(x.custo), 0))); return true; }
-  if (t.id === 'cmNum'){ S.compraManual.numero = t.value; return true; }
+  if (t.id === 'cpBusca'){ S.cpBusca = t.value; later(); return true; }
+  if (t.id === 'cmBusca'){ S.cm.busca = t.value; $('#cmRes').innerHTML = resultadosHtml(t.value, 'cmAdd'); return true; }
+  if (t.dataset.cm !== undefined && S.cm){ S.cm[t.dataset.cm] = t.value;
+    if (t.dataset.cm === 'chave'){ const el = $('#cmChaveInfo'); if (el) el.innerHTML = dig(t.value) ? (chaveOk(t.value) ? '<span style="color:var(--ok)">✓ chave válida</span>' : '<span style="color:var(--bad)">✕ chave inválida</span>') : ''; }
+    if (['frete','seguro','outras'].includes(t.dataset.cm)) $('#cmTotais').innerHTML = totaisCompraHtml(); return true; }
+  if (t.dataset.it !== undefined && S.cm){ const [k, f] = t.dataset.it.split(':'); S.cm.itens[+k][f] = t.value;
+    if (['qCom','vUnCom'].includes(f)){ const i = S.cm.itens[+k], el = $('#cmIt' + k); if (el) el.textContent = brl(r2(numIn(i.qCom) * numIn(i.vUnCom))); }
+    $('#cmTotais').innerHTML = totaisCompraHtml(); return true; }
+  if (t.dataset.dp !== undefined && S.cm){ const [k, f] = t.dataset.dp.split(':'); S.cm.duplicatas[+k][f] = t.value; $('#cmTotais').innerHTML = totaisCompraHtml(); return true; }
   if (t.dataset.cf !== undefined){ const it = S.compraImport.itens[+t.dataset.cf]; it.fator = numIn(t.value); $('#cix-' + t.dataset.cf).innerHTML = linhaEntrada(it); return true; }
   if (t.dataset.cp !== undefined){ S.compraImport.itens[+t.dataset.cp].preco = t.value; return true; }
   return false;
 }
 function changeEstoque(t){
-  if (t.id === 'compraXml'){ if (t.files[0]) lerCompraXml(t.files[0]); t.value = ''; return true; }
+  if (t.id === 'compraXml'){ if (t.files.length) importarXmls([...t.files]); t.value = ''; return true; }
+  if (t.id === 'cpMes'){ S.cpMes = t.value; render(); return true; }
   if (t.dataset.ci !== undefined){ const it = S.compraImport.itens[+t.dataset.ci]; it.produto_id = t.value; it.como = ''; renderCompraImport(); return true; }
   if (t.id === 'ciPerf'){ S.ciPerf = t.value; return true; }
-  if (t.id === 'cmForn'){ S.compraManual.fornecedor_id = t.value; return true; }
-  if (t.id === 'cmData'){ S.compraManual.data = t.value; return true; }
+  if (t.dataset.cm !== undefined && S.cm){ S.cm[t.dataset.cm] = t.value; if (['modelo','pagamento','fornecedor_id'].includes(t.dataset.cm)) renderCompraManual(); return true; }
   return false;
 }
 

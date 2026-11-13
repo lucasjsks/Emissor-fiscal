@@ -15,12 +15,15 @@ update docs set data = data || '{"estoque":5000,"preco":6}' where path='empresas
 select data->>'estoque' estoque_preservado, data->>'preco' preco_novo from docs where path='empresas/'||:'e'||'/produtos/P1';
 select count(*) vinculos from docs where col='empresas/'||:'e'||'/vinculos';
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/movimentos/fake','empresas/'||:'e'||'/movimentos',:'e','{}'); -- deve falhar (RLS)
+insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/compras_xml/'||:'c1','empresas/'||:'e'||'/compras_xml',:'e','{"xml":"<nfe/>"}');
+select count(*) xml_guardado_pelo_dono from docs where col='empresas/'||:'e'||'/compras_xml';
 select public.convidar(:'e','op@x.com','operador');
 reset role;
 select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;
 select public.lancar_compra(:'e', '{"numero":"12","itens":[{"produto_id":"P1","qtd_estoque":1,"custo_unit":1}]}'); -- operador: falha
 update docs set data = data || '{"preco":1}' where path='empresas/'||:'e'||'/produtos/P1'; -- operador: 0 linhas
 select count(*) movimentos_visiveis_operador from docs where col='empresas/'||:'e'||'/movimentos';
+insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/compras_xml/x2','empresas/'||:'e'||'/compras_xml',:'e','{}'); -- operador: falha (RLS)
 reset role; set role service_role;
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/notas/N1','empresas/'||:'e'||'/notas',:'e','{"modelo":"65","numero":7,"itens":[{"pid":"P1","q":2},{"d":"sem pid","q":1}]}');
 select public.aplicar_estoque_nota(:'e','N1',false); select public.aplicar_estoque_nota(:'e','N1',false);
