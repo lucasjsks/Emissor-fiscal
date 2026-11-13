@@ -67,7 +67,7 @@ language sql stable security definer set search_path = public as $$
     when p_col = 'ncm' then public.eh_admin()
     when p_empresa is null then false
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
-    when split_part(p_col, '/', 3) in ('produtos','perfis','fornecedores') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
+    when split_part(p_col, '/', 3) in ('produtos','perfis','fornecedores','compras_xml') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     when split_part(p_col, '/', 3) in ('clientes','caixas') then public.meu_papel(p_empresa) is not null
     else false
   end
@@ -81,7 +81,7 @@ language sql stable security definer set search_path = public as $$
     -- empresa com notas não pode ser apagada (guarda fiscal obrigatória)
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) = 'dono', false)
       and not exists (select 1 from public.docs d where d.col = 'empresas/' || p_empresa || '/notas')
-    when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas','fornecedores') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
+    when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas','fornecedores','compras_xml') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     else false
   end
 $$;
