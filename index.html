@@ -19,6 +19,9 @@ header{position:sticky;top:0;z-index:5;background:var(--brand);color:#fff;paddin
 header h1{font-size:16px;margin:0;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header select{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 8px;max-width:45vw}
 header select option{color:#000}
+.sair{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
+.sair:hover{background:rgba(255,255,255,.25)}.sair svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
+@media(max-width:420px){.sair span{display:none}}
 header select:disabled{opacity:1;cursor:default;-webkit-appearance:none;appearance:none}
 .badge{font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(255,255,255,.18);white-space:nowrap}
 .amb{background:var(--warn-soft);color:var(--warn);font-size:12.5px;padding:7px 16px;border-bottom:1px solid #f1d9b5}
@@ -111,6 +114,7 @@ code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);
   <h1 id="hTitle">Emissor Fiscal</h1>
   <select id="empSel" aria-label="Empresa"></select>
   <span class="badge" id="badge">…</span>
+  <button class="sair" id="btnSair" data-act="pedirSair" title="Sair da conta" aria-label="Sair da conta" style="display:none"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/></svg><span>Sair</span></button>
 </header>
 <div class="amb" id="ambBar" style="display:none">Ambiente de <b>homologação</b>: as notas vão para a SEFAZ de testes e não têm valor fiscal.</div>
 <main id="main"></main>
@@ -574,7 +578,7 @@ function render(){
   renderNav(); renderHeader();
   const m = $('#main');
   const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
-  $('#nav').style.display = fora ? 'none' : ''; $('#empSel').style.display = fora ? 'none' : '';
+  $('#nav').style.display = fora ? 'none' : ''; $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' ? '' : 'none';
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
   else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
@@ -1805,7 +1809,13 @@ async function eventoServidor(body, ok){
 async function acoesV5(a, t, id){
   if (['entrar','criarConta','esqueci','modoLogin','novaSenha'].includes(a)){ t.disabled = true; await acaoLogin(a, t); t.disabled = false; return true; }
   switch (a){
-    case 'sair': await SB.auth.signOut(); return true;
+    case 'pedirSair': {
+      const temCaixa = typeof caixaAberto === 'function' && caixaAberto();
+      openModal(`${mhead('Sair da conta')}<p>Deseja sair do sistema neste aparelho?</p>
+        ${temCaixa ? '<div class="msg warn">Seu caixa continua aberto. Se terminou o expediente, feche o caixa antes de sair.</div>' : ''}
+        <div class="actions"><button class="btn" data-act="fechar">Continuar no sistema</button><button class="btn bad" data-act="sair">Sair</button></div>`);
+      return true; }
+    case 'sair': closeModal(); await SB.auth.signOut(); S.tab = 'venda'; return true;
     case 'consultarNota': { t.disabled = true; const r = await eventoServidor({ tipo:'consultar', ref:id }); t.disabled = false; if (r) verNota(r.nota); return true; }
     case 'convidar': {
       const email = val('cvEmail'), papel = val('cvPapel');
