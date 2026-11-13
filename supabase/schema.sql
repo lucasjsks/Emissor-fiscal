@@ -67,7 +67,7 @@ language sql stable security definer set search_path = public as $$
     when p_col = 'ncm' then public.eh_admin()
     when p_empresa is null then false
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
-    when split_part(p_col, '/', 3) in ('produtos','perfis') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
+    when split_part(p_col, '/', 3) in ('produtos','perfis','fornecedores') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     when split_part(p_col, '/', 3) in ('clientes','caixas') then public.meu_papel(p_empresa) is not null
     else false
   end
@@ -81,7 +81,7 @@ language sql stable security definer set search_path = public as $$
     -- empresa com notas não pode ser apagada (guarda fiscal obrigatória)
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) = 'dono', false)
       and not exists (select 1 from public.docs d where d.col = 'empresas/' || p_empresa || '/notas')
-    when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
+    when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas','fornecedores') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     else false
   end
 $$;
@@ -254,8 +254,151 @@ begin
    where path = 'empresas/' || e;
 end $$;
 
+-- =====================================================================
+-- ESTOQUE E COMPRAS
+-- O saldo (estoque) e o custo médio dos produtos só mudam por movimentos:
+-- compra, venda, cancelamento, devolução e ajuste. Nem a tela consegue
+-- alterar o saldo diretamente (gatilho proteger_estoque).
+-- =====================================================================
+create or replace function public._agora() returns text
+language sql stable as $$
+  select to_char(now() at time zone 'America/Fortaleza', 'YYYY-MM-DD"T"HH24:MI:SS') || '-03:00'
+$$;
+
+create or replace function public.proteger_estoque() returns trigger
+language plpgsql as $$
+begin
+  if new.col like 'empresas/%/produtos' and coalesce(current_setting('app.estoque', true), '') <> '1' then
+    if tg_op = 'INSERT' then
+      new.data := new.data - 'estoque' - 'custo_medio';
+    else
+      new.data := (new.data - 'estoque' - 'custo_medio' - 'custo')
+        || jsonb_strip_nulls(jsonb_build_object('estoque', old.data->'estoque', 'custo_medio', old.data->'custo_medio', 'custo', old.data->'custo'));
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists proteger_estoque on public.docs;
+create trigger proteger_estoque before insert or update on public.docs
+  for each row execute function public.proteger_estoque();
+
+-- movimento interno: soma "delta" ao saldo e registra o histórico
+create or replace function public._mover(e text, pid text, delta numeric, tipo text, ref text, docnum text, custo numeric, uid uuid) returns numeric
+language plpgsql security definer set search_path = public as $$
+declare p jsonb; novo numeric; caminho text := 'empresas/' || e || '/produtos/' || pid;
+begin
+  perform set_config('app.estoque', '1', true);
+  select data into p from public.docs where path = caminho for update;
+  if p is null then return null; end if;
+  novo := coalesce((p->>'estoque')::numeric, 0) + delta;
+  update public.docs set data = data || jsonb_build_object('estoque', novo) where path = caminho;
+  insert into public.docs (path, col, empresa_id, data) values (
+    'empresas/' || e || '/movimentos/' || gen_random_uuid(), 'empresas/' || e || '/movimentos', e,
+    jsonb_build_object('produto_id', pid, 'descricao', p->>'descricao', 'tipo', tipo, 'qtd', delta, 'saldo', novo,
+      'custo_unit', custo, 'ref', ref, 'doc', docnum, 'em', public._agora(), 'por', uid));
+  return novo;
+end $$;
+
+-- lança uma compra (XML ou manual): entra no estoque, atualiza custo e custo médio e guarda o vínculo fornecedor → produto
+create or replace function public.lancar_compra(e text, compra jsonb) returns text
+language plpgsql security definer set search_path = public as $$
+declare cid text := gen_random_uuid()::text; it jsonb; pid text; q numeric; cu numeric; p jsonb; est numeric; cm numeric;
+        caminho text; chave text := nullif(compra->>'chave', ''); vk text;
+begin
+  if coalesce(public.meu_papel(e), '') not in ('dono','gerente') then raise exception 'Só gerente ou dono pode lançar compras.'; end if;
+  if jsonb_array_length(coalesce(compra->'itens', '[]'::jsonb)) = 0 then raise exception 'A compra não tem itens.'; end if;
+  if chave is not null and exists (select 1 from public.docs where col = 'empresas/' || e || '/compras'
+       and data->>'chave' = chave and coalesce(data->>'status', '') <> 'estornada') then
+    raise exception 'Esta nota de compra já foi lançada.';
+  end if;
+  perform set_config('app.estoque', '1', true);
+  for it in select value from jsonb_array_elements(compra->'itens') loop
+    pid := nullif(it->>'produto_id', ''); q := (it->>'qtd_estoque')::numeric; cu := coalesce((it->>'custo_unit')::numeric, 0);
+    if pid is null then raise exception 'Item sem produto vinculado: %', it->>'xProd'; end if;
+    if q is null or q <= 0 then raise exception 'Quantidade inválida em: %', it->>'xProd'; end if;
+    caminho := 'empresas/' || e || '/produtos/' || pid;
+    select data into p from public.docs where path = caminho for update;
+    if p is null then raise exception 'Produto não encontrado: %', it->>'xProd'; end if;
+    est := coalesce((p->>'estoque')::numeric, 0);
+    cm := case when est > 0 and coalesce((p->>'custo_medio')::numeric, 0) > 0
+               then round((est * (p->>'custo_medio')::numeric + q * cu) / (est + q), 4) else round(cu, 4) end;
+    update public.docs set data = data || jsonb_build_object('custo', round(cu, 4), 'custo_medio', cm) where path = caminho;
+    perform public._mover(e, pid, q, 'compra', cid, compra->>'numero', cu, auth.uid());
+    vk := nullif(it->>'vinc_chave', '');
+    if vk is not null then
+      if vk !~ '^[A-Za-z0-9_.-]+$' then raise exception 'Vínculo inválido.'; end if;
+      insert into public.docs (path, col, empresa_id, data) values (
+        'empresas/' || e || '/vinculos/' || vk, 'empresas/' || e || '/vinculos', e,
+        jsonb_build_object('fornecedor_cnpj', compra->>'fornecedor_cnpj', 'cProd', it->>'cProd', 'produto_id', pid,
+          'fator', coalesce((it->>'fator')::numeric, 1), 'unidade_forn', it->>'uCom'))
+      on conflict (path) do update set data = excluded.data;
+    end if;
+  end loop;
+  insert into public.docs (path, col, empresa_id, data) values (
+    'empresas/' || e || '/compras/' || cid, 'empresas/' || e || '/compras', e,
+    compra || jsonb_build_object('id', cid, 'status', 'lancada', 'lancado_em', public._agora(), 'lancado_por', auth.uid()));
+  return cid;
+end $$;
+
+-- desfaz uma compra lançada por engano (tira do estoque)
+create or replace function public.estornar_compra(e text, cid text, motivo text) returns void
+language plpgsql security definer set search_path = public as $$
+declare c jsonb; it jsonb; caminho text := 'empresas/' || e || '/compras/' || cid;
+begin
+  if coalesce(public.meu_papel(e), '') not in ('dono','gerente') then raise exception 'Só gerente ou dono pode estornar compras.'; end if;
+  select data into c from public.docs where path = caminho for update;
+  if c is null then raise exception 'Compra não encontrada.'; end if;
+  if c->>'status' = 'estornada' then raise exception 'Esta compra já foi estornada.'; end if;
+  for it in select value from jsonb_array_elements(c->'itens') loop
+    perform public._mover(e, it->>'produto_id', -((it->>'qtd_estoque')::numeric), 'estorno_compra', cid, c->>'numero', null, auth.uid());
+  end loop;
+  update public.docs set data = data || jsonb_build_object('status', 'estornada', 'estornado_em', public._agora(),
+    'estornado_por', auth.uid(), 'motivo_estorno', motivo) where path = caminho;
+end $$;
+
+-- inventário: acerta o saldo para a quantidade contada
+create or replace function public.ajustar_estoque(e text, pid text, novo_saldo numeric, motivo text) returns numeric
+language plpgsql security definer set search_path = public as $$
+declare atual numeric;
+begin
+  if coalesce(public.meu_papel(e), '') not in ('dono','gerente') then raise exception 'Só gerente ou dono pode ajustar o estoque.'; end if;
+  select coalesce((data->>'estoque')::numeric, 0) into atual from public.docs where path = 'empresas/' || e || '/produtos/' || pid for update;
+  if not found then raise exception 'Produto não encontrado.'; end if;
+  if novo_saldo = atual then return atual; end if;
+  return public._mover(e, pid, novo_saldo - atual, 'ajuste', null, nullif(trim(motivo), ''), null, auth.uid());
+end $$;
+
+-- chamada pelo servidor: venda autorizada tira do estoque; cancelamento devolve. Não aplica duas vezes.
+create or replace function public.aplicar_estoque_nota(e text, p_ref text, desfazer boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare n jsonb; caminho text := 'empresas/' || e || '/notas/' || p_ref; it jsonb; dir int; tipo text; op text;
+begin
+  select data into n from public.docs where path = caminho for update;
+  if n is null then return; end if;
+  if desfazer <> coalesce((n->>'estoque_aplicado')::boolean, false) then return; end if;
+  op := coalesce(n->>'op', 'venda');
+  dir := case op when 'dev_venda' then 1 else -1 end;
+  if desfazer then dir := -dir; end if;
+  tipo := case when desfazer then 'cancelamento' when op = 'dev_venda' then 'devolucao_venda' when op = 'dev_compra' then 'devolucao_compra' else 'venda' end;
+  for it in select value from jsonb_array_elements(coalesce(n->'itens', '[]'::jsonb)) loop
+    if nullif(it->>'pid', '') is null or (it->>'q') is null then continue; end if;
+    perform public._mover(e, it->>'pid', dir * (it->>'q')::numeric, tipo, p_ref,
+      (case n->>'modelo' when '65' then 'NFC-e ' else 'NF-e ' end) || (n->>'numero'), null, null);
+  end loop;
+  update public.docs set data = data || jsonb_build_object('estoque_aplicado', not desfazer) where path = caminho;
+end $$;
+
 -- ---------- permissões de execução ----------
 revoke execute on function public.proximo_numero(text, text) from public, anon, authenticated;
+revoke execute on function public._mover(text, text, numeric, text, text, text, numeric, uuid) from public, anon, authenticated;
+revoke execute on function public.aplicar_estoque_nota(text, text, boolean) from public, anon, authenticated;
+grant execute on function public.aplicar_estoque_nota(text, text, boolean) to service_role;
+revoke execute on function public.lancar_compra(text, jsonb) from public, anon;
+revoke execute on function public.estornar_compra(text, text, text) from public, anon;
+revoke execute on function public.ajustar_estoque(text, text, numeric, text) from public, anon;
+grant execute on function public.lancar_compra(text, jsonb) to authenticated;
+grant execute on function public.estornar_compra(text, text, text) to authenticated;
+grant execute on function public.ajustar_estoque(text, text, numeric, text) to authenticated;
 revoke execute on function public.gravar_campo_empresa(text, text[], jsonb) from public, anon, authenticated;
 revoke execute on function public.ajustar_proximo(text, text, int) from public, anon, authenticated;
 grant execute on function public.proximo_numero(text, text) to service_role;

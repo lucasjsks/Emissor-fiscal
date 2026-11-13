@@ -33,6 +33,8 @@ export default rota(async (req, b) => {
     chave:r.chave_nfe ? String(r.chave_nfe).replace(/\D/g, '') : null, focus:{ ...resumoFocus(r), http:resp.status },
     emitida_por:u.id, data:payload.data_emissao || isoBR() };
   await putDoc(`empresas/${empresa_id}/notas/${ref}`, final, u.id);
+  // estoque: venda autorizada tira do saldo; devolução de venda devolve (a função não aplica duas vezes)
+  if (status === 'autorizada') await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:ref, desfazer:false });
 
   if (status === 'autorizada' || status === 'processando'){
     if (extras.difal_uf && /^[A-Z]{2}$/.test(extras.difal_uf.uf || ''))

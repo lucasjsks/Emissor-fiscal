@@ -55,6 +55,8 @@ test('emite NFC-e: reserva número no servidor, limpa campos internos e grava au
   assert.equal(envio.numero, 7); assert.equal(envio.serie, '1'); assert.equal(envio.cnpj_emitente, '11222333000181');
   assert.equal(envio.inscricao_estadual_emitente, undefined); assert.equal(envio.items[0]._rtc, undefined);
   assert.ok(docs['empresas/E1/notas/' + r.body.nota.ref]);
+  const est = chamadas.find(c => c.url === '/rest/v1/rpc/aplicar_estoque_nota');
+  assert.deepEqual(est.body, { e:'E1', p_ref:r.body.nota.ref, desfazer:false });
 });
 
 test('rejeição da SEFAZ grava a nota como rejeitada com a mensagem', async () => {
@@ -62,6 +64,7 @@ test('rejeição da SEFAZ grava a nota como rejeitada com a mensagem', async () 
   const r = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{} });
   assert.equal(r.body.nota.status, 'rejeitada');
   assert.match(r.body.mensagem, /225 — Falha no Schema/);
+  assert.ok(!chamadas.some(c => c.url === '/rest/v1/rpc/aplicar_estoque_nota'), 'nota rejeitada não mexe no estoque');
 });
 
 test('sem login → 401; sem acesso à empresa → 403; operador não faz devolução', async () => {
@@ -84,7 +87,8 @@ test('cancelamento: operador barrado; gerente cancela nota autorizada', async ()
   focusResp = { status:200, body:{ status:'cancelado' } };
   const r = await chamar(evento, 't2', { empresa_id:'E1', tipo:'cancelar', ref:'R1', justificativa:'erro de digitação no item' });
   assert.equal(r.body.ok, true); assert.equal(docs['empresas/E1/notas/R1'].status, 'cancelada');
-  assert.equal(chamadas.at(-2).method, 'DELETE');
+  assert.ok(chamadas.some(c => c.method === 'DELETE'));
+  assert.deepEqual(chamadas.find(c => c.url === '/rest/v1/rpc/aplicar_estoque_nota').body, { e:'E1', p_ref:'R1', desfazer:true });
 });
 
 test('carta de correção e inutilização', async () => {

@@ -5,7 +5,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 ## Arquitetura
 - `index.html` — app inteiro (HTML+CSS+JS puro, mobile first). **Sem build e sem dependências npm.** supabase-js é carregado por `import()` do jsDelivr.
   - Camada de dados `criarShim()` imita a API doc/collection/onSnapshot sobre a tabela `docs` (path, col, empresa_id, data jsonb) com Realtime.
-  - Caminhos: `empresas/<id>`, `empresas/<id>/{produtos,clientes,notas,caixas,perfis,inutilizacoes}/<doc>`, `ncm/<doc>`.
+  - Caminhos: `empresas/<id>`, `empresas/<id>/{produtos,clientes,notas,caixas,perfis,inutilizacoes,fornecedores,compras,vinculos,movimentos}/<doc>`, `ncm/<doc>`.
 - `api/` — funções Vercel (Node 18+, ESM, só `fetch`). `_lib.js` (auth, Supabase service role, Focus), `config.js`, `emitir.js`, `evento.js` (consultar/cancelar/cce/inutilizar).
 - `supabase/schema.sql` — tabelas, RLS, RPCs. **Idempotente**: altere sempre de forma que possa rodar de novo.
 
@@ -13,6 +13,8 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 - Notas e inutilizações só podem ser gravadas pelo servidor (RLS bloqueia o cliente). Numeração via RPC `proximo_numero`.
 - Segredos (token Focus, service_role) só em variáveis da Vercel. Nunca no código, nunca pedir no chat.
 - **Uma empresa por conta** (o sistema é vendido por empresa): `criar_empresa` recusa se o usuário já é dono de alguma; a tela não oferece "nova empresa". Empresa com notas não pode ser apagada.
+- **Estoque:** o saldo (`estoque`) e o `custo_medio` do produto só mudam por movimentos, via funções do banco: `lancar_compra`, `estornar_compra`, `ajustar_estoque` (gerente/dono) e `aplicar_estoque_nota` (servidor: venda autorizada baixa, cancelamento devolve; não aplica duas vezes). O gatilho `proteger_estoque` ignora qualquer saldo enviado pela tela. `compras`, `vinculos` e `movimentos` só são gravados por essas funções. Vínculo fornecedor+código → produto e fator de conversão (ex.: 1 CX = 12 UN) ficam em `vinculos` e são lembrados na próxima compra. Compra **não altera preço de venda** (decisão do Lucas). Venda sem estoque é permitida, com aviso.
+- Testar o banco: `npm run test:banco` (precisa de Postgres local; `test/banco/prelude.sql` imita o Supabase).
 - Papéis: dono > gerente > operador. Checar no servidor (`papelDe`) e no RLS (`pode_gravar`/`pode_apagar`), não só na tela.
 - Rodar `npm test` antes de enviar. Testes usam fetch simulado (`test/api.test.js`).
 - Validado em homologação (12/11/2026, empresa piloto em Campo Maior/PI, Simples): emissão de NFC-e, cupom oficial e XML, cancelamento, pagamento dividido/troco, NF-e com consulta de situação e fechamento de caixa — tudo autorizado pela SEFAZ-PI.
@@ -26,6 +28,6 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 ## Roteiro
 1. Fundação (feito e validado em homologação): login, multiempresa, emissão real de NFC-e e NF-e.
 2. Validar em homologação com o primeiro cliente piloto; mapear IBS/CBS.
-3. Estoque (entrada por XML, baixa na venda, inventário).
+3. Estoque (feito): compras por XML ou manual, vínculo automático, conversão de unidade, baixa na venda, inventário, fornecedores.
 4. Financeiro (contas a pagar/receber, conciliação PIX/cartão, DRE).
 5. Venda: site, planos, cobrança, contrato, LGPD.

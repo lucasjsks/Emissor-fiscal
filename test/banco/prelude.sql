@@ -1,0 +1,11 @@
+do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role service_role nologin bypassrls; exception when duplicate_object then null; end $$;
+create schema auth;
+create table auth.users(id uuid primary key, email text);
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
+create function auth.email() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.email', true),'') $$;
+create publication supabase_realtime;
+grant usage on schema public, auth to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+insert into auth.users values ('11111111-1111-1111-1111-111111111111','dono@x.com'),('22222222-2222-2222-2222-222222222222','op@x.com');

@@ -39,6 +39,8 @@ export default rota(async (req, b) => {
       n.status = statusDe(r.body); n.focus = { ...resumoFocus(r.body), http:r.status };
       if (r.body.chave_nfe) n.chave = String(r.body.chave_nfe).replace(/\D/g, '');
       await putDoc(path, n, u.id);
+      if (n.status === 'autorizada') await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:n.ref, desfazer:false });
+      if (n.status === 'cancelada') await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:n.ref, desfazer:true });
     }
     return { ok:r.status === 200, nota:n, mensagem:mensagemFocus(r.body) };
   }
@@ -53,6 +55,7 @@ export default rota(async (req, b) => {
     n.status = 'cancelada'; n.justificativa = just; n.cancelada_em = isoBR();
     n.eventos = [...(n.eventos || []), { tipo:'cancelamento', texto:just, em:n.cancelada_em, focus:resumoFocus(r.body) }];
     await putDoc(path, n, u.id);
+    await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:n.ref, desfazer:true });
     return { ok:true, nota:n };
   }
 

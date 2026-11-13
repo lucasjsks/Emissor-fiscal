@@ -3,5 +3,6 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=18" },
-  "scripts": { "test": "node --test test/*.test.js" }
+  "scripts": { "test": "node --test test/*.test.js",
+    "test:banco": "bash test/banco/rodar.sh" }
 }

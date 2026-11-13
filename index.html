@@ -29,6 +29,7 @@ main{max-width:980px;margin:0 auto;padding:16px 14px 96px}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:6;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;max-width:140px;background:none;border:0;padding:9px 2px 8px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+@media(max-width:440px){nav button{font-size:10px;padding:8px 0 7px}nav button svg{width:20px;height:20px}}
 nav button.on{color:var(--brand);font-weight:600}
 h2{font-size:19px;margin:4px 0 12px}
 h3{font-size:15px;margin:18px 0 8px}
@@ -154,13 +155,13 @@ const CBS_2026 = 0.9, IBS_2026 = 0.1; // alíquotas de teste de 2026 (destaque i
 
 /* ================== estado e armazenamento ================== */
 const S = { tab:'venda', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
-  nfe:null, caixas:[], perfis:[], inutilizacoes:[], conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
+  nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estView:'compras', estFiltro:'todos', estBusca:'', conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
 let db = null, unsubs = [], local = {};
 const LS = 'emissor-fiscal-v1';
 S.nfe = { op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } };
 function lsLoad(){ try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch(e){ return {}; } }
 function lsSave(){ try { localStorage.setItem(LS, JSON.stringify(local)); } catch(e){} }
-const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes'];
+const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes','fornecedores','compras','vinculos'];
 const colOf = k => k === 'empresas' ? 'empresas' : `empresas/${S.empId}/${k}`;
 const emp = () => S.empresas.find(e => e.id === S.empId) || null;
 
@@ -322,6 +323,7 @@ function validarProduto(p, e){
   if (ncm.length === 8 && CESTA.some(x => ncm.startsWith(x)) && (p.cst_ibscbs || '000') === '000')
     A('NCM pode estar na Cesta Básica Nacional (alíquota zero de IBS/CBS, Anexo I da LC 214/2025), mas o CST IBS/CBS está como tributação integral (000). Confira o CST e o cClassTrib.');
   if (p.gtin && p.gtin !== 'SEM GTIN' && !gtinOk(p.gtin)) E('Código de barras (GTIN) com dígito verificador inválido.');
+  if (!(num(p.preco) > 0)) E('Informe o preço de venda.');
   return out;
 }
 const temErro = v => v.some(x => x.n === 'erro'), temAviso = v => v.some(x => x.n === 'aviso');
@@ -558,9 +560,10 @@ const ICON = {
   produtos:'<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',
   clientes:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
   empresa:'<path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/>',
-  caixa:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3M8 6V4h8v2"/>'
+  caixa:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3M8 6V4h8v2"/>',
+  estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>'
 };
-const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
+const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['estoque','Estoque'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
 function renderNav(){
   $('#nav').innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${l}</button>`).join('');
 }
@@ -585,7 +588,7 @@ function render(){
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
-  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
+  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, estoque:vEstoque, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -594,7 +597,7 @@ function resultadosHtml(q, act){
   const t = q.trim().toLowerCase(); if (!t) return '';
   const r = S.produtos.filter(p => (p.descricao || '').toLowerCase().includes(t) || (p.codigo || '').toLowerCase() === t || (p.gtin || '') === t).slice(0, 30);
   if (!r.length) return '<div class="small" style="padding:8px">Nenhum produto encontrado.</div>';
-  return r.map(p => `<div class="res" data-act="${act}" data-id="${esc(p.id)}"><span>${esc(p.descricao)} <span class="small">${esc(p.codigo || '')}</span></span><b class="num">${brl(p.preco)}</b></div>`).join('');
+  return r.map(p => `<div class="res" data-act="${act}" data-id="${esc(p.id)}"><span>${esc(p.descricao)} <span class="small">${esc(p.codigo || '')}${temSaldo(p) ? ` · estoque <b style="color:${p.estoque <= 0 ? 'var(--bad)' : 'inherit'}">${qtdTxt(p.estoque)}</b>` : ''}</span></span><b class="num">${brl(p.preco)}</b></div>`).join('');
 }
 
 /* ---------- NF-e ---------- */
@@ -613,7 +616,7 @@ function vVenda(){
       <div class="results" id="resV">${resultadosHtml(S.busca, 'addCart')}</div></div>
     <div class="card"><h3 style="margin-top:0">Itens</h3>
       ${L.length ? `<div class="list">${L.map((l, i) => `<div class="it"><div class="grow" data-act="descItem" data-i="${i}" style="cursor:pointer"><div class="t">${esc(l.p.descricao)}</div>
-        <div class="s">${brl(l.preco)} / ${esc(l.p.unidade || 'UN')}${l.descItem ? ` · <span style="color:var(--bad)">desc. −${brl(l.descItem)}</span>` : ' · <u>desconto</u>'}</div></div>
+        <div class="s">${brl(l.preco)} / ${esc(l.p.unidade || 'UN')}${temSaldo(l.p) && l.p.estoque - l.qtd < 0 ? ` · <b style="color:var(--bad)">estoque ${qtdTxt(l.p.estoque)}</b>` : ''}${l.descItem ? ` · <span style="color:var(--bad)">desc. −${brl(l.descItem)}</span>` : ' · <u>desconto</u>'}</div></div>
         <div class="qty"><button data-act="qtd" data-i="${i}" data-d="-1">−</button><input id="q${i}" data-qi="${i}" inputmode="decimal" value="${l.qtd}"><button data-act="qtd" data-i="${i}" data-d="1">+</button></div>
         <b class="num" style="min-width:76px;text-align:right">${brl(r2(l.c.bruto - l.descItem))}</b></div>`).join('')}</div>` : '<div class="empty">Nenhum item ainda.</div>'}
     </div></div>
@@ -849,14 +852,18 @@ function formProduto(p){
   ${perfilSelHtml(p)}
   ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
   <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p>
+  <h3>Estoque</h3>
+  <div class="row"><div><label>Saldo atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b>${p.custo_medio ? ` · custo médio ${brl(p.custo_medio)}` : ''}</div></div>
+    ${fld('pEstMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}</div>
+  <p class="small">O saldo muda só por compras, vendas e ajustes de inventário (aba Estoque).</p>
   <h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>
   <div id="errM"></div>
   <div class="actions">${p.id ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
 }
 async function salvarProd(id, force){
   const o = { descricao:val('pDesc').toUpperCase(), codigo:val('pCod'), gtin:val('pGtin') || 'SEM GTIN', preco:numIn(val('pPreco')), unidade:(val('pUn') || 'UN').toUpperCase(),
-    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil') };
-  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
+    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), estoque_min:numIn(val('pEstMin')) };
+  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn','estoque','custo_medio'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
   const pf = S.perfis.find(f => f.id === o.perfil_id);
   if (pf && Object.entries(taxOf(pf)).some(([k, v]) => String(v) !== String(o[k]))) o.perfil_id = '';
   if (o.gtin.toUpperCase() === 'SEM GTIN') o.gtin = 'SEM GTIN'; else o.gtin = dig(o.gtin);
@@ -1043,7 +1050,7 @@ function loadXlsx(){
     sc.onload = () => res(window.XLSX); sc.onerror = () => { XLSXP = null; rej(new Error('Não foi possível carregar a biblioteca de planilhas.')); }; document.head.appendChild(sc); });
   return XLSXP;
 }
-const PROD_COLS = ['id','codigo','descricao','gtin','preco','unidade','ncm','cest','cfop','origem','cst_csosn','icms_aliq','icms_red','st_mva','st_aliq','st_fcp','pis_cst','pis_aliq','cofins_cst','cofins_aliq','cst_ibscbs','cclasstrib'];
+const PROD_COLS = ['id','codigo','descricao','gtin','preco','estoque','estoque_min','custo','custo_medio','unidade','ncm','cest','cfop','origem','cst_csosn','icms_aliq','icms_red','st_mva','st_aliq','st_fcp','pis_cst','pis_aliq','cofins_cst','cofins_aliq','cst_ibscbs','cclasstrib'];
 const CLI_COLS = ['id','doc','nome','ind_ie','ie','email','logradouro','numero','bairro','cep','municipio','cod_municipio','uf'];
 async function exportar(){
   const e = emp();
@@ -1443,7 +1450,7 @@ function vPerfis(){
 }
 function segProd(){
   return `<div class="seg" style="margin-bottom:12px">${[['produtos','Produtos'],['perfis','Perfis de tributação']].map(([k, l]) => `<button data-act="prodView" data-v="${k}" class="${(S.prodView || 'produtos') === k ? 'on' : ''}">${l}</button>`).join('')}
-    ${pode('produto') ? '<button data-act="importarXml">⤓ Importar XML de compra</button>' : ''}</div>`;
+    ${pode('produto') ? '<button data-act="importarXml">⤓ Entrada por XML de compra</button>' : ''}</div>`;
 }
 function formPerfil(f){
   const e = emp(), simples = String(e.regime) !== '3';
@@ -1545,7 +1552,7 @@ async function acoesV4(a, t, id){
     case 'salvarPerfil': salvarPerfil(id); return true;
     case 'delPerfil': confirmar('Excluir este perfil? Os produtos vinculados mantêm a tributação atual, só deixam de estar vinculados.', 'confDelPerfil', id); return true;
     case 'confDelPerfil': if (await safe(() => del('perfis', id), 'Perfil excluído.')) closeModal(); return true;
-    case 'importarXml': formXml(); return true;
+    case 'importarXml': S.tab = 'estoque'; S.estView = 'compras'; render(); { const f = $('#compraXml'); if (f) f.click(); } return true;
     case 'salvarXml': salvarXml(); return true;
     case 'contOn': S.conting = !S.conting; render(); return true;
   }
@@ -1873,17 +1880,320 @@ async function preencherPorCnpj(f, cnpj){
   } catch(e){ autoMsg(f, `<span style="color:var(--bad)">✕ ${esc(e.message)}</span> Você pode preencher à mão.`); }
 }
 function autoPreencher(t){
-  const f = t.id === 'eCnpj' || t.id === 'eCep' ? 'empresa' : t.id === 'cDoc' || t.id === 'cCep' ? 'cliente' : null;
+  const f = t.id === 'eCnpj' || t.id === 'eCep' ? 'empresa' : t.id === 'cDoc' || t.id === 'cCep' ? 'cliente' : t.id === 'fnCnpj' || t.id === 'fnCep' ? 'fornecedor' : null;
   if (!f) return false;
   const d = dig(t.value), chave = t.id + ':' + d;
   if (autoUltimo[t.id] === chave) return true;
-  if ((t.id === 'eCnpj' || t.id === 'cDoc') && d.length === 14){
+  if ((t.id === 'eCnpj' || t.id === 'cDoc' || t.id === 'fnCnpj') && d.length === 14){
     autoUltimo[t.id] = chave;
     if (!cnpjOk(d)){ autoMsg(f, '<span style="color:var(--bad)">✕ CNPJ inválido. Confira os números.</span>'); return true; }
     preencherPorCnpj(f, d);
   }
-  if ((t.id === 'eCep' || t.id === 'cCep') && d.length === 8){ autoUltimo[t.id] = chave; preencherPorCep(f, d); }
+  if ((t.id === 'eCep' || t.id === 'cCep' || t.id === 'fnCep') && d.length === 8){ autoUltimo[t.id] = chave; preencherPorCep(f, d); }
   return true;
+}
+
+/* ================== ESTOQUE E COMPRAS ================== */
+Object.assign(ACT_PERM, { novaCompraManual:'produto', lancarCompraXml:'produto', lancarCompraManual:'produto', estornarCompra:'produto', confEstornar:'produto',
+  salvarAjuste:'produto', salvarMinimo:'produto', novoFornecedor:'produto', editFornecedor:'produto', salvarFornecedor:'produto', delFornecedor:'produto', confDelFornecedor:'produto' });
+AUTO.fornecedor = { doc:'fnCnpj', info:'fnAutoInfo', nome:'fnNome', fantasia:'fnFant', fone:'fnFone', email:'fnEmail', regime:null, log:'fnLog', num:'fnNum', bai:'fnBai', cep:'fnCep', mun:'fnMun', ibge:'fnIbge', uf:'fnUf' };
+const temSaldo = p => typeof p.estoque === 'number';
+const qtdTxt = q => (Math.round(q * 1000) / 1000).toLocaleString('pt-BR');
+const hoje = () => isoNow().slice(0, 10);
+const chaveVinc = (cnpj, cProd) => (dig(cnpj) + '_' + String(cProd)).replace(/[^A-Za-z0-9_.-]/g, '-').slice(0, 180);
+const nomeProd = id => { const p = S.produtos.find(x => x.id === id); return p ? p.descricao : '(produto removido)'; };
+
+/* ---------- leitura completa do XML da NF-e de compra ---------- */
+function parseCompraXml(txt){
+  const d = new DOMParser().parseFromString(txt, 'application/xml');
+  if (d.getElementsByTagName('parsererror').length) throw new Error('O arquivo não é um XML válido.');
+  const g = (el, t) => { const x = el && el.getElementsByTagName(t)[0]; return x ? x.textContent.trim() : ''; };
+  const n = (el, t) => +g(el, t) || 0;
+  const inf = d.getElementsByTagName('infNFe')[0];
+  if (!inf) throw new Error('Este XML não é de uma NF-e.');
+  const ide = d.getElementsByTagName('ide')[0], emit = d.getElementsByTagName('emit')[0], dest = d.getElementsByTagName('dest')[0];
+  const ender = emit && emit.getElementsByTagName('enderEmit')[0], tot = d.getElementsByTagName('ICMSTot')[0];
+  const chave = dig(inf.getAttribute('Id') || '') || dig(g(d, 'chNFe'));
+  const itens = [...d.getElementsByTagName('det')].map(det => {
+    const pr = det.getElementsByTagName('prod')[0], imp = det.getElementsByTagName('imposto')[0], icms = imp && imp.getElementsByTagName('ICMS')[0], ipi = imp && imp.getElementsByTagName('IPI')[0];
+    const vProd = n(pr, 'vProd'), custoTotal = r2(vProd - n(pr, 'vDesc') + n(pr, 'vFrete') + n(pr, 'vSeg') + n(pr, 'vOutro') + n(ipi, 'vIPI') + n(icms, 'vICMSST') + n(icms, 'vFCPST'));
+    return { cProd:g(pr, 'cProd'), ean:g(pr, 'cEAN'), xProd:g(pr, 'xProd'), ncm:g(pr, 'NCM'), cest:g(pr, 'CEST'), cfop:g(pr, 'CFOP'), uCom:(g(pr, 'uCom') || 'UN').toUpperCase(),
+      qCom:n(pr, 'qCom'), vUnCom:n(pr, 'vUnCom'), vProd, custoTotal, orig:icms ? g(icms, 'orig') : '0' };
+  });
+  if (!itens.length) throw new Error('Não encontrei produtos neste XML.');
+  return { chave, numero:g(ide, 'nNF'), serie:g(ide, 'serie'), data_emissao:(g(ide, 'dhEmi') || g(ide, 'dEmi')).slice(0, 10),
+    fornecedor:{ cnpj:g(emit, 'CNPJ') || g(emit, 'CPF'), nome:g(emit, 'xNome'), fantasia:g(emit, 'xFant'), ie:g(emit, 'IE'),
+      logradouro:g(ender, 'xLgr'), numero:g(ender, 'nro'), bairro:g(ender, 'xBairro'), municipio:g(ender, 'xMun'), cod_municipio:g(ender, 'cMun'), uf:g(ender, 'UF'), cep:g(ender, 'CEP'), telefone:g(ender, 'fone') },
+    destCnpj:g(dest, 'CNPJ') || g(dest, 'CPF'), total_produtos:n(tot, 'vProd'), total_nota:n(tot, 'vNF'), itens };
+}
+
+/* ---------- tela principal ---------- */
+function vEstoque(){
+  const v = S.estView || 'compras', P = S.produtos;
+  const valor = r2(P.filter(temSaldo).reduce((a, p) => a + Math.max(p.estoque, 0) * num(p.custo_medio || p.custo || 0), 0));
+  const baixo = P.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min)).length, neg = P.filter(p => temSaldo(p) && p.estoque < 0).length;
+  const seg = `<div class="seg" style="margin-bottom:12px">${[['compras','Compras'],['saldo','Saldo de estoque'],['fornecedores','Fornecedores']].map(([k, l]) => `<button data-act="estView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const stats = `<div class="stats"><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${baixo}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${neg}</b>com saldo negativo</div></div>`;
+  return `<h2>Estoque</h2>${seg}${stats}` + ({ compras:vCompras, saldo:vSaldo, fornecedores:vFornecedores })[v]();
+}
+function vCompras(){
+  const L = [...S.compras].sort((a, b) => String(b.lancado_em || '').localeCompare(String(a.lancado_em || '')));
+  return `${pode('produto') ? `<div class="actions" style="margin:0 0 12px"><label class="btn pri" style="flex:1">⤓ Importar XML da nota de compra<input type="file" id="compraXml" accept=".xml" hidden></label>
+      <button class="btn" data-act="novaCompraManual">+ Compra manual</button></div>` : ''}
+    <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
+      <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}</span></div>
+      <div class="s">${(c.data_emissao || '').split('-').reverse().join('/')} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}</div></div>
+      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${c.status === 'estornada' ? '<span class="tag b">estornada</span>' : '<span class="tag">lançada</span>'}</div></div>`).join('')}</div>`
+      : '<div class="empty">Nenhuma compra lançada. Importe o XML da nota do fornecedor para dar entrada no estoque.</div>'}</div>`;
+}
+function vSaldo(){
+  const f = S.estFiltro || 'todos', q = norm(S.estBusca || '');
+  let L = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || ''));
+  if (q) L = L.filter(p => norm(p.descricao).includes(q) || (p.gtin || '') === q || (p.codigo || '') === q);
+  if (f === 'baixo') L = L.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min));
+  if (f === 'neg') L = L.filter(p => temSaldo(p) && p.estoque < 0);
+  if (f === 'sem') L = L.filter(p => !temSaldo(p));
+  const cor = p => !temSaldo(p) ? 'var(--muted)' : p.estoque < 0 ? 'var(--bad)' : num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min) ? 'var(--warn)' : 'var(--ink)';
+  return `<div class="card"><input id="estBusca" placeholder="Buscar produto…" value="${esc(S.estBusca || '')}" autocomplete="off">
+    <div class="seg" style="margin-top:8px">${[['todos','Todos'],['baixo','Abaixo do mínimo'],['neg','Negativos'],['sem','Sem entrada ainda']].map(([k, l]) => `<button data-act="estFiltro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="card">${L.length ? `<div class="list">${L.map(p => `<div class="it" data-act="verEstoque" data-id="${esc(p.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(p.descricao)}</div>
+      <div class="s">${temSaldo(p) ? `custo médio ${brl(p.custo_medio || 0)}${num(p.estoque_min) > 0 ? ' · mínimo ' + qtdTxt(num(p.estoque_min)) : ''}` : 'ainda sem entrada no estoque'}</div></div>
+      <div style="text-align:right"><b class="num" style="color:${cor(p)}">${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</b> <span class="small">${esc(p.unidade || 'UN')}</span></div></div>`).join('')}</div>` : '<div class="empty">Nenhum produto neste filtro.</div>'}</div>`;
+}
+function vFornecedores(){
+  const L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  return `${pode('produto') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="novoFornecedor">+ Fornecedor</button></div>' : ''}
+    <div class="card">${L.length ? `<div class="list">${L.map(f => { const n = S.compras.filter(c => c.fornecedor_cnpj === f.cnpj && c.status !== 'estornada').length;
+      return `<div class="it" data-act="editFornecedor" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.fantasia || f.nome)}</div>
+        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><span class="tag">${n} compra(s)</span></div>`; }).join('')}</div>`
+      : '<div class="empty">Os fornecedores entram sozinhos quando você importa uma nota de compra.</div>'}</div>`;
+}
+
+/* ---------- importação do XML ---------- */
+async function lerCompraXml(file){
+  let x;
+  try { x = parseCompraXml(await file.text()); } catch(e){ toast(e.message); return; }
+  const e = emp(), fc = dig(x.fornecedor.cnpj);
+  x.erros = [];
+  if (x.destCnpj && dig(x.destCnpj) !== dig(e.cnpj)) x.erros.push(`Esta nota foi emitida para outro CNPJ (${fmtDoc(x.destCnpj)}), não para ${esc(e.razao)}.`);
+  if (x.chave && S.compras.some(c => c.chave === x.chave && c.status !== 'estornada')) x.erros.push('Esta nota de compra já foi lançada no estoque.');
+  x.itens.forEach(it => {
+    const v = S.vinculos.find(v => dig(v.fornecedor_cnpj) === fc && String(v.cProd) === it.cProd && S.produtos.some(p => p.id === v.produto_id));
+    const porGtin = gtinOk(it.ean) ? S.produtos.find(p => p.gtin === dig(it.ean)) : null;
+    it.produto_id = v ? v.produto_id : porGtin ? porGtin.id : 'novo';
+    it.como = v ? 'lembrado' : porGtin ? 'código de barras' : '';
+    it.fator = v ? num(v.fator) || 1 : 1; it.preco = '';
+  });
+  S.compraImport = x; renderCompraImport();
+}
+function linhaEntrada(it){
+  const q = r2(it.qCom * (num(it.fator) || 0) * 1000) / 1000, cu = q > 0 ? Math.round(it.custoTotal / q * 10000) / 10000 : 0;
+  const un = it.produto_id === 'novo' ? (num(it.fator) > 1 ? 'UN' : it.uCom) : (S.produtos.find(p => p.id === it.produto_id) || {}).unidade || 'UN';
+  return `Entra no estoque: <b>${qtdTxt(q)} ${esc(un)}</b> a <b>${brl(cu)}</b> cada`;
+}
+function renderCompraImport(){
+  const x = S.compraImport, prods = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || ''));
+  const novos = x.itens.filter(i => i.produto_id === 'novo').length;
+  openModal(`${mhead('Entrada de compra')}
+  <div class="card" style="margin:0 0 10px"><b>${esc(x.fornecedor.fantasia || x.fornecedor.nome)}</b> <span class="small">${fmtDoc(x.fornecedor.cnpj)}</span><br>
+    <span class="small">NF-e nº ${esc(x.numero)} série ${esc(x.serie)} · emissão ${x.data_emissao.split('-').reverse().join('/')} · total ${brl(x.total_nota)}</span></div>
+  ${x.erros.length ? `<div class="msg err">${x.erros.join('<br>')}</div>` : ''}
+  <p class="small">Confira o produto de cada item. Os reconhecidos vêm marcados; para os demais, escolha um produto que você já tem ou deixe "cadastrar como novo". O sistema lembra a escolha nas próximas compras deste fornecedor. O custo inclui IPI, ST, frete e outras despesas da nota, menos descontos.</p>
+  ${x.itens.map((it, i) => `<div class="card" style="margin:0 0 8px;padding:10px">
+    <div class="t" style="font-weight:600">${esc(it.xProd)}</div>
+    <div class="small">cód. ${esc(it.cProd)} · NCM ${fmtNcm(it.ncm)} · ${qtdTxt(it.qCom)} ${esc(it.uCom)} × ${brl(it.vUnCom)} · custo total ${brl(it.custoTotal)}${it.como ? ` · <span style="color:var(--ok)">✓ reconhecido pelo ${it.como}</span>` : ''}</div>
+    <label>Produto no meu cadastro</label>
+    <select data-ci="${i}"><option value="novo" ${it.produto_id === 'novo' ? 'selected' : ''}>➕ Cadastrar como produto novo</option>${prods.map(p => `<option value="${esc(p.id)}" ${p.id === it.produto_id ? 'selected' : ''}>${esc(p.descricao)}</option>`).join('')}</select>
+    <div class="row" style="align-items:flex-end">
+      <div><label>Conversão: 1 ${esc(it.uCom)} =</label><input data-cf="${i}" inputmode="decimal" value="${String(it.fator).replace('.', ',')}"></div>
+      ${it.produto_id === 'novo' ? `<div><label>Preço de venda (R$)</label><input data-cp="${i}" inputmode="decimal" placeholder="obrigatório para vender" value="${esc(it.preco)}"></div>` : ''}
+    </div>
+    <div class="small" id="cix-${i}" style="margin-top:6px">${linhaEntrada(it)}</div></div>`).join('')}
+  ${novos ? `${S.perfis.length ? sel('ciPerf', `Perfil de tributação para os ${novos} produto(s) novo(s)`, S.ciPerf || '', [['','— padrão do regime —'], ...S.perfis.map(f => [f.id, f.nome])]) : ''}
+    <p class="small">Produtos novos entram com NCM, CEST e código de barras da nota. Confira a tributação deles depois na aba Produtos.</p>` : ''}
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="lancarCompraXml" ${x.erros.length ? 'disabled' : ''}>Dar entrada no estoque</button></div>`);
+}
+async function garantirFornecedor(f){
+  const c = dig(f.cnpj); if (!c) return null;
+  const ex = S.fornecedores.find(x => x.cnpj === c); if (ex) return ex.id;
+  const o = await put('fornecedores', { cnpj:c, nome:(f.nome || '').toUpperCase(), fantasia:f.fantasia || '', ie:dig(f.ie), logradouro:f.logradouro || '', numero:f.numero || '',
+    bairro:f.bairro || '', municipio:f.municipio || '', cod_municipio:dig(f.cod_municipio), uf:f.uf || '', cep:dig(f.cep), telefone:f.telefone || '' });
+  return o.id;
+}
+async function lancarCompraXml(btn){
+  const x = S.compraImport, e = emp(), simples = String(e.regime) !== '3';
+  const errs = []; x.itens.forEach(it => { if (!(num(it.fator) > 0)) errs.push(`Conversão inválida em ${esc(it.xProd)}.`); });
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Lançando…</div>';
+  try {
+    const fornecedor_id = await garantirFornecedor(x.fornecedor);
+    const perf = S.perfis.find(f => f.id === S.ciPerf);
+    const base = perf ? taxOf(perf) : { cfop:'5102', cst_csosn:simples ? '102' : '00', icms_aliq:simples ? 0 : 20.5, icms_red:0, st_mva:0, st_aliq:0, st_fcp:0,
+      pis_cst:simples ? '49' : '01', pis_aliq:0, cofins_cst:simples ? '49' : '01', cofins_aliq:0, cst_ibscbs:'000', cclasstrib:'000001' };
+    for (const it of x.itens){
+      if (it.produto_id !== 'novo') continue;
+      it.eraNovo = true;
+      const p = await put('produtos', { ...base, perfil_id:perf ? perf.id : '', descricao:it.xProd.toUpperCase(), codigo:'', gtin:gtinOk(it.ean) ? dig(it.ean) : 'SEM GTIN',
+        preco:numIn(it.preco), unidade:(num(it.fator) > 1 ? 'UN' : it.uCom).slice(0, 6), ncm:dig(it.ncm), cest:dig(it.cest), origem:({ '1':'2', '6':'7' })[it.orig] || it.orig || '0' });
+      it.produto_id = p.id;
+    }
+    const itens = x.itens.map(it => { const q = Math.round(it.qCom * num(it.fator) * 1000) / 1000;
+      return { cProd:it.cProd, xProd:it.xProd, ean:it.ean, ncm:it.ncm, cfop:it.cfop, uCom:it.uCom, qCom:it.qCom, vUnCom:it.vUnCom, vProd:it.vProd, custo_total:it.custoTotal,
+        produto_id:it.produto_id, fator:num(it.fator), qtd_estoque:q, custo_unit:Math.round(it.custoTotal / q * 10000) / 10000, vinc_chave:chaveVinc(x.fornecedor.cnpj, it.cProd) }; });
+    const compra = { origem:'xml', chave:x.chave, numero:x.numero, serie:x.serie, data_emissao:x.data_emissao, data_entrada:hoje(), fornecedor_id,
+      fornecedor_cnpj:dig(x.fornecedor.cnpj), fornecedor_nome:(x.fornecedor.fantasia || x.fornecedor.nome || '').toUpperCase(), total_produtos:x.total_produtos, total_nota:x.total_nota, itens };
+    const { error } = await SB.rpc('lancar_compra', { e:S.empId, compra });
+    if (error) throw new Error(error.message);
+    const semPreco = x.itens.filter(i => i.eraNovo && !(numIn(i.preco) > 0)).length;
+    S.compraImport = null; closeModal();
+    toast(`Compra lançada: ${itens.length} item(ns) entraram no estoque.${semPreco ? ' Defina o preço dos produtos novos.' : ''}`);
+  } catch(err){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+}
+
+/* ---------- compra manual ---------- */
+function novaCompraManual(){ S.compraManual = { fornecedor_id:'', numero:'', data:hoje(), itens:[], busca:'' }; renderCompraManual(); }
+function renderCompraManual(){
+  const c = S.compraManual, total = r2(c.itens.reduce((a, i) => a + numIn(i.qtd) * numIn(i.custo), 0));
+  openModal(`${mhead('Compra manual')}
+  <p class="small">Para compras sem XML (nota de papel, recibo, produtor rural). Para nota eletrônica, prefira importar o XML.</p>
+  ${sel('cmForn','Fornecedor', c.fornecedor_id, [['','— sem fornecedor —'], ...[...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || '')).map(f => [f.id, (f.fantasia || f.nome) + ' · ' + fmtDoc(f.cnpj)])])}
+  <div class="row">${fld('cmNum','Número do documento', c.numero)}${fld('cmData','Data', c.data, 'type="date"')}</div>
+  <label for="cmBusca">Adicionar produto</label><input id="cmBusca" autocomplete="off" placeholder="Buscar produto…" value="${esc(c.busca)}"><div class="results" id="cmRes">${resultadosHtml(c.busca, 'cmAdd')}</div>
+  ${c.itens.length ? `<div class="list" style="margin-top:8px">${c.itens.map((i, k) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${esc(nomeProd(i.pid))}</div></div>
+    <div class="g3"><div><label>Quantidade</label><input data-mq="${k}" inputmode="decimal" value="${esc(i.qtd)}"></div><div><label>Custo unitário</label><input data-mc="${k}" inputmode="decimal" value="${esc(i.custo)}"></div>
+    <div style="align-self:end"><button class="btn sm bad" data-act="cmRem" data-i="${k}">Remover</button></div></div></div>`).join('')}</div>` : ''}
+  <div class="total big" style="margin-top:10px"><span>Total</span><span class="num" id="cmTot">${brl(total)}</span></div>
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="lancarCompraManual" ${c.itens.length ? '' : 'disabled'}>Dar entrada no estoque</button></div>`);
+}
+async function lancarCompraManual(btn){
+  const c = S.compraManual, errs = [];
+  c.itens.forEach(i => { if (!(numIn(i.qtd) > 0)) errs.push(`Quantidade inválida em ${esc(nomeProd(i.pid))}.`); if (!(numIn(i.custo) >= 0)) errs.push(`Custo inválido em ${esc(nomeProd(i.pid))}.`); });
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  const f = S.fornecedores.find(x => x.id === c.fornecedor_id);
+  const itens = c.itens.map(i => ({ produto_id:i.pid, xProd:nomeProd(i.pid), qtd_estoque:numIn(i.qtd), custo_unit:numIn(i.custo), fator:1, custo_total:r2(numIn(i.qtd) * numIn(i.custo)) }));
+  const compra = { origem:'manual', numero:c.numero, data_emissao:c.data, data_entrada:hoje(), fornecedor_id:f ? f.id : '', fornecedor_cnpj:f ? f.cnpj : '', fornecedor_nome:f ? (f.fantasia || f.nome) : '',
+    total_produtos:r2(itens.reduce((a, i) => a + i.custo_total, 0)), total_nota:r2(itens.reduce((a, i) => a + i.custo_total, 0)), itens };
+  btn.disabled = true;
+  const { error } = await SB.rpc('lancar_compra', { e:S.empId, compra });
+  if (error){ btn.disabled = false; return $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; }
+  S.compraManual = null; closeModal(); toast(`Compra lançada: ${itens.length} item(ns) entraram no estoque.`);
+}
+
+/* ---------- detalhes da compra e estorno ---------- */
+function verCompra(id){
+  const c = S.compras.find(x => x.id === id); if (!c) return;
+  openModal(`${mhead('Compra ' + (c.numero ? 'nº ' + esc(c.numero) : ''))}
+  ${c.status === 'estornada' ? `<div class="msg err">Estornada em ${fmtData(c.estornado_em)}${c.motivo_estorno ? ': ' + esc(c.motivo_estorno) : ''}</div>` : ''}
+  <p><b>${esc(c.fornecedor_nome || 'Sem fornecedor')}</b> ${c.fornecedor_cnpj ? '<span class="small">' + fmtDoc(c.fornecedor_cnpj) + '</span>' : ''}<br>
+  <span class="small">Emissão ${(c.data_emissao || '').split('-').reverse().join('/')} · lançada em ${fmtData(c.lancado_em)} · ${c.origem === 'xml' ? 'importada do XML' : 'lançamento manual'}</span>
+  ${c.chave ? `<br><span class="small">Chave ${fmtChave(c.chave)}</span>` : ''}</p>
+  <div class="list">${(c.itens || []).map(i => `<div class="it"><div class="grow"><div class="t">${esc(nomeProd(i.produto_id))}</div>
+    <div class="s">${i.xProd && i.xProd !== nomeProd(i.produto_id) ? 'na nota: ' + esc(i.xProd) + ' · ' : ''}${i.fator && i.fator !== 1 ? `${qtdTxt(i.qCom)} ${esc(i.uCom)} × ${qtdTxt(i.fator)} = ` : ''}${qtdTxt(i.qtd_estoque)} un. a ${brl(i.custo_unit)}</div></div>
+    <b class="num">${brl(i.custo_total || i.qtd_estoque * i.custo_unit)}</b></div>`).join('')}</div>
+  <div class="total big"><span>Total da nota</span><span class="num">${brl(c.total_nota || 0)}</span></div>
+  ${c.status !== 'estornada' && pode('produto') ? `<label for="motEst">Estornar (desfazer a entrada)</label><input id="motEst" placeholder="Motivo do estorno">
+    <div id="errM"></div><div class="actions"><button class="btn bad" data-act="confEstornar" data-id="${esc(c.id)}">Estornar compra</button></div>` : ''}`);
+}
+async function confEstornar(id){
+  const m = val('motEst');
+  if (m.length < 5) return $('#errM').innerHTML = '<div class="msg err">Escreva o motivo do estorno.</div>';
+  const { error } = await SB.rpc('estornar_compra', { e:S.empId, cid:id, motivo:m });
+  if (error) return $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`;
+  closeModal(); toast('Compra estornada: os itens saíram do estoque.');
+}
+
+/* ---------- ficha de estoque do produto ---------- */
+const TIPO_MOV = { compra:'Compra', venda:'Venda', cancelamento:'Cancelamento de venda', devolucao_venda:'Devolução de cliente', devolucao_compra:'Devolução ao fornecedor', ajuste:'Ajuste (inventário)', estorno_compra:'Estorno de compra' };
+async function verEstoque(id){
+  const p = S.produtos.find(x => x.id === id); if (!p) return;
+  openModal(`${mhead(esc(p.descricao))}
+  <div class="stats"><div><b>${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</b>saldo (${esc(p.unidade || 'UN')})</div><div><b>${brl(p.custo_medio || 0)}</b>custo médio</div><div><b>${brl(p.custo || 0)}</b>último custo</div></div>
+  ${pode('produto') ? `<div class="row">${fld('ajMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}<div style="align-self:end;flex:0 0 auto"><button class="btn" data-act="salvarMinimo" data-id="${esc(id)}">Salvar mínimo</button></div></div>
+  <h3>Ajuste de inventário</h3><p class="small">Contou o produto na prateleira? Informe a quantidade real; o sistema registra a diferença.</p>
+  <div class="row">${fld('ajSaldo','Quantidade contada', '', 'inputmode="decimal"')}${fld('ajMot','Motivo', 'Inventário')}</div>
+  <div id="errM"></div><div class="actions"><button class="btn pri" data-act="salvarAjuste" data-id="${esc(id)}">Ajustar saldo</button></div>` : ''}
+  <h3>Movimentações recentes</h3><div id="movList" class="small">Carregando…</div>`);
+  const { data, error } = await SB.from('docs').select('data').eq('col', `empresas/${S.empId}/movimentos`).eq('data->>produto_id', id).order('atualizado_em', { ascending:false }).limit(40);
+  const el = $('#movList'); if (!el) return;
+  if (error){ el.textContent = 'Não foi possível carregar as movimentações.'; return; }
+  el.innerHTML = data.length ? `<div class="list">${data.map(({ data:m }) => `<div class="it" style="padding:7px 0"><div class="grow"><div>${TIPO_MOV[m.tipo] || esc(m.tipo)}${m.doc ? ' · ' + esc(m.doc) : ''}</div><div class="s">${fmtData(m.em)}</div></div>
+    <div style="text-align:right"><b class="num" style="color:${m.qtd < 0 ? 'var(--bad)' : 'var(--ok)'}">${m.qtd > 0 ? '+' : ''}${qtdTxt(m.qtd)}</b><br><span class="s">saldo ${qtdTxt(m.saldo)}</span></div></div>`).join('')}</div>`
+    : 'Nenhuma movimentação ainda.';
+}
+
+/* ---------- fornecedores ---------- */
+function formFornecedor(f){
+  f = f || { uf:'PI' };
+  openModal(`${mhead(f.id ? 'Editar fornecedor' : 'Novo fornecedor')}
+  <div class="row">${fld('fnCnpj','CNPJ * (preenche o resto sozinho)', fmtDoc(f.cnpj), 'inputmode="numeric" autocomplete="off"')}${fld('fnIe','Inscrição estadual', f.ie, 'inputmode="numeric"')}</div>
+  <div id="fnAutoInfo" class="small" style="margin-top:4px"></div>
+  ${fld('fnNome','Razão social *', f.nome)}${fld('fnFant','Nome fantasia', f.fantasia)}
+  <div class="row">${fld('fnFone','Telefone', f.telefone, 'inputmode="tel"')}${fld('fnEmail','E-mail', f.email, 'type="email"')}</div>
+  <div class="row">${fld('fnLog','Logradouro', f.logradouro)}${fld('fnNum','Número', f.numero)}</div>
+  <div class="row">${fld('fnBai','Bairro', f.bairro)}${fld('fnCep','CEP', f.cep, 'inputmode="numeric" autocomplete="off"')}</div>
+  <div class="row">${fld('fnMun','Município', f.municipio)}${fld('fnIbge','Código IBGE', f.cod_municipio, 'inputmode="numeric"')}${sel('fnUf','UF', f.uf, UFS.map(u => [u, u]))}</div>
+  <div id="errM"></div>
+  <div class="actions">${f.id ? `<button class="btn bad" data-act="delFornecedor" data-id="${esc(f.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarFornecedor" data-id="${esc(f.id || '')}">Salvar</button></div>`);
+}
+async function salvarFornecedor(id){
+  const o = { cnpj:dig(val('fnCnpj')), ie:dig(val('fnIe')), nome:val('fnNome').toUpperCase(), fantasia:val('fnFant'), telefone:val('fnFone'), email:val('fnEmail'),
+    logradouro:val('fnLog'), numero:val('fnNum'), bairro:val('fnBai'), cep:dig(val('fnCep')), municipio:val('fnMun'), cod_municipio:dig(val('fnIbge')), uf:val('fnUf') };
+  if (id) o.id = id;
+  const errs = [];
+  if (!(o.cnpj.length === 11 ? cpfOk(o.cnpj) : cnpjOk(o.cnpj))) errs.push('CNPJ/CPF inválido.');
+  if (!o.nome) errs.push('Informe a razão social.');
+  if (S.fornecedores.some(f => f.cnpj === o.cnpj && f.id !== id)) errs.push('Já existe um fornecedor com esse CNPJ.');
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  if (await safe(() => put('fornecedores', o), 'Fornecedor salvo.')) closeModal();
+}
+
+/* ---------- eventos do estoque ---------- */
+async function acoesEstoque(a, t, id){
+  switch (a){
+    case 'estView': S.estView = t.dataset.v; render(); return true;
+    case 'estFiltro': S.estFiltro = t.dataset.f; render(); return true;
+    case 'verCompra': verCompra(id); return true;
+    case 'confEstornar': t.disabled = true; await confEstornar(id); t.disabled = false; return true;
+    case 'lancarCompraXml': await lancarCompraXml(t); return true;
+    case 'novaCompraManual': novaCompraManual(); return true;
+    case 'cmAdd': { const p = S.produtos.find(x => x.id === id); S.compraManual.itens.push({ pid:id, qtd:'1', custo:p && p.custo ? String(p.custo).replace('.', ',') : '' }); S.compraManual.busca = ''; renderCompraManual(); return true; }
+    case 'cmRem': S.compraManual.itens.splice(+t.dataset.i, 1); renderCompraManual(); return true;
+    case 'lancarCompraManual': await lancarCompraManual(t); return true;
+    case 'verEstoque': verEstoque(id); return true;
+    case 'salvarMinimo': { const p = S.produtos.find(x => x.id === id); if (await safe(() => put('produtos', { ...clone(p), estoque_min:numIn(val('ajMin')) }), 'Estoque mínimo salvo.')) closeModal(); return true; }
+    case 'salvarAjuste': {
+      const v = val('ajSaldo'); if (v === '' || isNaN(numIn(v))) { $('#errM').innerHTML = '<div class="msg err">Informe a quantidade contada.</div>'; return true; }
+      t.disabled = true; const { error } = await SB.rpc('ajustar_estoque', { e:S.empId, pid:id, novo_saldo:numIn(v), motivo:val('ajMot') }); t.disabled = false;
+      if (error){ $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return true; }
+      toast('Saldo ajustado.'); verEstoque(id); return true; }
+    case 'novoFornecedor': formFornecedor(); return true;
+    case 'editFornecedor': formFornecedor(clone(S.fornecedores.find(x => x.id === id))); return true;
+    case 'salvarFornecedor': salvarFornecedor(id); return true;
+    case 'delFornecedor': confirmar('Excluir este fornecedor? As compras já lançadas continuam no histórico.', 'confDelFornecedor', id); return true;
+    case 'confDelFornecedor': if (await safe(() => del('fornecedores', id), 'Fornecedor excluído.')) closeModal(); return true;
+  }
+  return false;
+}
+function inputEstoque(t){
+  if (t.id === 'estBusca'){ S.estBusca = t.value; later(); return true; }
+  if (t.id === 'cmBusca'){ S.compraManual.busca = t.value; $('#cmRes').innerHTML = resultadosHtml(t.value, 'cmAdd'); return true; }
+  if (t.dataset.mq !== undefined || t.dataset.mc !== undefined){
+    const c = S.compraManual, i = +(t.dataset.mq ?? t.dataset.mc); c.itens[i][t.dataset.mq !== undefined ? 'qtd' : 'custo'] = t.value;
+    $('#cmTot').textContent = brl(r2(c.itens.reduce((a, x) => a + numIn(x.qtd) * numIn(x.custo), 0))); return true; }
+  if (t.id === 'cmNum'){ S.compraManual.numero = t.value; return true; }
+  if (t.dataset.cf !== undefined){ const it = S.compraImport.itens[+t.dataset.cf]; it.fator = numIn(t.value); $('#cix-' + t.dataset.cf).innerHTML = linhaEntrada(it); return true; }
+  if (t.dataset.cp !== undefined){ S.compraImport.itens[+t.dataset.cp].preco = t.value; return true; }
+  return false;
+}
+function changeEstoque(t){
+  if (t.id === 'compraXml'){ if (t.files[0]) lerCompraXml(t.files[0]); t.value = ''; return true; }
+  if (t.dataset.ci !== undefined){ const it = S.compraImport.itens[+t.dataset.ci]; it.produto_id = t.value; it.como = ''; renderCompraImport(); return true; }
+  if (t.id === 'ciPerf'){ S.ciPerf = t.value; return true; }
+  if (t.id === 'cmForn'){ S.compraManual.fornecedor_id = t.value; return true; }
+  if (t.id === 'cmData'){ S.compraManual.data = t.value; return true; }
+  return false;
 }
 
 /* ================== eventos ================== */
@@ -1896,6 +2206,7 @@ document.addEventListener('click', async ev => {
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
+  if (await acoesEstoque(a, t, id)) return;
   if (await acoesV5(a, t, id)) return;
   if (await acoesV4(a, t, id)) return;
   switch (a){
@@ -1918,7 +2229,10 @@ document.addEventListener('click', async ev => {
     case 'salvarCli': salvarCli(id); break;
     case 'delCli': confirmar('Excluir este cliente?', 'confDelCli', id); break;
     case 'confDelCli': if (await safe(() => del('clientes', id), 'Cliente excluído.')) closeModal(); break;
-    case 'addCart': { const ex = S.cart.find(c => c.pid === id); if (ex) ex.qtd = r2(ex.qtd + 1); else S.cart.push({ pid:id, qtd:1 }); S.busca = ''; render(); const b = $('#busca'); if (b) b.focus(); break; }
+    case 'addCart': { const ex = S.cart.find(c => c.pid === id); if (ex) ex.qtd = r2(ex.qtd + 1); else S.cart.push({ pid:id, qtd:1 }); S.busca = ''; render(); const b = $('#busca'); if (b) b.focus();
+      const p = S.produtos.find(x => x.id === id), q = (ex || S.cart.find(c => c.pid === id)).qtd;
+      if (p && temSaldo(p) && p.estoque - q < 0) toast(`Atenção: ${p.descricao} está sem estoque suficiente (saldo ${qtdTxt(p.estoque)}).`);
+      break; }
     case 'qtd': { const c = S.cart[+t.dataset.i]; c.qtd = r2(c.qtd + +t.dataset.d); if (c.qtd <= 0) S.cart.splice(+t.dataset.i, 1); render(); break; }
     case 'addPag': { const T = totais(cartLinhas()), f = pagResumo(T.nota).falta; S.pags.push({ forma:t.dataset.c, valor:f > 0 ? String(f).replace('.', ',') : '' }); render();
       const el = $('#pv' + (S.pags.length - 1)); if (el){ el.focus(); el.select(); } break; }
@@ -1949,7 +2263,7 @@ document.addEventListener('click', async ev => {
   }
 });
 document.addEventListener('input', ev => {
-  const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return;
+  const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return; if (inputEstoque(t)) return;
   if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(S.busca, 'addCart'); }
   else if (t.id === 'buscaNfe'){ S.buscaNfe = t.value; $('#resN').innerHTML = resultadosHtml(S.buscaNfe, 'addNfe'); }
   else if (t.dataset.pv !== undefined){ S.pags[+t.dataset.pv].valor = t.value; }
@@ -1970,6 +2284,7 @@ let laterT; const later = () => { clearTimeout(laterT); laterT = setTimeout(rend
 document.addEventListener('change', ev => {
   const t = ev.target;
   if (changeV4(t)) return;
+  if (changeEstoque(t)) return;
   if (t.dataset.membro !== undefined){ SB.rpc('alterar_papel', { e:S.empId, uid:t.dataset.membro, p_papel:t.value }).then(({ error }) => { toast(error ? error.message : 'Papel alterado.'); carregarMembros(); }); return; }
   if (t.id === 'ncmFile'){ if (t.files[0]) lerArquivoNcm(t.files[0]); return; }
   if (t.id === 'empSel'){ if (t.value === '__nova'){ renderHeader(); formEmpresa(); } else if (t.value) setEmp(t.value); }
