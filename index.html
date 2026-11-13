@@ -650,7 +650,7 @@ function nfeCtx(){
 function nfeLinhas(){
   const { e, inter, naoContrib, precisaDifal } = nfeCtx();
   const itens = S.nfe.itens.map(ci => { const p = S.produtos.find(x => x.id === ci.pid); if (!p) return null;
-    const cfop = cfopOp(p.cfop, S.nfe.op, inter);
+    const cfop = ci.cfop ? (inter ? ({ '1':'2', '5':'6' }[ci.cfop[0]] || ci.cfop[0]) + ci.cfop.slice(1) : ci.cfop) : cfopOp(p.cfop, S.nfe.op, inter);
     return { p, qtd:ci.qtd, preco:ci.preco, desc:numIn(ci.desc), cfop }; }).filter(Boolean);
   return montarLinhas(itens, e, { inter, semST:!!naoContrib || S.nfe.op !== 'venda', difal:precisaDifal ? S.nfe.difal : null, descTotal:S.nfe.descTotal,
     frete:numIn(S.nfe.vFrete), seguro:numIn(S.nfe.vSeguro), outras:numIn(S.nfe.vOutras) });
@@ -1111,7 +1111,7 @@ async function emitirNfe(){
   if (obs) payload.informacoes_adicionais_contribuinte = obs;
   const nota = { id:ref, ref, modelo:'55', serie, numero, data:payload.data_emissao, total:T.nota, destNome:cli.nome, destDoc:cli.doc, destUf:cli.uf, destMun:cli.municipio,
     natureza:payload.natureza_operacao, pag:n.op === 'venda' ? n.pag : '90', status:'simulada', ambiente:'homologacao', tot:T, obs, emitida_por:S.meuId || null,
-    op:n.op, refChave:n.op !== 'venda' ? dig(n.ref) : '', chave:gerarChave(e, '55', serie, numero, payload.data_emissao),
+    op:n.op, refChave:n.op !== 'venda' ? dig(n.ref) : '', chave:gerarChave(e, '55', serie, numero, payload.data_emissao), ...(n.compraId ? { compra_id:n.compraId, dev_itens:n.devItens } : {}),
     itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, ncm:l.p.ncm, cfop:l.c.cfop, cst:l.c.cst, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc, st:l.c.st })), payload };
   const novaEmp = { ...e, prox_nfe:numero + 1 };
   if (precisaDifal) novaEmp.difal_uf = { ...(e.difal_uf || {}), [cli.uf]:{ aliq:numIn(n.difal.aliq), fcp:numIn(n.difal.fcp), metodo:n.difal.metodo } };
@@ -2026,7 +2026,7 @@ function autoPreencher(t){
 }
 
 /* ================== COMPRAS E ESTOQUE ================== */
-Object.assign(ACT_PERM, { novaCompra:'produto', corrigirCompra:'produto', lancarCompraXml:'produto', salvarCompra:'produto', confEstornar:'produto',
+Object.assign(ACT_PERM, { devCompra:'produto', emitirDevCompra:'produto', dcTudo:'produto', dcNada:'produto', novaCompra:'produto', corrigirCompra:'produto', lancarCompraXml:'produto', salvarCompra:'produto', confEstornar:'produto',
   salvarAjuste:'produto', salvarMinimo:'produto', novoFornecedor:'produto', editFornecedor:'produto', salvarFornecedor:'produto', delFornecedor:'produto', confDelFornecedor:'produto' });
 AUTO.fornecedor = { doc:'fnCnpj', info:'fnAutoInfo', nome:'fnNome', fantasia:'fnFant', fone:'fnFone', email:'fnEmail', regime:null, log:'fnLog', num:'fnNum', bai:'fnBai', cep:'fnCep', mun:'fnMun', ibge:'fnIbge', uf:'fnUf' };
 const temSaldo = p => typeof p.estoque === 'number';
@@ -2093,7 +2093,7 @@ function vNotasCompra(){
     <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
       <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></div>
       <div class="s">${dataBR(c.data_emissao)} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${c.status === 'estornada' ? '<span class="tag b">estornada</span>' : '<span class="tag">lançada</span>'}</div></div>`).join('')}</div>`
+      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${c.status === 'estornada' ? '<span class="tag b">estornada</span>' : situacaoDev(c) === 'total' ? '<span class="tag w">devolvida</span>' : situacaoDev(c) === 'parcial' ? '<span class="tag w">devolução parcial</span>' : '<span class="tag">lançada</span>'}</div></div>`).join('')}</div>`
       : `<div class="empty">${S.compras.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
 }
 
@@ -2336,8 +2336,10 @@ function verCompra(id){
   <div class="actions" style="margin-top:0">
     <button class="btn pri" data-act="imprimirCompra" data-id="${esc(id)}">📄 Gerar PDF (DANFE)</button>
     ${c.tem_xml ? `<button class="btn" data-act="baixarXmlCompra" data-id="${esc(id)}">⤓ Baixar XML</button>` : ''}
-    ${ativa && ger ? `<button class="btn" data-act="corrigirCompra" data-id="${esc(id)}">Corrigir</button>` : ''}
+    ${ativa && ger && situacaoDev(c) !== 'total' ? `<button class="btn" data-act="devCompra" data-id="${esc(id)}">↩ Devolver ao fornecedor</button>` : ''}
+    ${ativa && ger && !devsDaCompra(id).length ? `<button class="btn" data-act="corrigirCompra" data-id="${esc(id)}">Corrigir</button>` : ''}
   </div>
+  ${devsDaCompra(id).length ? `<div class="card" style="margin:10px 0"><b>Devoluções desta compra</b>${devsDaCompra(id).map(n => `<div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer;display:flex;gap:8px;padding:8px 0"><div style="flex:1">NF-e nº ${n.numero} · ${fmtData(n.data)}</div>${tagStatus(n)} <b class="num">${brl(n.total)}</b></div>`).join('')}</div>` : ''}
   <p class="small">O PDF sai no modelo oficial do DANFE. Na janela que abrir, escolha <b>Salvar como PDF</b> no destino (ou a impressora, para imprimir).</p>
   ${danfeCompraHtml(c)}
   ${ativa && ger ? `<h3>Estornar</h3><p class="small">Desfaz a entrada no estoque (por exemplo, nota lançada por engano ou devolvida inteira).</p>
@@ -2519,6 +2521,88 @@ async function gerarDanfeCompra(id, btn){
   } finally { if (btn) btn.disabled = false; }
 }
 
+/* ---------- devolução de compra (NF-e de saída para o fornecedor) ---------- */
+const CFOP_ST_COMPRA = ['5401','5402','5403','5405','6401','6402','6403','6404'];
+const devsDaCompra = cid => S.notas.filter(n => n.op === 'dev_compra' && n.compra_id === cid && notaValida(n));
+function devolvidoPorItem(cid){
+  const q = {}; devsDaCompra(cid).forEach(n => (n.dev_itens || []).forEach(d => q[d.i] = rq((q[d.i] || 0) + num(d.q)))); return q;
+}
+function situacaoDev(c){
+  const dv = devolvidoPorItem(c.id), its = c.itens || []; if (!Object.keys(dv).length) return '';
+  return its.every((it, i) => num(dv[i]) >= num(it.qCom) - 0.0001) ? 'total' : 'parcial';
+}
+function formDevCompra(cid){
+  const c = S.compras.find(x => x.id === cid); if (!c) return;
+  if (!chaveOk(c.chave || '')) return toast('Esta compra não tem chave de acesso. A devolução precisa referenciar a NF-e do fornecedor.');
+  const dv = devolvidoPorItem(cid);
+  S.dc = { cid, motivo:'', q:(c.itens || []).map((it, i) => { const r = rq(num(it.qCom) - num(dv[i])); return r > 0 ? v2(r) : ''; }) };
+  renderDevCompra();
+}
+function calcDevCompra(){
+  const c = S.compras.find(x => x.id === S.dc.cid), dv = devolvidoPorItem(c.id);
+  let total = 0, outras = 0, ipi = 0, st = 0; const linhas = [];
+  (c.itens || []).forEach((it, i) => {
+    const q = numIn(S.dc.q[i]), resta = rq(num(it.qCom) - num(dv[i]));
+    if (!(q > 0)) return;
+    const k = q / num(it.qCom), fator = num(it.fator) || 1;
+    const desc = r2(num(it.vDesc) * k), ex = r2((num(it.vFrete) + num(it.vSeg) + num(it.vOutro)) * k), vipi = r2(num(it.vIPI) * k), vst = r2(num(it.vICMSST) * k);
+    const bruto = r2(num(it.vUnCom) * q);
+    linhas.push({ i, it, q, resta, fator, qEst:rq(q * fator), preco:Math.round(num(it.vUnCom) / fator * 10000) / 10000, desc, ex, vipi, vst, bruto });
+    total += bruto - desc + ex + vipi + vst; outras += ex + vipi + vst; ipi += vipi; st += vst;
+  });
+  return { c, dv, linhas, total:r2(total), outras:r2(outras), ipi:r2(ipi), st:r2(st) };
+}
+function renderDevCompra(){
+  const { c, dv, linhas, total, ipi, st } = calcDevCompra(), f = c.fornecedor || {};
+  openModal(`${mhead('Devolver ao fornecedor')}
+  <div class="card" style="margin:0 0 10px"><b>${esc(f.fantasia || f.nome || c.fornecedor_nome)}</b> <span class="small">${fmtDoc(c.fornecedor_cnpj)}</span><br>
+    <span class="small">Nota de compra nº ${esc(c.numero)} · emissão ${dataBR(c.data_emissao)} · ${brl(c.total_nota)}</span></div>
+  <p class="small">Informe quanto vai voltar de cada item (na unidade da nota do fornecedor). O sistema emite a <b>NF-e de devolução</b> referenciando a nota de compra, tira os itens do estoque e devolve na mesma proporção os descontos, frete, IPI e ICMS-ST.</p>
+  <div class="actions" style="margin:0 0 8px"><button class="btn sm" data-act="dcTudo">Devolver tudo</button><button class="btn sm" data-act="dcNada">Zerar quantidades</button></div>
+  ${(c.itens || []).map((it, i) => { const resta = rq(num(it.qCom) - num(dv[i]));
+    return `<div class="it" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line-2)"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(it.xProd || nomeProd(it.produto_id))}</div>
+      <div class="small">comprado ${qtdTxt(it.qCom)} ${esc(it.uCom)} × ${brl(it.vUnCom)}${num(dv[i]) ? ` · já devolvido ${qtdTxt(dv[i])}` : ''} · pode devolver <b>${qtdTxt(resta)}</b></div></div>
+      <input data-dq="${i}" inputmode="decimal" style="width:96px;text-align:right" value="${esc(S.dc.q[i])}" ${resta <= 0 ? 'disabled' : ''}></div>`; }).join('')}
+  <label for="dcMot">Motivo (vai nas informações da nota)</label><input id="dcMot" placeholder="Ex.: mercadoria avariada, fora do pedido, vencida" value="${esc(S.dc.motivo)}">
+  <div id="dcTot" style="margin-top:10px">${linhas.length ? `${ipi ? linhaTot('IPI devolvido', ipi, 'small') : ''}${st ? linhaTot('ICMS-ST devolvido', st, 'small') : ''}${linhaTot('Total da devolução', total, 'big')}` : '<div class="small">Nenhum item marcado.</div>'}</div>
+  <div class="msg warn">Devolução de compra ainda não foi testada na SEFAZ-PI. Faça primeiro em homologação e confira a nota antes de usar de verdade.</div>
+  <div id="errN"></div>
+  <div class="actions"><button class="btn" data-act="verCompra" data-id="${esc(c.id)}">Voltar</button><button class="btn pri" data-act="emitirDevCompra" ${linhas.length ? '' : 'disabled'}>Emitir NF-e de devolução</button></div>`);
+}
+async function clienteDoFornecedor(c){
+  const f = S.fornecedores.find(x => x.id === c.fornecedor_id) || c.fornecedor || {}, doc = dig(f.cnpj || c.fornecedor_cnpj);
+  const ex = S.clientes.find(x => x.doc === doc); if (ex) return ex;
+  const o = { doc, nome:(f.nome || c.fornecedor_nome || '').toUpperCase(), ind_ie:dig(f.ie) ? '1' : '9', ie:dig(f.ie), email:f.email || '', logradouro:f.logradouro || '', numero:f.numero || 'S/N',
+    bairro:f.bairro || '', cep:dig(f.cep), municipio:f.municipio || '', cod_municipio:dig(f.cod_municipio), uf:f.uf || '', fornecedor:true };
+  const falta = [!o.logradouro && 'endereço', !o.bairro && 'bairro', !o.municipio && 'município', o.cod_municipio.length !== 7 && 'código IBGE do município', !o.uf && 'UF'].filter(Boolean);
+  if (falta.length) throw new Error(`Complete o cadastro do fornecedor (Compras → Fornecedores): falta ${falta.join(', ')}.`);
+  const novo = await put('clientes', o);
+  if (!S.clientes.some(x => x.id === novo.id)) S.clientes.push(novo); // ainda não chegou pelo tempo real
+  return novo;
+}
+async function emitirDevCompra(btn){
+  const D = calcDevCompra(), c = D.c, errs = [];
+  D.linhas.forEach(l => { if (l.q > l.resta + 0.0001) errs.push(`${esc(l.it.xProd)}: só dá para devolver ${qtdTxt(l.resta)} ${esc(l.it.uCom)}.`);
+    if (!S.produtos.some(p => p.id === l.it.produto_id)) errs.push(`${esc(l.it.xProd)}: o produto foi excluído do cadastro.`); });
+  if (!D.linhas.length) errs.push('Informe a quantidade de pelo menos um item.');
+  if (errs.length) return $('#errN').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  btn.disabled = true; $('#errN').innerHTML = '<div class="msg info">Emitindo a NF-e de devolução…</div>';
+  const antes = S.nfe;
+  try {
+    const cli = await clienteDoFornecedor(c), nf = nfeVazia();
+    const mot = val('dcMot');
+    Object.assign(nf, { op:'dev_compra', natureza:NAT_OP.dev_compra, ref:c.chave, clienteId:cli.id, frete:'9', vOutras:v2(D.outras), compraId:c.id,
+      devItens:D.linhas.map(l => ({ i:l.i, q:l.q })),
+      obs:[`Devolução ref. NF-e ${c.numero} série ${c.serie || ''} de ${dataBR(c.data_emissao)}`, mot && 'Motivo: ' + mot,
+        D.ipi && 'IPI devolvido ' + brl(D.ipi), D.st && 'ICMS-ST devolvido ' + brl(D.st)].filter(Boolean).join('. '),
+      itens:D.linhas.map(l => ({ pid:l.it.produto_id, qtd:l.qEst, preco:l.preco, desc:l.desc ? v2(l.desc) : '',
+        cfop:CFOP_ST_COMPRA.includes(String(l.it.cfop)) || num(l.it.vICMSST) > 0 ? '5411' : '5202' })) });
+    S.nfe = nf;
+    await emitirNfe();
+  } catch(err){ $('#errN').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+  finally { S.nfe = antes; const b = $('[data-act=emitirDevCompra]'); if (b) b.disabled = false; }
+}
+
 /* ---------- ficha de estoque do produto (inventário e movimentações) ---------- */
 const TIPO_MOV = { compra:'Compra', venda:'Venda', cancelamento:'Cancelamento de venda', devolucao_venda:'Devolução de cliente', devolucao_compra:'Devolução ao fornecedor', ajuste:'Ajuste (inventário)', estorno_compra:'Estorno de compra' };
 async function verEstoque(id){
@@ -2587,6 +2671,10 @@ async function acoesEstoque(a, t, id){
     case 'pularXml': closeModal(); proximoXml(); return true;
     case 'cancelarFila': S.filaXml = []; S.compraImport = null; closeModal(); return true;
     case 'novaCompra': novaCompra(); return true;
+    case 'devCompra': formDevCompra(id); return true;
+    case 'dcTudo': { const c = S.compras.find(x => x.id === S.dc.cid), dv = devolvidoPorItem(c.id); S.dc.q = c.itens.map((it, i) => v2(rq(num(it.qCom) - num(dv[i])))); S.dc.motivo = val('dcMot'); renderDevCompra(); return true; }
+    case 'dcNada': S.dc.q = S.dc.q.map(() => ''); S.dc.motivo = val('dcMot'); renderDevCompra(); return true;
+    case 'emitirDevCompra': await emitirDevCompra(t); return true;
     case 'cmAdd': { const p = S.produtos.find(x => x.id === id); S.cm.itens.push({ ...itemVazio(), produto_id:id, uCom:p.unidade || 'UN', ncm:p.ncm || '', vUnCom:p.custo ? v2(p.custo) : '' }); S.cm.busca = ''; renderCompraManual(); return true; }
     case 'cmNovoItem': S.cm.itens.push({ ...itemVazio(), produto_id:'novo' }); renderCompraManual(); return true;
     case 'cmRem': S.cm.itens.splice(+t.dataset.i, 1); renderCompraManual(); return true;
@@ -2618,6 +2706,10 @@ async function acoesEstoque(a, t, id){
 function inputEstoque(t){
   if (t.id === 'estBusca'){ S.estBusca = t.value; later(); return true; }
   if (t.id === 'cpBusca'){ S.cpBusca = t.value; later(); return true; }
+  if (t.dataset.dq !== undefined && S.dc){ S.dc.q[+t.dataset.dq] = t.value; const D = calcDevCompra(), el = $('#dcTot');
+    if (el) el.innerHTML = D.linhas.length ? `${D.ipi ? linhaTot('IPI devolvido', D.ipi, 'small') : ''}${D.st ? linhaTot('ICMS-ST devolvido', D.st, 'small') : ''}${linhaTot('Total da devolução', D.total, 'big')}` : '<div class="small">Nenhum item marcado.</div>';
+    const b = $('[data-act=emitirDevCompra]'); if (b) b.disabled = !D.linhas.length; return true; }
+  if (t.id === 'dcMot' && S.dc){ S.dc.motivo = t.value; return true; }
   if (t.id === 'cmBusca'){ S.cm.busca = t.value; $('#cmRes').innerHTML = resultadosHtml(t.value, 'cmAdd'); return true; }
   if (t.dataset.cm !== undefined && S.cm){ S.cm[t.dataset.cm] = t.value;
     if (t.dataset.cm === 'chave'){ const el = $('#cmChaveInfo'); if (el) el.innerHTML = dig(t.value) ? (chaveOk(t.value) ? '<span style="color:var(--ok)">✓ chave válida</span>' : '<span style="color:var(--bad)">✕ chave inválida</span>') : ''; }
