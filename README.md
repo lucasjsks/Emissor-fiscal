@@ -68,7 +68,8 @@ Testa as rotas do servidor com Supabase e Focus simulados (emissão, rejeição,
 ## Situação atual e próximos passos
 - [x] Emissão real de NFC-e e NF-e em homologação via Focus (cancelamento, carta de correção, inutilização, consulta)
 - [x] Login, várias empresas, convites e papéis com trava no banco
-- [ ] Validar os nomes de campos com envios reais em homologação (ICMS-ST, DIFAL, devolução)
+- [x] NFC-e e NF-e autorizadas na SEFAZ-PI em homologação (emissão, cancelamento, consulta)
+- [ ] Validar em homologação: ICMS-ST, DIFAL, devolução, carta de correção e inutilização
 - [ ] Mapear os campos de IBS/CBS no layout da Focus
 - [ ] Pacote mensal com os XMLs autorizados (hoje leva os dados de envio)
 - [ ] Contingência offline e impressão direta (programa local no caixa)
