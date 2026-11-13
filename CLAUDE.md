@@ -14,7 +14,8 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 - Segredos (token Focus, service_role) só em variáveis da Vercel. Nunca no código, nunca pedir no chat.
 - Papéis: dono > gerente > operador. Checar no servidor (`papelDe`) e no RLS (`pode_gravar`/`pode_apagar`), não só na tela.
 - Rodar `npm test` antes de enviar. Testes usam fetch simulado (`test/api.test.js`).
-- Os nomes de campos do JSON da Focus para ST, DIFAL, devolução e eventos ainda **não foram validados** em envio real: ao receber rejeições, ajustar e registrar aqui.
+- Validado em homologação (12/11/2026, empresa piloto em Campo Maior/PI, Simples): emissão de NFC-e, cupom oficial e XML, cancelamento, pagamento dividido/troco, NF-e com consulta de situação e fechamento de caixa — tudo autorizado pela SEFAZ-PI.
+- Ainda **não validados** em envio real: campos de ICMS-ST, DIFAL, devolução, carta de correção, inutilização e IBS/CBS. Ao receber rejeições, ajustar e registrar aqui.
 - Datas no formato `YYYY-MM-DDTHH:MM:SS-03:00` (`isoNow()`/`isoBR()`).
 
 ## Fluxo de trabalho
@@ -22,7 +23,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 - Variáveis da Vercel: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FOCUS_TOKEN_HOMOLOGACAO, FOCUS_AMBIENTE (e FOCUS_TOKEN_PRODUCAO quando for para produção).
 
 ## Roteiro
-1. Fundação (feito): login, multiempresa, emissão real em homologação.
+1. Fundação (feito e validado em homologação): login, multiempresa, emissão real de NFC-e e NF-e.
 2. Validar em homologação com o primeiro cliente piloto; mapear IBS/CBS.
 3. Estoque (entrada por XML, baixa na venda, inventário).
 4. Financeiro (contas a pagar/receber, conciliação PIX/cartão, DRE).
