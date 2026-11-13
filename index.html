@@ -2198,35 +2198,26 @@ function danfeCompraHtml(c){
   ${(c.itens || []).map(i => `<tr><td>${esc(i.xProd || '')}</td><td>${esc(nomeProd(i.produto_id))}</td><td>${num(i.fator) !== 1 ? '1 ' + esc(i.uCom) + ' = ' + qtdTxt(i.fator) : '—'}</td><td>${qtdTxt(i.qtd_estoque)}</td><td>${brl(i.custo_unit)}</td></tr>`).join('')}</table></div>
   <div class="small" style="margin-top:6px">Documento auxiliar gerado pelo Emissor Fiscal${c.origem === 'xml' ? ' a partir do XML da nota' : ' a partir do lançamento manual'} · lançada em ${fmtData(c.lancado_em)}.</div></div>`;
 }
-function imprimirHtml(titulo, corpo){
-  const css = document.querySelector('style').textContent, f = document.createElement('iframe');
-  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
-  const d = f.contentDocument;
-  d.open(); d.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${css}
-html,body{background:#fff}body{margin:0;padding:0;font-size:12px}@page{size:A4;margin:8mm}.danfe{margin:0;border:0;padding:0}</style></head><body>${corpo}</body></html>`); d.close();
-  setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch(_){ toast('Não foi possível abrir a impressão.'); } setTimeout(() => f.remove(), 60000); }, 300);
-}
 function verCompra(id){
   const c = S.compras.find(x => x.id === id); if (!c) return;
   const ger = pode('produto'), ativa = c.status !== 'estornada';
   openModal(`${mhead('Nota de compra nº ' + esc(c.numero || '—'))}
   ${c.status === 'estornada' ? `<div class="msg err">Estornada em ${fmtData(c.estornado_em)}${c.motivo_estorno ? ': ' + esc(c.motivo_estorno) : ''}</div>` : ''}
   <div class="actions" style="margin-top:0">
-    <button class="btn pri" data-act="imprimirCompra" data-id="${esc(id)}">🖨 Imprimir / salvar PDF</button>
+    <button class="btn pri" data-act="imprimirCompra" data-id="${esc(id)}">📄 Gerar PDF (DANFE)</button>
     ${c.tem_xml ? `<button class="btn" data-act="baixarXmlCompra" data-id="${esc(id)}">⤓ Baixar XML</button>` : ''}
     ${ativa && ger ? `<button class="btn" data-act="corrigirCompra" data-id="${esc(id)}">Corrigir</button>` : ''}
   </div>
-  <p class="small">Para salvar em PDF: clique em Imprimir e escolha "Salvar como PDF" no destino da impressora.</p>
+  <p class="small">O PDF sai no modelo oficial do DANFE. Na janela que abrir, escolha <b>Salvar como PDF</b> no destino (ou a impressora, para imprimir).</p>
   ${danfeCompraHtml(c)}
   ${ativa && ger ? `<h3>Estornar</h3><p class="small">Desfaz a entrada no estoque (por exemplo, nota lançada por engano ou devolvida inteira).</p>
     <input id="motEst" placeholder="Motivo do estorno"><div id="errM"></div>
     <div class="actions"><button class="btn bad" data-act="confEstornar" data-id="${esc(c.id)}">Estornar compra</button></div>` : '<div id="errM"></div>'}`);
 }
 async function baixarXmlCompra(id){
-  const c = S.compras.find(x => x.id === id), xid = (c && c.xml_id) || id;
-  const s = await db.collection(colOf('compras_xml')).doc(xid).get();
-  if (!s.exists) return toast('O XML desta nota não está guardado.');
-  const d = s.data(); if (await salvarArquivo(d.arquivo || `NFe-compra-${(c && c.numero) || xid}.xml`, new Blob([d.xml], { type:'application/xml' }))) toast('XML baixado.');
+  const c = S.compras.find(x => x.id === id), d = await xmlDaCompra(c);
+  if (!d) return toast('O XML desta nota não está guardado.');
+  if (await salvarArquivo(d.arquivo || `NFe-compra-${c.numero || id}.xml`, new Blob([d.xml], { type:'application/xml' }))) toast('XML baixado.');
 }
 async function confEstornar(id, motivoFixo){
   const m = motivoFixo || val('motEst');
@@ -2250,6 +2241,152 @@ async function confCorrigir(id){
     itens:(c.itens || []).map(i => ({ ...itemVazio(), produto_id:S.produtos.some(p => p.id === i.produto_id) ? i.produto_id : 'novo', novoDesc:i.xProd || '', ncm:i.ncm || '', cProd:i.cProd || '', ean:i.ean || '', vinc_chave:i.vinc_chave || '',
       cfop:i.cfop || '', cst:i.cst || '', uCom:i.uCom || 'UN', fator:i.fator || 1, qCom:v2(i.qCom), vUnCom:v2(i.vUnCom), vDesc:i.vDesc ? v2(i.vDesc) : '',
       vBC:i.vBC ? v2(i.vBC) : '', pICMS:i.pICMS ? v2(i.pICMS) : '', vICMS:i.vICMS ? v2(i.vICMS) : '', vICMSST:i.vICMSST ? v2(i.vICMSST) : '', vIPI:i.vIPI ? v2(i.vIPI) : '' })) });
+}
+
+/* ---------- DANFE no padrão nacional (impressão / PDF das notas de compra) ---------- */
+const C128 = ['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+  '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+  '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+  '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+  '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+  '114131','311141','411131','211412','211214','211232','2331112'];
+// código de barras CODE-128C da chave de acesso (padrão do DANFE), em SVG
+function barras128C(digs){
+  const vals = [105]; for (let i = 0; i < digs.length; i += 2) vals.push(+digs.substr(i, 2));
+  vals.push(vals.reduce((a, v, i) => a + v * (i || 1), 0) % 103, 106);
+  let x = 10, rects = '';
+  vals.forEach(v => [...C128[v]].forEach((w, i) => { w = +w; if (i % 2 === 0) rects += `<rect x="${x}" y="0" width="${w}" height="50"/>`; x += w; }));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x + 10} 50" preserveAspectRatio="none" shape-rendering="crispEdges" style="width:100%;height:12mm;display:block">${rects}</svg>`;
+}
+// lê do XML tudo que o DANFE mostra
+function danfeDeXml(txt){
+  const d = new DOMParser().parseFromString(txt, 'application/xml');
+  const g = (el, t) => { const x = el && el.getElementsByTagName(t)[0]; return x ? x.textContent.trim() : ''; };
+  const n = (el, t) => +g(el, t) || 0, E = t => d.getElementsByTagName(t)[0];
+  const inf = E('infNFe'), ide = E('ide'), emit = E('emit'), dest = E('dest'), tot = E('ICMSTot'), tr = E('transp'), adic = E('infAdic'), prot = E('infProt');
+  const ee = emit && emit.getElementsByTagName('enderEmit')[0], ed = dest && dest.getElementsByTagName('enderDest')[0];
+  const ta = tr && tr.getElementsByTagName('transporta')[0], vei = tr && tr.getElementsByTagName('veicTransp')[0], vol = tr && tr.getElementsByTagName('vol')[0];
+  const end = e => [g(e, 'xLgr') + (g(e, 'nro') ? ', ' + g(e, 'nro') : ''), g(e, 'xCpl')].filter(Boolean).join(' - ');
+  return { modelo:g(ide, 'mod') || '55', tpNF:g(ide, 'tpNF') || '1', numero:g(ide, 'nNF'), serie:g(ide, 'serie'), natOp:g(ide, 'natOp'),
+    chave:dig(inf.getAttribute('Id') || '') || dig(g(prot, 'chNFe')), dhEmi:g(ide, 'dhEmi') || g(ide, 'dEmi'), dhSaiEnt:g(ide, 'dhSaiEnt') || g(ide, 'dSaiEnt'),
+    protocolo:g(prot, 'nProt') ? `${g(prot, 'nProt')} - ${dataHoraBR(g(prot, 'dhRecbto'))}` : '',
+    emit:{ nome:g(emit, 'xNome'), l1:end(ee), l2:[g(ee, 'xBairro'), g(ee, 'CEP') && fmtCep(g(ee, 'CEP'))].filter(Boolean).join(' - '),
+      l3:`${g(ee, 'xMun')} - ${g(ee, 'UF')}${g(ee, 'fone') ? ' Fone/Fax: ' + g(ee, 'fone') : ''}`, ie:g(emit, 'IE'), iest:g(emit, 'IEST'), im:g(emit, 'IM'), doc:g(emit, 'CNPJ') || g(emit, 'CPF') },
+    dest:{ nome:g(dest, 'xNome'), doc:g(dest, 'CNPJ') || g(dest, 'CPF') || g(dest, 'idEstrangeiro'), end:end(ed), bairro:g(ed, 'xBairro'), cep:g(ed, 'CEP'), mun:g(ed, 'xMun'), uf:g(ed, 'UF'), fone:g(ed, 'fone'), ie:g(dest, 'IE') },
+    dup:[...d.getElementsByTagName('dup')].map(x => ({ n:g(x, 'nDup'), venc:g(x, 'dVenc'), valor:n(x, 'vDup') })),
+    tot:Object.fromEntries(['vBC','vICMS','vBCST','vST','vII','vICMSUFRemet','vFCPUFDest','vPIS','vProd','vFrete','vSeg','vDesc','vOutro','vIPI','vICMSUFDest','vTotTrib','vCOFINS','vNF'].map(k => [k, n(tot, k)])),
+    transp:{ mod:g(tr, 'modFrete'), nome:g(ta, 'xNome'), antt:g(vei, 'RNTC'), placa:g(vei, 'placa'), ufPlaca:g(vei, 'UF'), doc:g(ta, 'CNPJ') || g(ta, 'CPF'), end:g(ta, 'xEnder'), mun:g(ta, 'xMun'), uf:g(ta, 'UF'), ie:g(ta, 'IE'),
+      qVol:g(vol, 'qVol'), esp:g(vol, 'esp'), marca:g(vol, 'marca'), nVol:g(vol, 'nVol'), pesoB:g(vol, 'pesoB'), pesoL:g(vol, 'pesoL') },
+    itens:[...d.getElementsByTagName('det')].map(det => { const pr = det.getElementsByTagName('prod')[0], imp = det.getElementsByTagName('imposto')[0];
+      const icW = imp && imp.getElementsByTagName('ICMS')[0], ic = icW && icW.firstElementChild, ipi = imp && imp.getElementsByTagName('IPI')[0];
+      return { cProd:g(pr, 'cProd'), xProd:g(pr, 'xProd'), info:g(det, 'infAdProd'), ncm:g(pr, 'NCM'), cst:(g(ic, 'orig') || '') + (g(ic, 'CST') || g(ic, 'CSOSN')), cfop:g(pr, 'CFOP'), un:g(pr, 'uCom'),
+        q:n(pr, 'qCom'), vun:n(pr, 'vUnCom'), vtot:n(pr, 'vProd'), vdesc:n(pr, 'vDesc'), vbc:n(ic, 'vBC'), vicms:n(ic, 'vICMS'), vipi:n(ipi, 'vIPI'), picms:n(ic, 'pICMS'), pipi:n(ipi, 'pIPI') }; }),
+    infCpl:g(adic, 'infCpl'), fisco:g(adic, 'infAdFisco') };
+}
+// monta os mesmos dados a partir de uma compra lançada à mão
+function danfeDeCompra(c){
+  const f = c.fornecedor || {}, e = emp() || {}, t = c.totais || {};
+  return { modelo:c.modelo, tpNF:'1', numero:c.numero, serie:c.serie, natOp:c.natureza || 'COMPRA', chave:chaveOk(c.chave || '') ? dig(c.chave) : '', dhEmi:c.data_emissao, dhSaiEnt:c.data_entrada,
+    protocolo:'', manual:true,
+    emit:{ nome:f.nome || c.fornecedor_nome, l1:[f.logradouro, f.numero].filter(Boolean).join(', '), l2:[f.bairro, f.cep && fmtCep(f.cep)].filter(Boolean).join(' - '),
+      l3:`${f.municipio || ''}${f.uf ? ' - ' + f.uf : ''}${f.telefone ? ' Fone/Fax: ' + f.telefone : ''}`, ie:f.ie, iest:'', im:'', doc:f.cnpj || c.fornecedor_cnpj },
+    dest:{ nome:e.razao, doc:e.cnpj, end:[e.logradouro, e.numero].filter(Boolean).join(', '), bairro:e.bairro, cep:e.cep, mun:e.municipio, uf:e.uf, fone:e.telefone, ie:e.ie },
+    dup:c.duplicatas || [], tot:{ vBC:t.vBC, vICMS:t.vICMS, vBCST:t.vBCST, vST:t.vST, vProd:t.vProd ?? c.total_produtos, vFrete:t.vFrete, vSeg:t.vSeg, vDesc:t.vDesc, vOutro:t.vOutro, vIPI:t.vIPI, vNF:t.vNF ?? c.total_nota },
+    transp:{ mod:num(t.vFrete) > 0 ? '' : '9' },
+    itens:(c.itens || []).map(i => ({ cProd:i.cProd, xProd:i.xProd || nomeProd(i.produto_id), ncm:i.ncm, cst:i.cst, cfop:i.cfop, un:i.uCom, q:i.qCom, vun:i.vUnCom, vtot:i.vProd, vdesc:i.vDesc,
+      vbc:i.vBC, vicms:i.vICMS, vipi:i.vIPI, picms:i.pICMS, pipi:0 })),
+    infCpl:c.obs || '', fisco:'' };
+}
+const dataHoraBR = s => { s = String(s || ''); return s ? dataBR(s) + (s.length > 10 ? ' ' + s.slice(11, 19) : '') : ''; };
+const fmtCep = c => { c = dig(c); return c.length === 8 ? c.slice(0, 5) + '-' + c.slice(5) : c; };
+const nDanfe = (v, k = 2) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits:k, maximumFractionDigits:k });
+const numNF = v => { const s = String(dig(v)).padStart(9, '0'); return s.slice(0, 3) + '.' + s.slice(3, 6) + '.' + s.slice(6); };
+const MOD_FRETE = { '0':'0-Por conta do Rem', '1':'1-Por conta do Dest', '2':'2-Por conta de Terceiros', '3':'3-Próprio por conta do Rem', '4':'4-Próprio por conta do Dest', '9':'9-Sem Transporte' };
+const DANFE_CSS = `*{box-sizing:border-box}html,body{background:#fff;margin:0}body{font-family:"Times New Roman",Times,serif;color:#000;font-size:8px}
+@page{size:A4 portrait;margin:6mm}.pg{width:198mm;margin:0 auto}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+.g td{border:1px solid #000;padding:1px 3px 2px;vertical-align:top;overflow:hidden}
+.l{display:block;font-size:6.2px;text-transform:uppercase;line-height:1.15}
+.v{display:block;font-size:10px;font-weight:bold;line-height:1.2;min-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .v,.r{text-align:right}.c,.c .v{text-align:center}
+.sec{font-weight:bold;font-size:8.5px;margin:5px 0 1px;text-transform:uppercase}
+.corte{border-top:1px dashed #000;margin:5px 0}
+.dupx{display:inline-table;width:auto;margin:0 3px 0 0;border:1px solid #000}.dupx td{border:0;padding:0 3px;font-size:7px}
+.prod th{border:1px solid #000;font-size:6.2px;font-weight:normal;padding:1px;text-transform:uppercase;vertical-align:middle;text-align:center}
+.prod td{border-left:1px solid #000;border-right:1px solid #000;font-size:7px;padding:2px;vertical-align:top;text-align:right}
+.prod td.t{text-align:left;white-space:normal}.prod td.m{text-align:center}.prod tbody tr.it td{border-bottom:1px dashed #999}
+.prod tbody{border-bottom:1px solid #000}thead{display:table-header-group}tr{page-break-inside:avoid}
+.aviso{text-align:center;font-weight:bold;font-size:11px;border:1px solid #000;padding:3px;margin:0 0 4px}
+.rod{display:flex;justify-content:space-between;font-style:italic;font-size:7px;margin-top:2px}`;
+function danfeOficialHtml(D, extra){
+  const F = (l, v, o = {}) => `<td ${o.span ? `colspan="${o.span}"` : ''} class="${o.cls || ''}" ${o.w ? `style="width:${o.w}"` : ''}><span class="l">${l}</span><span class="v" ${o.fs ? `style="font-size:${o.fs}"` : ''}>${esc(v ?? '') || '&nbsp;'}</span></td>`;
+  const t = D.tot || {}, tr = D.transp || {}, nf = numNF(D.numero), sr = String(D.serie || '').padStart(3, '0');
+  const chaveF = D.chave ? fmtChave(D.chave) : '', e = D.emit, d = D.dest, nItens = (D.itens || []).length;
+  const tituloDoc = D.chave ? 'Documento Auxiliar da Nota<br>Fiscal Eletrônica' : 'Documento de controle<br>interno de compra';
+  const valor = (k, l) => F(l, nDanfe(t[k]), { cls:'r' });
+  return `<div class="pg">
+  ${extra ? `<div class="aviso">${esc(extra)}</div>` : ''}
+  <table class="g"><tr><td colspan="2" style="width:80%"><span style="font-size:7px">RECEBEMOS DE ${esc(e.nome || '')} OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ${D.chave ? 'ELETRÔNICA ' : ''}INDICADA ABAIXO.
+    EMISSÃO: ${dataBR(D.dhEmi)} VALOR TOTAL: R$ ${nDanfe(t.vNF)} DESTINATÁRIO: ${esc(d.nome || '')} - ${esc(d.end || '')} ${esc(d.bairro || '')} ${esc(d.mun || '')}-${esc(d.uf || '')}</span></td>
+    <td rowspan="2" class="c" style="vertical-align:middle"><div style="font-size:14px;font-weight:bold">${D.modelo === '65' ? 'NFC-e' : D.chave ? 'NF-e' : 'NOTA'}</div><div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div></td></tr>
+    <tr>${F('Data de recebimento', '', { w:'20%' })}${F('Identificação e assinatura do recebedor', '')}</tr></table>
+  <div class="corte"></div>
+  <table class="g"><tr>
+    <td rowspan="3" style="width:38%;text-align:center;vertical-align:middle"><span class="l" style="font-style:italic">Identificação do emitente</span>
+      <div style="font-size:11px;font-weight:bold;margin:4px 0 3px">${esc(e.nome || '')}</div><div style="font-size:7.5px">${esc(e.l1 || '')}<br>${esc(e.l2 || '')}<br>${esc(e.l3 || '')}</div></td>
+    <td rowspan="3" class="c" style="width:17%;vertical-align:middle"><div style="font-size:15px;font-weight:bold">DANFE</div><div style="font-size:7.5px">${tituloDoc}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:4px 0;font-size:7.5px;text-align:left"><span>0 - ENTRADA<br>1 - SAÍDA</span><b style="border:1px solid #000;padding:1px 5px;font-size:11px">${esc(D.tpNF)}</b></div>
+      <div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div><div style="font-style:italic;font-size:7.5px">Folha 1/1</div></td>
+    <td style="height:15mm;padding:2px 6px">${D.chave ? barras128C(D.chave) : '<div class="c" style="padding-top:4mm;font-size:9px">Lançamento manual — sem código de barras</div>'}</td></tr>
+    <tr>${F('Chave de acesso', chaveF || '—', { cls:'c', fs:'9px' })}</tr>
+    <tr><td class="c" style="font-size:8.5px;vertical-align:middle">${D.chave ? 'Consulta de autenticidade no portal nacional da NF-e<br>www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora' : 'Documento gerado a partir do lançamento manual da compra'}</td></tr></table>
+  <table class="g"><tr>${F('Natureza da operação', D.natOp, { w:'55%' })}${F('Protocolo de autorização de uso', D.protocolo || (D.manual ? 'Lançamento manual' : ''), { cls:'c' })}</tr></table>
+  <table class="g"><tr>${F('Inscrição estadual', e.ie)}${F('Inscrição municipal', e.im)}${F('Inscrição estadual do subst. tribut.', e.iest)}${F('CNPJ / CPF', fmtDoc(e.doc || ''), { cls:'r' })}</tr></table>
+  <div class="sec">Destinatário / Remetente</div>
+  <table class="g"><tr>${F('Nome / razão social', d.nome, { span:3 })}${F('CNPJ / CPF', fmtDoc(d.doc || ''), { span:2, cls:'r' })}${F('Data da emissão', dataBR(D.dhEmi), { w:'15%', cls:'r' })}</tr>
+    <tr>${F('Endereço', d.end, { span:2, w:'44%' })}${F('Bairro / distrito', d.bairro, { span:2 })}${F('CEP', fmtCep(d.cep || ''), { cls:'r' })}${F('Data da saída/entrada', dataBR(D.dhSaiEnt), { cls:'r' })}</tr>
+    <tr>${F('Município', d.mun, { span:2 })}${F('UF', d.uf, { w:'5%' })}${F('Fone / fax', d.fone, { cls:'r' })}${F('Inscrição estadual', d.ie, { cls:'r' })}${F('Hora da saída/entrada', String(D.dhSaiEnt || '').slice(11, 19), { cls:'r' })}</tr></table>
+  ${(D.dup || []).length ? `<div class="sec">Fatura / Duplicata</div><div>${D.dup.map(x => `<table class="dupx"><tr><td>Num.</td><td class="r"><b>${esc(x.n)}</b></td></tr><tr><td>Venc.</td><td class="r"><b>${dataBR(x.venc)}</b></td></tr><tr><td>Valor</td><td class="r"><b>R$ ${nDanfe(x.valor)}</b></td></tr></table>`).join('')}</div>` : ''}
+  <div class="sec">Cálculo do imposto</div>
+  <table class="g"><tr>${valor('vBC','Base de cálc. do ICMS')}${valor('vICMS','Valor do ICMS')}${valor('vBCST','Base de cálc. ICMS S.T.')}${valor('vST','Valor do ICMS subst.')}${valor('vII','V. imp. importação')}${valor('vICMSUFRemet','V. ICMS UF remet.')}${valor('vFCPUFDest','V. FCP UF dest.')}${valor('vPIS','Valor do PIS')}${valor('vProd','V. total produtos')}</tr>
+    <tr>${valor('vFrete','Valor do frete')}${valor('vSeg','Valor do seguro')}${valor('vDesc','Desconto')}${valor('vOutro','Outras despesas')}${valor('vIPI','Valor total IPI')}${valor('vICMSUFDest','V. ICMS UF dest.')}${valor('vTotTrib','V. tot. trib.')}${valor('vCOFINS','Valor da COFINS')}${valor('vNF','V. total da nota')}</tr></table>
+  <div class="sec">Transportador / Volumes transportados</div>
+  <table class="g"><tr>${F('Nome / razão social', tr.nome, { w:'30%' })}${F('Frete', MOD_FRETE[tr.mod] || tr.mod, { w:'17%' })}${F('Código ANTT', tr.antt)}${F('Placa do veículo', tr.placa)}${F('UF', tr.ufPlaca, { w:'5%' })}${F('CNPJ / CPF', fmtDoc(tr.doc || ''), { w:'18%' })}</tr></table>
+  <table class="g"><tr>${F('Endereço', tr.end, { w:'47%' })}${F('Município', tr.mun)}${F('UF', tr.uf, { w:'5%' })}${F('Inscrição estadual', tr.ie, { w:'18%' })}</tr></table>
+  <table class="g"><tr>${F('Quantidade', tr.qVol)}${F('Espécie', tr.esp)}${F('Marca', tr.marca)}${F('Numeração', tr.nVol)}${F('Peso bruto', tr.pesoB ? nDanfe(tr.pesoB, 3) : '', { cls:'r' })}${F('Peso líquido', tr.pesoL ? nDanfe(tr.pesoL, 3) : '', { cls:'r' })}</tr></table>
+  <div class="sec">Dados dos produtos / serviços</div>
+  <table class="prod"><colgroup>${[14,50,13,8,8,7,14,14,15,11,12,11,9,7,5].map(w => `<col style="width:${w}mm">`).join('')}</colgroup>
+    <thead><tr><th>Código produto</th><th>Descrição do produto / serviço</th><th>NCM/SH</th><th>O/CST</th><th>CFOP</th><th>UN</th><th>Quant</th><th>Valor unit</th><th>Valor total</th><th>Valor desc</th><th>B.cálc ICMS</th><th>Valor ICMS</th><th>Valor IPI</th><th>Alíq. ICMS</th><th>Alíq. IPI</th></tr></thead>
+    <tbody>${(D.itens || []).map(i => `<tr class="it"><td class="m">${esc(i.cProd || '')}</td><td class="t">${esc(i.xProd || '')}${i.info ? `<br>${esc(i.info)}` : ''}</td><td class="m">${esc(i.ncm || '')}</td><td class="m">${esc(i.cst || '')}</td><td class="m">${esc(i.cfop || '')}</td><td class="m">${esc(i.un || '')}</td>
+      <td>${nDanfe(i.q, 4)}</td><td>${nDanfe(i.vun, 4)}</td><td>${nDanfe(i.vtot)}</td><td>${nDanfe(i.vdesc)}</td><td>${nDanfe(i.vbc)}</td><td>${nDanfe(i.vicms)}</td><td>${nDanfe(i.vipi)}</td><td>${nDanfe(i.picms)}</td><td>${nDanfe(i.pipi)}</td></tr>`).join('')}
+    ${nItens < 14 ? `<tr>${`<td style="height:${((14 - nItens) * 6.2).toFixed(1)}mm"></td>`.repeat(15)}</tr>` : ''}</tbody></table>
+  <div class="sec">Dados adicionais</div>
+  <table class="g"><tr><td style="width:65%;height:28mm"><span class="l"><b>Informações complementares</b></span><div style="font-size:8px;white-space:pre-wrap">${esc(D.infCpl || '')}</div></td>
+    <td><span class="l"><b>Reservado ao fisco</b></span><div style="font-size:8px">${esc(D.fisco || '')}</div></td></tr></table>
+  <div class="rod"><span>Impresso em ${dataBR(isoNow())} às ${isoNow().slice(11, 19)}</span><span>Emissor Fiscal</span></div></div>`;
+}
+function imprimirDoc(titulo, css, corpo){
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+  const d = f.contentDocument;
+  d.open(); d.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${css}</style></head><body>${corpo}</body></html>`); d.close();
+  setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch(_){ toast('Não foi possível abrir a impressão.'); } setTimeout(() => f.remove(), 60000); }, 300);
+}
+async function xmlDaCompra(c){
+  if (!c || !c.tem_xml) return null;
+  const s = await db.collection(colOf('compras_xml')).doc(c.xml_id || c.id).get();
+  return s.exists ? s.data() : null;
+}
+async function gerarDanfeCompra(id, btn){
+  const c = S.compras.find(x => x.id === id); if (!c) return;
+  if (btn) btn.disabled = true;
+  try {
+    let D = null; const x = await xmlDaCompra(c).catch(() => null);
+    if (x && x.xml){ try { D = danfeDeXml(x.xml); } catch(_){ D = null; } }
+    if (!D) D = danfeDeCompra(c);
+    const nome = `DANFE ${D.numero || ''} - ${(D.emit.nome || '').slice(0, 40)}`.replace(/[\\/:*?"<>|]/g, ' ');
+    imprimirDoc(nome, DANFE_CSS, danfeOficialHtml(D, c.status === 'estornada' ? 'COMPRA ESTORNADA NO ESTOQUE' : ''));
+  } finally { if (btn) btn.disabled = false; }
 }
 
 /* ---------- aba Estoque: saldo e inventário ---------- */
@@ -2332,7 +2469,7 @@ async function acoesEstoque(a, t, id){
     case 'cpView': S.cpView = t.dataset.v; render(); return true;
     case 'estFiltro': S.estFiltro = t.dataset.f; render(); return true;
     case 'verCompra': verCompra(id); return true;
-    case 'imprimirCompra': { const c = S.compras.find(x => x.id === id); imprimirHtml(`Compra ${c.numero || ''} - ${c.fornecedor_nome || ''}`, danfeCompraHtml(c)); return true; }
+    case 'imprimirCompra': await gerarDanfeCompra(id, t); return true;
     case 'baixarXmlCompra': baixarXmlCompra(id); return true;
     case 'corrigirCompra': formCorrigir(id); return true;
     case 'confCorrigir': t.disabled = true; await confCorrigir(id); return true;
