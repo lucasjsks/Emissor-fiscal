@@ -219,6 +219,11 @@ nav .nav-brand,nav .nav-sec{display:none}
   main>*{max-width:1120px;margin-left:auto;margin-right:auto}
   .toast{bottom:28px;left:calc(50% + var(--side) / 2)}
 }
+#suporte{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:15;display:flex;align-items:center;gap:8px;background:#25d366;color:#fff;border-radius:99px;padding:12px;box-shadow:0 8px 20px -6px rgba(37,211,102,.55),0 2px 6px rgba(16,24,40,.15);text-decoration:none;font-weight:700;font-size:14px;transition:transform .15s}
+#suporte:hover{transform:translateY(-2px);text-decoration:none}#suporte svg{width:28px;height:28px}#suporte span{display:none}
+@media(min-width:1000px){#suporte{bottom:24px;right:24px;padding:11px 18px 11px 13px}#suporte span{display:inline}}
+.btn.whats{background:#25d366;border-color:#1fb457;color:#fff;text-decoration:none}.btn.whats:hover{background:#1fb457;text-decoration:none}.btn.whats svg{width:20px;height:20px}
+@media print{#suporte{display:none}}
 </style>
 </head>
 <body>
@@ -695,7 +700,7 @@ function renderHeader(){
 /* ================== render principal ================== */
 function render(){
   const ae = document.activeElement, aid = ae && ae.id, sel = ae && ae.selectionStart, val = ae && ae.value;
-  renderNav(); renderHeader();
+  renderNav(); renderHeader(); botaoSuporte();
   const m = $('#main');
   const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
   $('#nav').style.display = fora ? 'none' : ''; $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
@@ -1922,6 +1927,7 @@ function verNota(n){
   openModal(`${mhead(tit)}${statusMsg(n)}
   ${erros.length ? erros.map(x => `<div class="v erro">${esc(x.mensagem || JSON.stringify(x))}</div>`).join('') : ''}
   ${(n.devolucoes || []).length ? `<div class="msg warn">Devolvida: ${n.devolucoes.map(d => `NF-e nº ${d.numero} (${brl(d.total)})`).join(', ')}</div>` : ''}
+  ${notaProblema(n) ? `<a class="btn whats" href="${esc(linkSuporte(resumoNotaSuporte(n)))}" target="_blank" rel="noopener" style="width:100%;margin-top:8px">${WHATS_SVG} Pedir ajuda ao suporte sobre esta nota</a>` : ''}
   <div class="actions">
     ${['processando','erro_envio'].includes(n.status) ? btn('consultarNota', 'Consultar situação', 'pri') : ''}
     ${linksFocus(n)}
@@ -2892,6 +2898,33 @@ function vInicio(){
     <div class="card"><h3 style="margin-top:0">Mais vendidos do mês</h3>${top.length ? `<div class="list">${top.map((p, k) => `<div class="it" style="padding:7px 0"><b style="width:18px;color:var(--muted)">${k + 1}</b><div class="grow"><div class="t">${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u || 'UN')}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>`
       : '<div class="empty" style="padding:14px">Ainda sem vendas neste mês.</div>'}</div>
   </div></div>`;
+}
+
+/* ================== SUPORTE (WhatsApp) ================== */
+const SUPORTE_WHATS = '5586981931921'; // (86) 98193-1921
+const WHATS_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M16 3C8.8 3 3 8.7 3 15.8c0 2.5.7 4.9 2.1 7L3 29l6.4-2c2 1.1 4.3 1.7 6.6 1.7 7.2 0 13-5.7 13-12.8S23.2 3 16 3zm0 23.4c-2.1 0-4.1-.6-5.9-1.7l-.4-.3-3.8 1.2 1.2-3.7-.3-.4c-1.2-1.8-1.9-3.9-1.9-6 0-5.9 4.9-10.7 11-10.7s11 4.8 11 10.7-4.9 10.9-10.9 10.9zm6-8c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.2-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.7s1.2 3.1 1.4 3.4c.2.2 2.3 3.5 5.6 4.9.8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg>';
+function linkSuporte(extra){
+  const e = emp(), tb = TABS.find(([k]) => k === S.tab);
+  const linhas = ['Olá! Preciso de suporte no Emissor Fiscal.'];
+  if (e) linhas.push(`Empresa: ${e.fantasia || e.razao} (CNPJ ${fmtDoc(e.cnpj)})`);
+  if (S.meuEmail) linhas.push(`Usuário: ${S.meuEmail}`);
+  if (S.logado && tb) linhas.push(`Tela: ${tb[1]}`);
+  if (extra) linhas.push(extra);
+  linhas.push('', 'Minha dúvida: ');
+  return `https://wa.me/${SUPORTE_WHATS}?text=${encodeURIComponent(linhas.join('\n'))}`;
+}
+// resumo de uma nota com problema, para o suporte já saber do que se trata
+function resumoNotaSuporte(n){
+  const f = n.focus || {}, erros = (Array.isArray(f.erros) ? f.erros : []).map(x => x.mensagem).filter(Boolean);
+  const nome = n.modelo === '65' ? 'Cupom' : 'NF-e';
+  return `${nome} nº ${n.numero} série ${n.serie} · situação: ${n.status}${f.mensagem_sefaz ? ` · SEFAZ: ${f.status_sefaz ? f.status_sefaz + ' - ' : ''}${f.mensagem_sefaz}` : f.mensagem ? ' · ' + f.mensagem : ''}${erros.length ? ' · ' + erros.join('; ') : ''}`;
+}
+function botaoSuporte(){
+  let b = $('#suporte');
+  if (!b){ b = document.createElement('a'); b.id = 'suporte'; b.target = '_blank'; b.rel = 'noopener'; b.setAttribute('aria-label', 'Falar com o suporte no WhatsApp');
+    b.innerHTML = WHATS_SVG + '<span>Suporte</span>'; document.body.appendChild(b);
+    b.addEventListener('click', () => { b.href = linkSuporte(); }); }
+  b.href = linkSuporte(); b.style.display = S.carregando ? 'none' : '';
 }
 
 /* ================== eventos ================== */
