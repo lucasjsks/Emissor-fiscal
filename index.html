@@ -570,7 +570,7 @@ const ICON = {
   estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
   compras:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2h11.8L22 7H6.2"/>'
 };
-const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['estoque','Estoque'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
+const TABS = [['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
 function renderNav(){
   $('#nav').innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${l}</button>`).join('');
 }
@@ -595,7 +595,7 @@ function render(){
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
-  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vEstoque, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
+  } else m.innerHTML = ({ venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -751,25 +751,34 @@ function vNotas(){
 
 /* ---------- Produtos / Clientes / Empresa ---------- */
 function vProdutos(){
-  if (S.prodView === 'perfis') return vPerfis();
-  const e = emp(), V = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')).map(p => ({ p, v:validarProduto(p, e) }));
-  const nErr = V.filter(x => temErro(x.v)).length, nAv = V.filter(x => !temErro(x.v) && temAviso(x.v)).length, f = S.filtroProd;
-  const lista = V.filter(x => f === 'todos' || (f === 'erro' && temErro(x.v)) || (f === 'aviso' && !temErro(x.v) && temAviso(x.v)));
+  if (S.prodView === 'perfis') return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos e estoque</h2></div>${segProd()}${vPerfis()}`;
+  const e = emp(), P = S.produtos, V = [...P].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')).map(p => ({ p, v:validarProduto(p, e) }));
+  const nErr = V.filter(x => temErro(x.v)).length, nAv = V.filter(x => !temErro(x.v) && temAviso(x.v)).length, f = S.filtroProd, q = norm(S.estBusca || '');
+  const baixo = p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min), neg = p => temSaldo(p) && p.estoque < 0;
+  const valor = r2(P.filter(temSaldo).reduce((a, p) => a + Math.max(p.estoque, 0) * num(p.custo_medio || p.custo || 0), 0));
+  const filtros = { todos:() => true, baixo:x => baixo(x.p), neg:x => neg(x.p), sem:x => !temSaldo(x.p), fav:x => !!x.p.favorito, erro:x => temErro(x.v), aviso:x => !temErro(x.v) && temAviso(x.v) };
+  const lista = V.filter(filtros[f] || filtros.todos).filter(({ p }) => !q || norm(p.descricao).includes(q) || (p.gtin || '') === S.estBusca.trim() || norm(p.codigo || '') === q);
   const tag = v => { const ne = v.filter(x => x.n === 'erro').length, na = v.filter(x => x.n === 'aviso').length;
-    return ne ? `<span class="tag b">✕ ${ne}</span>` : na ? `<span class="tag w">⚠ ${na}</span>` : '<span class="tag">✓ ok</span>'; };
+    return ne ? `<span class="tag b">✕ ${ne} fiscal</span>` : na ? `<span class="tag w">⚠ ${na} fiscal</span>` : ''; };
+  const cor = p => !temSaldo(p) ? 'var(--muted)' : p.estoque < 0 ? 'var(--bad)' : baixo(p) ? 'var(--warn)' : 'var(--ink)';
   const m = S.ncmMeta || {};
-  return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos</h2>${pode('produto') ? '<button class="btn pri" data-act="novoProd" style="flex:0 0 auto">+ Produto</button>' : ''}</div>
+  const chips = [['todos','Todos', V.length], ['baixo','Estoque baixo', P.filter(baixo).length], ['neg','Negativos', P.filter(neg).length], ['sem','Sem entrada', P.filter(p => !temSaldo(p)).length],
+    ['fav','Atalhos do cupom', P.filter(p => p.favorito).length], ['erro','Erro fiscal', nErr], ['aviso','Aviso fiscal', nAv]];
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos e estoque</h2>${pode('produto') ? '<button class="btn pri" data-act="novoProd" style="flex:0 0 auto">+ Produto</button>' : ''}</div>
   ${segProd()}
-  <div class="card"><h3 style="margin-top:0">Conferência fiscal</h3>
-    <div class="stats"><div><b>${V.length}</b>produtos</div><div><b style="color:var(--bad)">${nErr}</b>com erro</div><div><b style="color:var(--warn)">${nAv}</b>com aviso</div></div>
+  <div class="stats"><div><b>${V.length}</b>produtos</div><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${P.filter(baixo).length}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${nErr}</b>com erro fiscal</div></div>
+  <div class="card"><input id="estBusca" placeholder="Buscar por nome, código ou código de barras…" value="${esc(S.estBusca || '')}" autocomplete="off">
+    <div class="seg" style="margin-top:8px">${chips.filter(([k, , n]) => k === 'todos' || n || f === k).map(([k, l, n]) => `<button data-act="filtroProd" data-f="${k}" class="${f === k ? 'on' : ''}">${l}${k !== 'todos' ? ` (${n})` : ''}</button>`).join('')}</div></div>
+  <div class="card">${lista.length ? `<div class="list">${lista.map(({ p, v }) => `<div class="it" data-act="editProd" data-id="${esc(p.id)}" style="cursor:pointer"><div class="grow"><div class="t">${p.favorito ? '★ ' : ''}${esc(p.descricao)}</div>
+    <div class="s">${p.codigo ? 'cód. ' + esc(p.codigo) + ' · ' : ''}NCM ${fmtNcm(p.ncm)}${temSaldo(p) ? ` · custo médio ${brl(p.custo_medio || 0)}` : ''}${num(p.estoque_min) > 0 ? ' · mín. ' + qtdTxt(p.estoque_min) : ''} ${tag(v)}</div></div>
+    <div style="text-align:right;min-width:92px"><b class="num">${brl(p.preco)}</b><br><span class="num" style="color:${cor(p)};font-weight:600">${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</span> <span class="small">${esc(p.unidade || 'UN')}</span></div></div>`).join('')}</div>`
+    : `<div class="empty">${V.length ? 'Nenhum produto neste filtro.' : 'Nenhum produto cadastrado. Cadastre aqui ou importe uma nota de compra na aba Compras.'}</div>`}</div>
+  <p class="small">Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.</p>
+  <details class="card"><summary style="cursor:pointer;font-weight:600">Tabela NCM e conferência fiscal</summary>
     <p class="small">${S.ncmMap ? `Tabela NCM carregada: ${(m.total || ncmFull().length).toLocaleString('pt-BR')} códigos${m.data ? ' · atualização ' + esc(m.data) : ''}.` : 'Tabela NCM ainda não importada. Por enquanto valem as regras de formato, capítulo, descrição, ST × CEST, monofásico e IBS/CBS.'}</p>
     ${pode('ncm') ? `<button class="btn" data-act="importarNcm">${S.ncmMap ? 'Atualizar tabela NCM' : 'Importar tabela NCM oficial'}</button>` : ''}
     ${S.ncmMap ? `<label for="ncmBusca">Consultar NCM por código ou descrição</label><input id="ncmBusca" autocomplete="off" placeholder="Ex.: 1006 ou arroz parboilizado" value="${esc(S.ncmQ)}"><div class="results" id="ncmRes">${ncmBuscaHtml(S.ncmQ)}</div>` : ''}
-  </div>
-  <div class="seg" style="margin-bottom:10px">${[['todos','Todos'],['erro','Com erro'],['aviso','Com aviso']].map(([k, l]) => `<button data-act="filtroProd" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <div class="card">${lista.length ? `<div class="list">${lista.map(({ p, v }) => `<div class="it" data-act="editProd" data-id="${esc(p.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(p.descricao)}</div>
-    <div class="s">NCM ${fmtNcm(p.ncm)} · CFOP ${esc(p.cfop)} · ${esc(p.cst_csosn)}${p.codigo ? ' · cód. ' + esc(p.codigo) : ''}${p.perfil_id && S.perfis.find(f => f.id === p.perfil_id) ? ' · ' + esc(S.perfis.find(f => f.id === p.perfil_id).nome) : ''}</div></div><div style="text-align:right"><b class="num">${brl(p.preco)}</b><br>${tag(v)}</div></div>`).join('')}</div>`
-    : `<div class="empty">${V.length ? 'Nenhum produto neste filtro. 🎉' : 'Nenhum produto cadastrado.'}</div>`}</div>`;
+  </details>`;
 }
 function vClientes(){
   const cs = [...S.clientes].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
@@ -866,7 +875,8 @@ function formProduto(p){
   <h3>Estoque</h3>
   <div class="row"><div><label>Saldo atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b>${p.custo_medio ? ` · custo médio ${brl(p.custo_medio)}` : ''}</div></div>
     ${fld('pEstMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}</div>
-  <p class="small">O saldo muda só por compras, vendas e ajustes de inventário (aba Estoque).</p>
+  <p class="small">O saldo muda só por compras, vendas e ajustes de inventário.</p>
+  ${p.id ? `<button class="btn" data-act="verEstoque" data-id="${esc(p.id)}">📦 Histórico e inventário</button>` : ''}
   <h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>
   <div id="errM"></div>
   <div class="actions">${p.id ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
@@ -2397,28 +2407,7 @@ async function gerarDanfeCompra(id, btn){
   } finally { if (btn) btn.disabled = false; }
 }
 
-/* ---------- aba Estoque: saldo e inventário ---------- */
-function vEstoque(){
-  const P = S.produtos;
-  const valor = r2(P.filter(temSaldo).reduce((a, p) => a + Math.max(p.estoque, 0) * num(p.custo_medio || p.custo || 0), 0));
-  const baixo = P.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min)).length, neg = P.filter(p => temSaldo(p) && p.estoque < 0).length;
-  return `<h2>Estoque</h2><div class="stats"><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${baixo}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${neg}</b>com saldo negativo</div></div>
-    <p class="small">As entradas vêm da aba <b>Compras</b>; as saídas, das vendas. Toque num produto para ver o histórico ou fazer inventário.</p>${vSaldo()}`;
-}
-function vSaldo(){
-  const f = S.estFiltro || 'todos', q = norm(S.estBusca || '');
-  let L = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || ''));
-  if (q) L = L.filter(p => norm(p.descricao).includes(q) || (p.gtin || '') === q || (p.codigo || '') === q);
-  if (f === 'baixo') L = L.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min));
-  if (f === 'neg') L = L.filter(p => temSaldo(p) && p.estoque < 0);
-  if (f === 'sem') L = L.filter(p => !temSaldo(p));
-  const cor = p => !temSaldo(p) ? 'var(--muted)' : p.estoque < 0 ? 'var(--bad)' : num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min) ? 'var(--warn)' : 'var(--ink)';
-  return `<div class="card"><input id="estBusca" placeholder="Buscar produto…" value="${esc(S.estBusca || '')}" autocomplete="off">
-    <div class="seg" style="margin-top:8px">${[['todos','Todos'],['baixo','Abaixo do mínimo'],['neg','Negativos'],['sem','Sem entrada ainda']].map(([k, l]) => `<button data-act="estFiltro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
-    <div class="card">${L.length ? `<div class="list">${L.map(p => `<div class="it" data-act="verEstoque" data-id="${esc(p.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(p.descricao)}</div>
-      <div class="s">${temSaldo(p) ? `custo médio ${brl(p.custo_medio || 0)}${num(p.estoque_min) > 0 ? ' · mínimo ' + qtdTxt(num(p.estoque_min)) : ''}` : 'ainda sem entrada no estoque'}</div></div>
-      <div style="text-align:right"><b class="num" style="color:${cor(p)}">${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</b> <span class="small">${esc(p.unidade || 'UN')}</span></div></div>`).join('')}</div>` : '<div class="empty">Nenhum produto neste filtro.</div>'}</div>`;
-}
+/* ---------- ficha de estoque do produto (inventário e movimentações) ---------- */
 const TIPO_MOV = { compra:'Compra', venda:'Venda', cancelamento:'Cancelamento de venda', devolucao_venda:'Devolução de cliente', devolucao_compra:'Devolução ao fornecedor', ajuste:'Ajuste (inventário)', estorno_compra:'Estorno de compra' };
 async function verEstoque(id){
   const p = S.produtos.find(x => x.id === id); if (!p) return;
@@ -2428,7 +2417,8 @@ async function verEstoque(id){
   <h3>Ajuste de inventário</h3><p class="small">Contou o produto na prateleira? Informe a quantidade real; o sistema registra a diferença.</p>
   <div class="row">${fld('ajSaldo','Quantidade contada', '', 'inputmode="decimal"')}${fld('ajMot','Motivo', 'Inventário')}</div>
   <div id="errM"></div><div class="actions"><button class="btn pri" data-act="salvarAjuste" data-id="${esc(id)}">Ajustar saldo</button></div>` : ''}
-  <h3>Movimentações recentes</h3><div id="movList" class="small">Carregando…</div>`);
+  <h3>Movimentações recentes</h3><div id="movList" class="small">Carregando…</div>
+  <div class="actions"><button class="btn" data-act="editProd" data-id="${esc(id)}">← Voltar ao cadastro</button></div>`);
   const { data, error } = await SB.from('docs').select('data').eq('col', `empresas/${S.empId}/movimentos`).eq('data->>produto_id', id).order('atualizado_em', { ascending:false }).limit(40);
   const el = $('#movList'); if (!el) return;
   if (error){ el.textContent = 'Não foi possível carregar as movimentações.'; return; }
@@ -2475,8 +2465,7 @@ async function salvarFornecedor(id){
 async function acoesEstoque(a, t, id){
   switch (a){
     case 'cpView': S.cpView = t.dataset.v; render(); return true;
-    case 'estFiltro': S.estFiltro = t.dataset.f; render(); return true;
-    case 'verCompra': verCompra(id); return true;
+        case 'verCompra': verCompra(id); return true;
     case 'imprimirCompra': await gerarDanfeCompra(id, t); return true;
     case 'baixarXmlCompra': baixarXmlCompra(id); return true;
     case 'corrigirCompra': formCorrigir(id); return true;
