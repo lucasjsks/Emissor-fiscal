@@ -202,6 +202,8 @@ a{color:var(--brand);font-weight:600;text-decoration:none}a:hover{text-decoratio
 .login-tit b,nav .nav-brand b{font-weight:800;background:linear-gradient(90deg,#1592d6,#2bb3e8);-webkit-background-clip:text;background-clip:text;color:transparent}
 .login-tit{font-size:30px}.login-sub{color:#1a86c9;font-size:14px;font-weight:500;letter-spacing:.01em}
 nav .nav-brand img{width:38px;height:38px;display:block}
+body.fora header{display:none}
+@media(min-width:1000px){body.fora main,body.fora .amb{margin-left:0}}
 /* navegação: barra inferior no celular */
 nav{background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 nav button{border-radius:12px;padding:6px 2px 6px;gap:2px;font-weight:550;transition:color .15s}
@@ -710,7 +712,7 @@ function render(){
   renderNav(); renderHeader(); botaoSuporte();
   const m = $('#main');
   const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
-  $('#nav').style.display = fora ? 'none' : ''; $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
+  $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' ? '' : 'none';
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
   else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
