@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Emissor Fiscal</title>
+<title>NotaOne — Emissão Inteligente</title>
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -187,7 +189,7 @@ details>summary::before{content:"›";display:inline-block;margin-right:8px;tran
 .mhead h2{font-size:20px}
 .x{width:34px;height:34px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}.x:hover{background:var(--bg)}
 .toast{background:#101828;box-shadow:var(--shadow-lg);padding:11px 18px;bottom:92px}
-header h1::before{min-width:32px;background-size:18px 18px,100% 100%;background-position:center,center;background-repeat:no-repeat}
+header h1::before{background:url(img/logo.png) center/contain no-repeat;box-shadow:none;border-radius:0;min-width:36px;height:36px}
 @media(max-width:999px){header h1{flex:0 0 auto;font-size:0;gap:0}header select{flex:1;max-width:none;min-width:0}}
 a{color:var(--brand);font-weight:600;text-decoration:none}a:hover{text-decoration:underline}
 .login-hero{text-align:center;margin:36px auto 18px}
@@ -195,6 +197,11 @@ a{color:var(--brand);font-weight:600;text-decoration:none}a:hover{text-decoratio
 .login-logo svg{width:32px;height:32px;stroke:#fff;fill:none;stroke-width:2}
 .login-tit{font-size:24px;font-weight:750;letter-spacing:-.03em}
 .login-card{max-width:420px;margin:0 auto;padding:24px}
+.login-logo{width:96px;height:96px;display:block;margin:0 auto 10px;background:none;box-shadow:none;border-radius:0}
+.login-tit,nav .nav-brand span{font-weight:800;letter-spacing:-.03em;background:linear-gradient(90deg,#0b4fa3,#1592d6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.login-tit b,nav .nav-brand b{font-weight:800;background:linear-gradient(90deg,#1592d6,#2bb3e8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.login-tit{font-size:30px}.login-sub{color:#1a86c9;font-size:14px;font-weight:500;letter-spacing:.01em}
+nav .nav-brand img{width:38px;height:38px;display:block}
 /* navegação: barra inferior no celular */
 nav{background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 nav button{border-radius:12px;padding:6px 2px 6px;gap:2px;font-weight:550;transition:color .15s}
@@ -204,7 +211,7 @@ nav .nav-brand,nav .nav-sec{display:none}
 /* navegação: menu lateral no computador */
 @media(min-width:1000px){
   nav{top:0;bottom:0;left:0;right:auto;width:var(--side);flex-direction:column;justify-content:flex-start;align-items:stretch;gap:2px;padding:16px 12px;border-top:0;border-right:1px solid var(--line);background:#fff;overflow-y:auto;z-index:7}
-  nav .nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16.5px;letter-spacing:-.02em;padding:4px 10px 18px;color:var(--ink)}
+  nav .nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:-.02em;padding:4px 10px 18px;color:var(--ink)}
   nav .nav-brand i{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#14a073,#0a6047);box-shadow:0 2px 6px rgba(14,122,90,.35);display:flex;align-items:center;justify-content:center}
   nav .nav-brand svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.2;padding:0}
   nav .nav-sec{display:block;font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:#98a2b3;padding:14px 12px 6px}
@@ -228,7 +235,7 @@ nav .nav-brand,nav .nav-sec{display:none}
 </head>
 <body>
 <header>
-  <h1 id="hTitle">Emissor Fiscal</h1>
+  <h1 id="hTitle">NotaOne</h1>
   <select id="empSel" aria-label="Empresa"></select>
   <span class="badge" id="badge">…</span>
   <button class="sair" id="btnSair" data-act="pedirSair" title="Sair da conta" aria-label="Sair da conta" style="display:none"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/></svg><span>Sair</span></button>
@@ -685,12 +692,12 @@ const ICON = {
 const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
 const NAV_SEC = { venda:'Vendas', compras:'Gestão', empresa:'Configuração' };
 function renderNav(){
-  $('#nav').innerHTML = `<div class="nav-brand"><i><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M10 13l2 2 3-4"/></svg></i>Emissor Fiscal</div>`
+  $('#nav').innerHTML = `<div class="nav-brand"><img src="img/logo.png" alt=""><span>Nota<b>One</b></span></div>`
     + TABS.map(([k, l]) => `${NAV_SEC[k] ? `<div class="nav-sec">${NAV_SEC[k]}</div>` : ''}<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" aria-label="${l}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${l}</span></button>`).join('');
 }
 function renderHeader(){
   const sel = $('#empSel'), tb = TABS.find(([k]) => k === S.tab);
-  $('#hTitle').textContent = S.logado && tb ? tb[1] : 'Emissor Fiscal';
+  $('#hTitle').textContent = S.logado && tb ? tb[1] : 'NotaOne';
   // cada conta tem uma única empresa: sem opção de "nova empresa" depois que ela existe
   sel.innerHTML = S.empresas.length ? S.empresas.map(e => `<option value="${esc(e.id)}" ${e.id === S.empId ? 'selected' : ''}>${esc(e.fantasia || e.razao)}</option>`).join('')
     : '<option value="">Sem empresa</option>';
@@ -1915,8 +1922,8 @@ function vLogin(){
     ${fld('lgNova','Nova senha (mínimo 8 caracteres)', '', 'type="password" autocomplete="new-password"')}<div id="errL"></div>
     <button class="btn pri block" data-act="novaSenha" style="margin-top:10px">Salvar nova senha</button></div>`;
   const m = S.loginModo || 'entrar', tit = { entrar:'Entrar', criar:'Criar conta', esqueci:'Recuperar senha' }[m];
-  return `<div class="login-hero"><div class="login-logo"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M10 13l2 2 3-4"/></svg></div>
-    <div class="login-tit">Emissor Fiscal</div><div class="small">Cupom, NF-e, compras e estoque num lugar só</div></div>
+  return `<div class="login-hero"><img class="login-logo" src="img/logo.png" alt="NotaOne">
+    <div class="login-tit">Nota<b>One</b></div><div class="login-sub">Emissão Inteligente</div></div>
   <div class="card login-card"><h2>${tit}</h2>
     ${fld('lgEmail','E-mail', S.lgEmail || '', 'type="email" autocomplete="email"')}
     ${m !== 'esqueci' ? fld('lgSenha', m === 'criar' ? 'Senha (mínimo 8 caracteres)' : 'Senha', '', `type="password" autocomplete="${m === 'criar' ? 'new-password' : 'current-password'}"`) : ''}
@@ -2388,7 +2395,7 @@ function danfeCompraHtml(c){
   ${c.obs ? `<div class="bx"><div class="lb">Informações complementares</div>${esc(c.obs)}</div>` : ''}
   <div class="bx" style="overflow-x:auto"><div class="lb">Entrada no estoque (controle interno)</div><table><tr><th>Item da nota</th><th>Produto no cadastro</th><th>Conversão</th><th>Qtd. no estoque</th><th>Custo unit.</th></tr>
   ${(c.itens || []).map(i => `<tr><td>${esc(i.xProd || '')}</td><td>${esc(nomeProd(i.produto_id))}</td><td>${num(i.fator) !== 1 ? '1 ' + esc(i.uCom) + ' = ' + qtdTxt(i.fator) : '—'}</td><td>${qtdTxt(i.qtd_estoque)}</td><td>${brl(i.custo_unit)}</td></tr>`).join('')}</table></div>
-  <div class="small" style="margin-top:6px">Documento auxiliar gerado pelo Emissor Fiscal${c.origem === 'xml' ? ' a partir do XML da nota' : ' a partir do lançamento manual'} · lançada em ${fmtData(c.lancado_em)}.</div></div>`;
+  <div class="small" style="margin-top:6px">Documento auxiliar gerado pelo NotaOne${c.origem === 'xml' ? ' a partir do XML da nota' : ' a partir do lançamento manual'} · lançada em ${fmtData(c.lancado_em)}.</div></div>`;
 }
 function verCompra(id){
   const c = S.compras.find(x => x.id === id); if (!c) return;
@@ -2557,7 +2564,7 @@ function danfeOficialHtml(D, extra){
   <div class="sec">Dados adicionais</div>
   <table class="g"><tr><td style="width:65%;height:28mm"><span class="l"><b>Informações complementares</b></span><div style="font-size:8px;white-space:pre-wrap">${esc(D.infCpl || '')}</div></td>
     <td><span class="l"><b>Reservado ao fisco</b></span><div style="font-size:8px">${esc(D.fisco || '')}</div></td></tr></table>
-  <div class="rod"><span>Impresso em ${dataBR(isoNow())} às ${isoNow().slice(11, 19)}</span><span>Emissor Fiscal</span></div></div>`;
+  <div class="rod"><span>Impresso em ${dataBR(isoNow())} às ${isoNow().slice(11, 19)}</span><span>NotaOne</span></div></div>`;
 }
 function imprimirDoc(titulo, css, corpo){
   const f = document.createElement('iframe');
@@ -2958,7 +2965,7 @@ const SUPORTE_WHATS = '5586981931921'; // (86) 98193-1921
 const WHATS_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M16 3C8.8 3 3 8.7 3 15.8c0 2.5.7 4.9 2.1 7L3 29l6.4-2c2 1.1 4.3 1.7 6.6 1.7 7.2 0 13-5.7 13-12.8S23.2 3 16 3zm0 23.4c-2.1 0-4.1-.6-5.9-1.7l-.4-.3-3.8 1.2 1.2-3.7-.3-.4c-1.2-1.8-1.9-3.9-1.9-6 0-5.9 4.9-10.7 11-10.7s11 4.8 11 10.7-4.9 10.9-10.9 10.9zm6-8c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.2-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.7s1.2 3.1 1.4 3.4c.2.2 2.3 3.5 5.6 4.9.8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg>';
 function linkSuporte(extra){
   const e = emp();
-  const linhas = ['Olá! Preciso de suporte no Emissor Fiscal.'];
+  const linhas = ['Olá! Preciso de suporte no NotaOne.'];
   if (e) linhas.push(`Empresa: ${e.fantasia || e.razao} (CNPJ ${fmtDoc(e.cnpj)})`);
   if (extra) linhas.push(extra);
   return `https://wa.me/${SUPORTE_WHATS}?text=${encodeURIComponent(linhas.join('\n'))}`;
