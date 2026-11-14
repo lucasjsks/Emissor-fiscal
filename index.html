@@ -206,6 +206,7 @@ body.fora header{display:none}
 @media(min-width:1000px){body.fora main,body.fora .amb{margin-left:0}}
 .rej{border:1px solid #f4c7c2;background:#fffafa;border-radius:14px;padding:14px 16px;margin:10px 0}.rej-t{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--bad);margin-bottom:3px}
 .msg.ok{background:var(--brand-soft);color:var(--brand-ink);border:1px solid #bfe3d3}
+.amb-card.prod{border:1px solid #bfe3d3;background:linear-gradient(180deg,#f3fbf7,#fff)}
 /* navegação: barra inferior no celular */
 nav{background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 nav button{border-radius:12px;padding:6px 2px 6px;gap:2px;font-weight:550;transition:color .15s}
@@ -701,6 +702,7 @@ function renderNav(){
 }
 function renderHeader(){
   const sel = $('#empSel'), tb = TABS.find(([k]) => k === S.tab);
+  if (emp()) S.ambiente = ambAtual();
   $('#hTitle').textContent = S.logado && tb ? tb[1] : 'NotaOne';
   // cada conta tem uma única empresa: sem opção de "nova empresa" depois que ela existe
   sel.innerHTML = S.empresas.length ? S.empresas.map(e => `<option value="${esc(e.id)}" ${e.id === S.empId ? 'selected' : ''}>${esc(e.fantasia || e.razao)}</option>`).join('')
@@ -925,6 +927,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardAmbiente()}
   ${cardCertificado()}
   ${cardImpressao()}
   ${cardBalanca()}
@@ -955,7 +958,7 @@ function formEmpresa(e){
   <h3>Numeração e NFC-e</h3>
   <div class="row">${fld('eSNfce','Série NFC-e',e.serie_nfce,'inputmode="numeric"')}${fld('ePNfce','Próximo nº NFC-e',e.prox_nfce,'inputmode="numeric"')}</div>
   <div class="row">${fld('eSNfe','Série NF-e',e.serie_nfe,'inputmode="numeric"')}${fld('ePNfe','Próximo nº NF-e',e.prox_nfe,'inputmode="numeric"')}</div>
-  <div class="row">${fld('eCsc','ID do CSC (só o número do ID)',e.csc_id,'inputmode="numeric"')}${sel('eAmb','Ambiente',e.ambiente,[['homologacao','Homologação (testes)']])}</div>
+  <div class="row">${fld('eCsc','ID do CSC (só o número do ID)',e.csc_id,'inputmode="numeric"')}</div>
   ${fld('eLim','Exigir CPF na NFC-e a partir de (R$)', String(e.limite_cpf_nfce || 10000).replace('.', ','), 'inputmode="decimal"')}
   <p class="small">Confira o valor-limite de identificação do consumidor com a SEFAZ-PI.</p>
   <p class="small">O código CSC em si não é guardado aqui: ele vai direto no painel da Focus NFe.</p>
@@ -966,7 +969,7 @@ async function salvarEmp(id){
   const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),
     logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), cod_municipio:dig(val('eCodMun')), uf:val('eUf'),
     serie_nfce:dig(val('eSNfce')) || '1', prox_nfce:parseInt(dig(val('ePNfce'))) || 1, serie_nfe:dig(val('eSNfe')) || '1', prox_nfe:parseInt(dig(val('ePNfe'))) || 1,
-    csc_id:dig(val('eCsc')), ambiente:'homologacao', limite_cpf_nfce:numIn(val('eLim')) || 10000 };
+    csc_id:dig(val('eCsc')), limite_cpf_nfce:numIn(val('eLim')) || 10000 };
   const antigo = id ? S.empresas.find(x => x.id === id) : null;
   if (antigo) Object.keys(antigo).forEach(k => { if (o[k] === undefined && k !== 'id') o[k] = clone(antigo[k]); });
   const errs = [];
@@ -1396,11 +1399,11 @@ async function salvarCce(id){
 function buracos(){
   // números que precisam ser inutilizados: entre o menor e o maior número tentado, sem nota válida/cancelada/em processamento
   const usados = {}, todos = {};
-  S.notas.forEach(n => { const k = n.modelo + '|' + n.serie; (todos[k] = todos[k] || []).push(+n.numero);
+  S.notas.filter(daAmb).forEach(n => { const k = n.modelo + '|' + n.serie; (todos[k] = todos[k] || []).push(+n.numero);
     if (notaValida(n) || n.status === 'cancelada') (usados[k] = usados[k] || new Set()).add(+n.numero); });
   const res = [];
   Object.entries(todos).forEach(([k, nums]) => {
-    const set = usados[k] || new Set(), inut = S.inutilizacoes.filter(i => i.modelo + '|' + i.serie === k);
+    const set = usados[k] || new Set(), inut = S.inutilizacoes.filter(i => i.modelo + '|' + i.serie === k && daAmb(i));
     const usado = x => set.has(x) || inut.some(i => x >= +i.ini && x <= +i.fim);
     const min = Math.min(...nums), max = Math.max(...nums); let ini = null;
     for (let x = min; x <= max + 1; x++){
@@ -3006,7 +3009,7 @@ const notaProblema = n => ['rejeitada','erro_envio','processando','denegada'].in
 const diaMais = (iso, k) => { const [y, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10); };
 const DIAS_SEM = ['dom','seg','ter','qua','qui','sex','sáb'];
 function vendasDe(ini, fim){
-  const v = S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim && notaValida(n) && (n.op || 'venda') === 'venda'; });
+  const v = S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim && notaValida(n) && (n.op || 'venda') === 'venda' && daAmb(n); });
   return { v, total:r2(v.reduce((a, n) => a + (n.total || 0), 0)) };
 }
 function variacao(atual, antes){
@@ -3076,6 +3079,44 @@ function vInicio(){
     <div class="card"><h3 style="margin-top:0">Mais vendidos do mês</h3>${top.length ? `<div class="list">${top.map((p, k) => `<div class="it" style="padding:7px 0"><b style="width:18px;color:var(--muted)">${k + 1}</b><div class="grow"><div class="t">${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u || 'UN')}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>`
       : '<div class="empty" style="padding:14px">Ainda sem vendas neste mês.</div>'}</div>
   </div></div>`;
+}
+
+/* ---------- ambiente de emissão (homologação × produção), escolhido no sistema ---------- */
+const ambAtual = () => ((emp() || {}).ambiente === 'producao' ? 'producao' : 'homologacao');
+const daAmb = n => (n.ambiente === 'producao' ? 'producao' : 'homologacao') === ambAtual();
+function cardAmbiente(){
+  const e = emp() || {}, prod = ambAtual() === 'producao', dono = S.papelEmp === 'dono';
+  return `<div class="card amb-card ${prod ? 'prod' : ''}"><h3 style="margin-top:0">Ambiente de emissão <span class="tag ${prod ? '' : 'w'}">${prod ? 'PRODUÇÃO — valendo' : 'Homologação — testes'}</span></h3>
+    <p class="small">${prod ? 'As notas emitidas têm <b>valor fiscal</b> e vão para a SEFAZ de verdade.' : 'As notas vão para a SEFAZ de testes e <b>não têm valor fiscal</b>. Use para treinar e conferir tudo antes de começar a valer.'}</p>
+    ${dono ? `<div class="actions" style="margin-top:4px">${prod ? '<button class="btn" data-act="formAmbiente" data-v="homologacao">Voltar para homologação (testes)</button>' : '<button class="btn pri" data-act="formAmbiente" data-v="producao">Passar para produção</button>'}</div>`
+      : '<p class="small">Só o dono pode trocar o ambiente.</p>'}</div>`;
+}
+function formAmbiente(novo){
+  const e = emp() || {}, c = e.certificado || {}, ok = c.valido_ate && new Date(c.valido_ate) > new Date(), g = (e.numeracao || {})[novo] || {}, prod = novo === 'producao';
+  const item = (bom, txt) => `<div style="display:flex;gap:8px;padding:4px 0"><b style="color:${bom === true ? 'var(--ok)' : bom === false ? 'var(--bad)' : 'var(--warn)'}">${bom === true ? '✓' : bom === false ? '✕' : '!'}</b><span>${txt}</span></div>`;
+  openModal(`${mhead(prod ? 'Passar para produção' : 'Voltar para homologação')}
+  ${prod ? `<p>Depois disso, <b>toda nota emitida terá valor fiscal</b>. Confira antes:</p>
+    <div class="card" style="margin:0 0 10px">${item(!!ok, ok ? `Certificado digital válido até ${dataBR(c.valido_ate)}` : 'Certificado digital não enviado ou vencido — envie no quadro "Certificado digital"')}
+      ${item(c.csc_producao ? true : null, c.csc_producao ? 'CSC de produção do cupom informado' : 'CSC de produção do cupom (NFC-e) não informado — sem ele o cupom é recusado; a NF-e funciona')}
+      ${item(null, 'Confira com o contador o regime tributário e a tributação dos produtos')}</div>`
+    : '<p>As próximas notas voltam a ir para a SEFAZ de <b>testes</b>, sem valor fiscal. A numeração de produção fica guardada para quando você voltar.</p>'}
+  <h3>Numeração em ${prod ? 'produção' : 'homologação'}</h3>
+  <p class="small">${prod ? 'Se a empresa já emitia notas em outro sistema, continue a numeração de lá (próximo número depois da última nota). Se nunca emitiu, comece no 1.' : 'Volta a numeração que estava em uso nos testes.'}</p>
+  <div class="row">${fld('amSNfce', 'Série do cupom', g.serie_nfce || '1', 'inputmode="numeric"')}${fld('amPNfce', 'Próximo nº do cupom', g.prox_nfce || '1', 'inputmode="numeric"')}</div>
+  <div class="row">${fld('amSNfe', 'Série da NF-e', g.serie_nfe || '1', 'inputmode="numeric"')}${fld('amPNfe', 'Próximo nº da NF-e', g.prox_nfe || '1', 'inputmode="numeric"')}</div>
+  ${prod ? '<label class="chk"><input type="checkbox" id="amConf"> Entendo que, a partir de agora, as notas emitidas têm valor fiscal.</label>' : ''}
+  <div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn ${prod ? 'pri' : ''}" data-act="trocarAmbiente" data-v="${novo}" ${prod && !ok ? 'disabled' : ''}>${prod ? 'Passar para produção' : 'Voltar para homologação'}</button></div>`);
+}
+async function trocarAmbiente(novo, btn){
+  const prod = novo === 'producao';
+  if (prod && !$('#amConf').checked) return $('#errM').innerHTML = '<div class="msg err">Marque a confirmação para continuar.</div>';
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Trocando o ambiente…</div>';
+  try {
+    const r = await api('ambiente', { empresa_id:S.empId, ambiente:novo, confirmo:prod, serie_nfce:val('amSNfce'), prox_nfce:val('amPNfce'), serie_nfe:val('amSNfe'), prox_nfe:val('amPNfe') });
+    closeModal(); toast(prod ? 'Pronto: a empresa está em PRODUÇÃO. As notas agora valem.' : 'Pronto: a empresa voltou para homologação (testes).');
+    if (r.aviso) setTimeout(() => toast(r.aviso), 3500);
+  } catch(e){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
 /* ---------- certificado digital A1 (enviado pelo sistema para a Focus) ---------- */
@@ -3282,6 +3323,8 @@ document.addEventListener('click', async ev => {
     case 'salvarBalanca': salvarBalanca(); break;
     case 'salvarImpressao': salvarImpressao(); break;
     case 'enviarCertificado': await enviarCertificado(t); break;
+    case 'formAmbiente': formAmbiente(t.dataset.v); break;
+    case 'trocarAmbiente': await trocarAmbiente(t.dataset.v, t); break;
     case 'imprimirCupom': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirCupom(n); break; }
     case 'enviarNota': formEnviar(id); break;
     case 'envWhats': envWhats(id); break;

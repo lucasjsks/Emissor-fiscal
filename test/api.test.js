@@ -182,3 +182,37 @@ test('certificado: só o dono envia; senha e arquivo vão para a Focus e não s�
   assert.ok(!JSON.stringify(grav.body).includes('segredo') && !JSON.stringify(grav.body).includes('AAAA'));
   globalThis.fetch = fetchOrig; delete process.env.FOCUS_TOKEN_PRINCIPAL;
 });
+
+// ---------- ambiente escolhido no sistema ----------
+const { default: ambienteRota } = await import('../api/ambiente.js');
+test('ambiente: só o dono troca; produção exige certificado válido e troca a numeração', async () => {
+  membros['E1|U3'] = 'dono'; process.env.FOCUS_TOKEN_PRINCIPAL = 'princ';
+  const fetchOrig = globalThis.fetch;
+  globalThis.fetch = async (url, opt = {}) => {
+    const u = new URL(url);
+    if (u.pathname === '/auth/v1/user' && opt.headers.Authorization === 'Bearer t3') return { ok:true, status:200, text:async () => '{"id":"U3"}', json:async () => ({ id:'U3' }) };
+    if (u.pathname === '/rest/v1/rpc/gravar_campo_empresa'){ const b = JSON.parse(opt.body); docs['empresas/' + b.e][b.caminho[0]] = b.valor; return { ok:true, status:200, text:async () => 'null' }; }
+    return fetchOrig(url, opt);
+  };
+  let r = await chamar(ambienteRota, 't2', { empresa_id:'E1', ambiente:'producao', confirmo:true });
+  assert.equal(r.code, 403);
+  r = await chamar(ambienteRota, 't3', { empresa_id:'E1', ambiente:'producao', confirmo:true });
+  assert.equal(r.code, 400); assert.match(r.body.erro, /certificado/);
+  docs['empresas/E1'].certificado = { valido_ate:'2099-01-01T00:00:00-03:00' };
+  r = await chamar(ambienteRota, 't3', { empresa_id:'E1', ambiente:'producao', confirmo:true, prox_nfce:'150' });
+  assert.equal(r.code, 200);
+  const d = docs['empresas/E1'];
+  assert.equal(d.ambiente, 'producao'); assert.equal(d.prox_nfce, 150); assert.equal(d.prox_nfe, 1);
+  assert.deepEqual(d.numeracao.homologacao, { serie_nfce:'1', prox_nfce:7, serie_nfe:'2', prox_nfe:3 });
+  // emissão vai para a Focus de produção com o token de produção (aqui, o principal)
+  const fetch2 = globalThis.fetch; let host = '', auth = '';
+  globalThis.fetch = async (url, opt = {}) => { const u = new URL(url); if (u.host === 'api.focusnfe.com.br'){ host = u.host; auth = opt.headers.Authorization; return { ok:true, status:201, text:async () => JSON.stringify({ status:'autorizado' }) }; } return fetch2(url, opt); };
+  r = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{ total:10 } });
+  assert.equal(r.body.nota.ambiente, 'producao'); assert.equal(host, 'api.focusnfe.com.br'); assert.match(r.body.nota.ref, /-p$/);
+  assert.equal(auth, 'Basic ' + Buffer.from('princ:').toString('base64'));
+  // volta para homologação e recupera a numeração de teste
+  globalThis.fetch = fetch2;
+  r = await chamar(ambienteRota, 't3', { empresa_id:'E1', ambiente:'homologacao' });
+  assert.equal(r.code, 200); assert.equal(d.prox_nfce, 7); assert.equal(d.numeracao.producao.prox_nfce, 151);
+  globalThis.fetch = fetchOrig; delete process.env.FOCUS_TOKEN_PRINCIPAL;
+});
