@@ -17,7 +17,9 @@ select count(*) vinculos from docs where col='empresas/'||:'e'||'/vinculos';
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/movimentos/fake','empresas/'||:'e'||'/movimentos',:'e','{}'); -- deve falhar (RLS)
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/compras_xml/'||:'c1','empresas/'||:'e'||'/compras_xml',:'e','{"xml":"<nfe/>"}');
 select count(*) xml_guardado_pelo_dono from docs where col='empresas/'||:'e'||'/compras_xml';
-select public.convidar(:'e','op@x.com','operador');
+select public.convidar(:'e','op@x.com','operador'); -- deve falhar: convites desativados
+reset role;
+insert into membros(empresa_id,user_id,papel) values (:'e','22222222-2222-2222-2222-222222222222','operador'); -- operador antigo (simulado)
 reset role;
 select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;
 select public.lancar_compra(:'e', '{"numero":"12","itens":[{"produto_id":"P1","qtd_estoque":1,"custo_unit":1}]}'); -- operador: falha

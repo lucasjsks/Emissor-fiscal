@@ -1909,18 +1909,7 @@ function cardUsuarios(){
   const nomePapel = { dono:'dono', gerente:'gerente', operador:'operador' };
   const conta = `<div class="card"><h3 style="margin-top:0">Sua conta</h3><p>${esc(S.meuEmail)}${S.papelEmp ? ' · <b>' + nomePapel[S.papelEmp] + '</b> nesta empresa' : ''}</p>
     <div class="actions"><button class="btn" data-act="sair">Sair</button></div></div>`;
-  if (!(S.papelEmp === 'dono' || S.papelEmp === 'gerente')) return conta;
-  const dono = S.papelEmp === 'dono', dt = d => String(d || '').slice(0, 10).split('-').reverse().join('/');
-  return conta + `<div class="card"><h3 style="margin-top:0">Usuários desta empresa</h3>
-    ${dono ? `<p class="small">Convide pelo e-mail. Se a pessoa ainda não tem conta, ela cria uma com esse mesmo e-mail e o acesso aparece sozinho.</p>
-    <div class="row">${fld('cvEmail','E-mail', '', 'type="email" autocomplete="off"')}${sel('cvPapel','Papel', 'operador', [['operador','Operador'],['gerente','Gerente']])}</div>
-    <div id="errU"></div><div class="actions"><button class="btn pri" data-act="convidar">Convidar</button></div>` : '<p class="small">Só o dono convida pessoas e muda papéis.</p>'}
-    <div class="list" style="margin-top:8px">${(S.membros || []).map(m => `<div class="it"><div class="grow"><div class="t">${esc(m.email)}</div><div class="s">${m.pendente ? 'convite pendente desde ' : 'desde '}${dt(m.criado_em)}</div></div>
-      ${m.papel === 'dono' ? '<span class="tag">dono</span>'
-        : m.pendente ? `<span class="tag w">${esc(m.papel)}</span>${dono ? `<button class="x" data-act="cancConvite" data-email="${esc(m.email)}" aria-label="Cancelar convite">×</button>` : ''}`
-        : dono ? `<select data-membro="${esc(m.user_id)}" style="width:auto"><option value="operador" ${m.papel === 'operador' ? 'selected' : ''}>Operador</option><option value="gerente" ${m.papel === 'gerente' ? 'selected' : ''}>Gerente</option></select>
-            <button class="x" data-act="remMembro" data-id="${esc(m.user_id)}" aria-label="Remover">×</button>` : `<span class="tag">${esc(m.papel)}</span>`}</div>`).join('')}</div>
-    <p class="small" style="margin-top:8px"><b>Operador:</b> emite notas, cadastra clientes e usa o caixa. <b>Gerente:</b> tudo, inclusive cancelar, devolver e editar produtos. As permissões valem no banco de dados e no servidor.</p></div>`;
+  return conta; // cada empresa tem um único usuário (o dono): não há convites
 }
 
 // tela de login

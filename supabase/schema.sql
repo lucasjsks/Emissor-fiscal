@@ -165,25 +165,11 @@ language sql stable security definer set search_path = public, auth as $$
    where c.empresa_id = e and public.meu_papel(e) in ('dono','gerente')
 $$;
 
+-- cada empresa tem um único usuário (o dono): convites desativados
 create or replace function public.convidar(e text, p_email text, p_papel text) returns text
 language plpgsql security definer set search_path = public, auth as $$
-declare uid uuid; em text := lower(trim(p_email));
 begin
-  if coalesce(public.meu_papel(e), '') <> 'dono' then raise exception 'Só o dono da empresa pode convidar pessoas.'; end if;
-  if p_papel not in ('gerente','operador') then raise exception 'Papel inválido.'; end if;
-  if em !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'E-mail inválido.'; end if;
-  select id into uid from auth.users where lower(email) = em;
-  if uid is not null then
-    if exists (select 1 from public.membros where empresa_id = e and user_id = uid and papel = 'dono') then
-      raise exception 'Essa pessoa já é a dona da empresa.';
-    end if;
-    insert into public.membros (empresa_id, user_id, papel) values (e, uid, p_papel)
-      on conflict (empresa_id, user_id) do update set papel = excluded.papel;
-    return 'adicionado';
-  end if;
-  insert into public.convites (empresa_id, email, papel, convidado_por) values (e, em, p_papel, auth.uid())
-    on conflict (empresa_id, email) do update set papel = excluded.papel;
-  return 'convidado';
+  raise exception 'Cada empresa tem apenas um usuário (o dono). Não é possível convidar outras pessoas.';
 end $$;
 
 create or replace function public.alterar_papel(e text, uid uuid, p_papel text) returns void
@@ -211,16 +197,14 @@ end $$;
 -- chamada no login: transforma convites do seu e-mail em acesso
 create or replace function public.aceitar_convites() returns int
 language plpgsql security definer set search_path = public as $$
-declare n int; em text := lower(auth.email());
 begin
-  if auth.uid() is null or em is null then return 0; end if;
-  insert into public.membros (empresa_id, user_id, papel)
-    select empresa_id, auth.uid(), papel from public.convites where email = em
-    on conflict do nothing;
-  get diagnostics n = row_count;
-  delete from public.convites where email = em;
-  return n;
+  -- convites desativados (um usuário por empresa): só limpa algum convite antigo do seu e-mail
+  if auth.uid() is not null and auth.email() is not null then delete from public.convites where email = lower(auth.email()); end if;
+  return 0;
 end $$;
+
+-- convites antigos que ainda estavam pendentes deixam de valer
+delete from public.convites;
 
 -- ---------- funções do servidor (só a chave service_role chama) ----------
 -- reserva o próximo número de NFC-e/NF-e sem risco de dois caixas pegarem o mesmo
