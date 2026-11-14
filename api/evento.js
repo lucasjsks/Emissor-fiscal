@@ -1,5 +1,5 @@
 // POST /api/evento — consultar, cancelar, carta de correção e inutilização.
-import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, focus, statusDe, resumoFocus, mensagemFocus, isoBR } from './_lib.js';
+import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, focus as focusAmb, statusDe, resumoFocus, mensagemFocus, isoBR, ambienteEmp } from './_lib.js';
 
 const SO_GERENTE = ['cancelar','cce','inutilizar'];
 
@@ -11,8 +11,9 @@ export default rota(async (req, b) => {
   if (!papel) throw new Falha('Você não tem acesso a esta empresa.', 403);
   if (SO_GERENTE.includes(tipo) && papel === 'operador') throw new Falha('Essa ação é só para gerente ou dono.', 403);
 
+  let amb = 'homologacao'; const focus = (m, p, b) => focusAmb(m, p, b, { amb });
   if (tipo === 'inutilizar'){
-    const emp = await getDoc('empresas/' + empresa_id);
+    const emp = await getDoc('empresas/' + empresa_id); amb = ambienteEmp(emp);
     const modelo = b.modelo === '55' ? '55' : '65', serie = String(parseInt(b.serie)), ini = parseInt(b.ini), fim = parseInt(b.fim);
     const just = String(b.justificativa || '').replace(/\s+/g, ' ').trim();
     if (!(ini > 0) || !(fim >= ini) || fim - ini >= 10000) throw new Falha('Faixa de numeração inválida.');
@@ -21,8 +22,8 @@ export default rota(async (req, b) => {
       { cnpj:emp.cnpj, serie, numero_inicial:String(ini), numero_final:String(fim), justificativa:just });
     if (!(r.status >= 200 && r.status < 300) || (r.body.status && r.body.status !== 'autorizado'))
       return { ok:false, mensagem:mensagemFocus(r.body) || `A SEFAZ não confirmou (HTTP ${r.status}).` };
-    const doc = { modelo, serie, ini, fim, justificativa:just, em:isoBR(), por:u.id, focus:resumoFocus(r.body) };
-    await putDoc(`empresas/${empresa_id}/inutilizacoes/${modelo}-${serie}-${ini}-${fim}`, doc, u.id);
+    const doc = { modelo, serie, ini, fim, justificativa:just, em:isoBR(), por:u.id, ambiente:amb, focus:resumoFocus(r.body) };
+    await putDoc(`empresas/${empresa_id}/inutilizacoes/${modelo}-${serie}-${ini}-${fim}${amb === 'producao' ? '-p' : ''}`, doc, u.id);
     const sc = modelo === '65' ? 'serie_nfce' : 'serie_nfe';
     if (String(emp[sc]) === serie) await rpc('ajustar_proximo', { e:empresa_id, campo:modelo === '65' ? 'prox_nfce' : 'prox_nfe', minimo:fim + 1 });
     return { ok:true, inutilizacao:doc };
@@ -31,6 +32,7 @@ export default rota(async (req, b) => {
   const path = `empresas/${empresa_id}/notas/${b.ref}`;
   const n = b.ref ? await getDoc(path) : null;
   if (!n) throw new Falha('Nota não encontrada.', 404);
+  amb = n.ambiente === 'producao' ? 'producao' : 'homologacao'; // cada nota volta ao ambiente em que foi emitida
   const base = `/v2/${n.modelo === '65' ? 'nfce' : 'nfe'}/${encodeURIComponent(n.ref)}`;
 
   if (tipo === 'consultar'){

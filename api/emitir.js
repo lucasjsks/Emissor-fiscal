@@ -1,5 +1,5 @@
 // POST /api/emitir — reserva o número, envia a NFC-e/NF-e para a Focus e grava a nota.
-import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, sb, focus, statusDe, resumoFocus, mensagemFocus, ambiente, isoBR } from './_lib.js';
+import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, sb, focus, statusDe, resumoFocus, mensagemFocus, ambienteEmp, isoBR } from './_lib.js';
 
 // campos que o sistema usa internamente e não vão para a Focus
 export function limparPayload(p){
@@ -23,13 +23,15 @@ export default rota(async (req, b) => {
   if (!emp) throw new Falha('Empresa não encontrada.', 404);
   const serie = String((modelo === '65' ? emp.serie_nfce : emp.serie_nfe) || '1');
   const numero = await rpc('proximo_numero', { e:empresa_id, campo:modelo === '65' ? 'prox_nfce' : 'prox_nfe' });
-  const ref = `${empresa_id.slice(0, 8)}-${modelo}-${serie}-${numero}`;
+  // a referência leva o ambiente para não colidir quando a numeração recomeça em produção
+  const ref = `${empresa_id.slice(0, 8)}-${modelo}-${serie}-${numero}${ambienteEmp(emp) === 'producao' ? '-p' : ''}`;
   const envio = limparPayload({ ...payload, cnpj_emitente:emp.cnpj, serie, numero });
 
-  const resp = await focus('POST', `/v2/${modelo === '65' ? 'nfce' : 'nfe'}?ref=${encodeURIComponent(ref)}`, envio);
+  const amb = ambienteEmp(emp);
+  const resp = await focus('POST', `/v2/${modelo === '65' ? 'nfce' : 'nfe'}?ref=${encodeURIComponent(ref)}`, envio, { amb });
   const r = resp.body || {};
   const status = (resp.status === 0 || resp.status >= 500) ? 'erro_envio' : statusDe(r);
-  const final = { ...nota, id:ref, ref, numero, serie, empresa_id, status, ambiente:ambiente(), payload:envio,
+  const final = { ...nota, id:ref, ref, numero, serie, empresa_id, status, ambiente:amb, payload:envio,
     chave:r.chave_nfe ? String(r.chave_nfe).replace(/\D/g, '') : null, focus:{ ...resumoFocus(r), http:resp.status },
     emitida_por:u.id, data:payload.data_emissao || isoBR() };
   await putDoc(`empresas/${empresa_id}/notas/${ref}`, final, u.id);
