@@ -921,14 +921,14 @@ function vEmpresa(){
   return `<div class="row" style="align-items:center"><h2 style="flex:1">Empresa emitente</h2>${pode('empresa') ? '<button class="btn" data-act="editEmp" style="flex:0 0 auto">Editar</button>' : ''}</div>
   <div class="card"><div class="t" style="font-weight:700;font-size:16px">${esc(e.razao)}</div><div class="small">${esc(e.fantasia || '')}</div>
     <p>CNPJ ${fmtDoc(e.cnpj)} · IE ${esc(e.ie)}<br>${esc(e.logradouro)}, ${esc(e.numero)} — ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)} · CEP ${esc(e.cep)}</p>
-    <p><span class="tag">${({'1':'Simples Nacional','2':'Simples — excesso de sublimite','3':'Regime Normal'})[e.regime]}</span> <span class="tag w">${e.ambiente === 'producao' ? 'Produção' : 'Homologação'}</span></p></div>
+    <p><span class="tag">${({'1':'Simples Nacional','2':'Simples — excesso de sublimite','3':'Regime Normal'})[e.regime]}</span> <span class="tag ${e.ambiente === 'producao' ? '' : 'w'}">${e.ambiente === 'producao' ? 'Produção' : 'Homologação'}</span> ${(() => { const d = diasAte((e.certificado || {}).valido_ate);
+      return d === null ? '<span class="tag w">sem certificado</span>' : d < 0 ? '<span class="tag b">certificado vencido</span>' : `<span class="tag ${d <= 30 ? 'w' : ''}">certificado até ${dataBR(e.certificado.valido_ate)}</span>`; })()}</p>
+    ${pode('empresa') ? '<p class="small">Ambiente de emissão e certificado digital ficam em <b>Editar</b>.</p>' : ''}</div>
   <div class="card"><h3 style="margin-top:0">Numeração</h3>
     <div class="row"><div><label>Cupom (NFC-e)</label>Série ${esc(e.serie_nfce)} · próximo nº <b>${esc(e.prox_nfce)}</b></div><div><label>NF-e</label>Série ${esc(e.serie_nfe)} · próximo nº <b>${esc(e.prox_nfe)}</b></div></div>
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
-  ${cardAmbiente()}
-  ${cardCertificado()}
   ${cardImpressao()}
   ${cardBalanca()}
   ${cardUsuarios()}
@@ -961,9 +961,9 @@ function formEmpresa(e){
   <div class="row">${fld('eCsc','ID do CSC (só o número do ID)',e.csc_id,'inputmode="numeric"')}</div>
   ${fld('eLim','Exigir CPF na NFC-e a partir de (R$)', String(e.limite_cpf_nfce || 10000).replace('.', ','), 'inputmode="decimal"')}
   <p class="small">Confira o valor-limite de identificação do consumidor com a SEFAZ-PI.</p>
-  <p class="small">O código CSC em si não é guardado aqui: ele vai direto no painel da Focus NFe.</p>
   <div id="errM"></div>
-  <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar</button></div>`);
+  <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar dados da empresa</button></div>
+  ${e.id ? `<div style="margin-top:18px">${cardAmbiente()}${cardCertificado()}</div>` : ''}`);
 }
 async function salvarEmp(id){
   const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),
@@ -3106,7 +3106,7 @@ function formAmbiente(novo){
   <div class="row">${fld('amSNfe', 'Série da NF-e', g.serie_nfe || '1', 'inputmode="numeric"')}${fld('amPNfe', 'Próximo nº da NF-e', g.prox_nfe || '1', 'inputmode="numeric"')}</div>
   ${prod ? '<label class="chk"><input type="checkbox" id="amConf"> Entendo que, a partir de agora, as notas emitidas têm valor fiscal.</label>' : ''}
   <div id="errM"></div>
-  <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn ${prod ? 'pri' : ''}" data-act="trocarAmbiente" data-v="${novo}" ${prod && !ok ? 'disabled' : ''}>${prod ? 'Passar para produção' : 'Voltar para homologação'}</button></div>`);
+  <div class="actions"><button class="btn" data-act="editEmp">Voltar</button><button class="btn ${prod ? 'pri' : ''}" data-act="trocarAmbiente" data-v="${novo}" ${prod && !ok ? 'disabled' : ''}>${prod ? 'Passar para produção' : 'Voltar para homologação'}</button></div>`);
 }
 async function trocarAmbiente(novo, btn){
   const prod = novo === 'producao';
