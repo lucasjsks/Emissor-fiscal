@@ -925,13 +925,14 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardCertificado()}
   ${cardImpressao()}
   ${cardBalanca()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
     <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}
   <div class="card"><h3 style="margin-top:0">Ligação com a Focus NFe</h3>
-    <p class="small">O certificado A1, a senha e o código CSC da NFC-e são cadastrados no painel da Focus — nunca ficam neste sistema. O token da API fica guardado no servidor (Vercel).</p>
+    <p class="small">O certificado A1 e o CSC são enviados pelo quadro <b>Certificado digital</b> acima e vão direto para a Focus NFe — o arquivo e a senha nunca ficam guardados neste sistema. Os tokens da API ficam só no servidor (Vercel).</p>
     <p>ID do CSC: <b>${esc(e.csc_id || '—')}</b></p></div>
   <div class="card"><h3 style="margin-top:0">Armazenamento</h3><p class="small">${S.mode === 'db' ? 'Dados salvos na nuvem — abra este link em qualquer aparelho.' : 'Esta visualização não acessa a nuvem: os dados ficam só neste navegador.'}</p></div>`;
 }
@@ -970,7 +971,7 @@ async function salvarEmp(id){
     serie_nfce:dig(val('eSNfce')) || '1', prox_nfce:parseInt(dig(val('ePNfce'))) || 1, serie_nfe:dig(val('eSNfe')) || '1', prox_nfe:parseInt(dig(val('ePNfe'))) || 1,
     csc_id:dig(val('eCsc')), ambiente:'homologacao', limite_cpf_nfce:numIn(val('eLim')) || 10000 };
   const antigo = id ? S.empresas.find(x => x.id === id) : null;
-  if (antigo){ if (antigo.difal_uf) o.difal_uf = clone(antigo.difal_uf); if (antigo.balanca) o.balanca = clone(antigo.balanca); }
+  if (antigo) Object.keys(antigo).forEach(k => { if (o[k] === undefined && k !== 'id') o[k] = clone(antigo[k]); });
   const errs = [];
   if (!o.razao) errs.push('Informe a razão social.');
   if (!cnpjOk(o.cnpj)) errs.push('CNPJ inválido.');
@@ -3037,6 +3038,9 @@ function alertasInicio(){
   if (cont.length) add('bad', `${cont.length} cupom(ns) em contingência para transmitir (prazo de 24 h)`, 'irPara', 'data-tab="notas" data-fn="pend"');
   const gaps = buracos();
   if (gaps.length && pode('inutilizar')) add('warn', `${gaps.reduce((a, g) => a + g.fim - g.ini + 1, 0)} número(s) de nota pulado(s) para inutilizar`, 'irPara', 'data-tab="notas"');
+  const ce = (e || {}).certificado || {}, dc = diasAte(ce.valido_ate);
+  if (dc !== null && dc < 0) add('bad', 'O certificado digital está vencido: as notas não saem. Envie o novo certificado.', 'irPara', 'data-tab="empresa"');
+  else if (dc !== null && dc <= 30) add('warn', `O certificado digital vence em ${dc} dia(s). Renove e envie o novo.`, 'irPara', 'data-tab="empresa"');
   const cx = caixaAberto();
   if (pode('caixa') && !cx) add('info', 'Seu caixa está fechado. Abra o caixa para vender no cupom.', 'irPara', 'data-tab="caixa"');
   else if (cx && String(cx.aberto_em || '').slice(0, 10) < hoje) add('warn', `Seu caixa está aberto desde ${dataBR(cx.aberto_em)}. Feche o caixa do dia anterior.`, 'irPara', 'data-tab="caixa"');
@@ -3087,6 +3091,39 @@ function vInicio(){
     <div class="card"><h3 style="margin-top:0">Mais vendidos do mês</h3>${top.length ? `<div class="list">${top.map((p, k) => `<div class="it" style="padding:7px 0"><b style="width:18px;color:var(--muted)">${k + 1}</b><div class="grow"><div class="t">${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u || 'UN')}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>`
       : '<div class="empty" style="padding:14px">Ainda sem vendas neste mês.</div>'}</div>
   </div></div>`;
+}
+
+/* ---------- certificado digital A1 (enviado pelo sistema para a Focus) ---------- */
+const diasAte = d => d ? Math.floor((new Date(d) - Date.now()) / 864e5) : null;
+function cardCertificado(){
+  const c = (emp() || {}).certificado || {}, dias = diasAte(c.valido_ate), dono = S.papelEmp === 'dono';
+  const st = !c.valido_ate ? '<span class="tag w">não enviado pelo sistema</span>' : dias < 0 ? '<span class="tag b">vencido</span>' : dias <= 30 ? `<span class="tag w">vence em ${dias} dia(s)</span>` : '<span class="tag">válido</span>';
+  return `<div class="card"><h3 style="margin-top:0">Certificado digital A1 ${st}</h3>
+    ${c.valido_ate ? `<p class="small">Válido até <b>${dataBR(c.valido_ate)}</b> · CNPJ ${fmtDoc(c.cnpj)} · enviado em ${fmtData(c.enviado_em)}${c.manifestacao ? ' · recebimento de notas ligado' : ''}</p>` : '<p class="small">Envie aqui o certificado A1 da empresa (arquivo .pfx ou .p12). O sistema manda direto para a Focus NFe, que assina as notas. O arquivo e a senha <b>não ficam guardados</b> no sistema.</p>'}
+    ${dono ? `<label for="certArq">Arquivo do certificado (.pfx ou .p12)</label><input id="certArq" type="file" accept=".pfx,.p12,application/x-pkcs12">
+    <label for="certSenha">Senha do certificado</label><input id="certSenha" type="password" autocomplete="new-password">
+    <details style="margin-top:8px"><summary class="small" style="cursor:pointer">CSC do cupom (NFC-e) — opcional</summary>
+      <p class="small">O CSC é o código que a SEFAZ-PI fornece para o QR Code do cupom de produção. Se ainda não tem, deixe em branco.</p>
+      <div class="row">${fld('certCscId', 'ID do token (CSC)', '', 'inputmode="numeric" autocomplete="off"')}${fld('certCsc', 'Código CSC', '', 'autocomplete="off"')}</div></details>
+    <label class="chk"><input type="checkbox" id="certManif" ${c.manifestacao !== false ? 'checked' : ''}> Ligar o recebimento das notas de fornecedores (Compras → Recebidas da SEFAZ)</label>
+    <div id="errCert"></div><div class="actions"><button class="btn pri" data-act="enviarCertificado">${c.valido_ate ? 'Trocar certificado' : 'Enviar certificado'}</button></div>`
+    : '<p class="small">Só o dono da empresa pode enviar ou trocar o certificado.</p>'}</div>`;
+}
+const lerBase64 = file => new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => erro(new Error('Não foi possível ler o arquivo.')); r.readAsDataURL(file); });
+async function enviarCertificado(btn){
+  const f = ($('#certArq').files || [])[0], senha = $('#certSenha').value, el = $('#errCert');
+  if (!f) return el.innerHTML = '<div class="msg err">Escolha o arquivo do certificado (.pfx ou .p12).</div>';
+  if (!/\.(pfx|p12)$/i.test(f.name)) return el.innerHTML = '<div class="msg err">O arquivo precisa ser .pfx ou .p12 (certificado A1).</div>';
+  if (f.size > 200000) return el.innerHTML = '<div class="msg err">Arquivo grande demais para um certificado A1.</div>';
+  if (!senha) return el.innerHTML = '<div class="msg err">Informe a senha do certificado.</div>';
+  btn.disabled = true; el.innerHTML = '<div class="msg info">Enviando para a Focus NFe…</div>';
+  try {
+    const r = await api('certificado', { empresa_id:S.empId, arquivo_base64:await lerBase64(f), senha, csc_id:val('certCscId'), csc:val('certCsc'), manifestacao:$('#certManif').checked });
+    if (!r.ok) throw new Error(r.mensagem);
+    $('#certSenha').value = ''; $('#certArq').value = '';
+    el.innerHTML = `<div class="msg ok">Certificado enviado! Válido até ${r.certificado.valido_ate ? dataBR(r.certificado.valido_ate) : '—'}.</div>`;
+  } catch(e){ el.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+  finally { btn.disabled = false; }
 }
 
 /* ================== IMPRESSÃO DIRETA, REJEIÇÕES EXPLICADAS E ENVIO AO CLIENTE ================== */
@@ -3259,6 +3296,7 @@ document.addEventListener('click', async ev => {
     case 'salvarEmp': salvarEmp(id); break;
     case 'salvarBalanca': salvarBalanca(); break;
     case 'salvarImpressao': salvarImpressao(); break;
+    case 'enviarCertificado': await enviarCertificado(t); break;
     case 'imprimirCupom': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirCupom(n); break; }
     case 'enviarNota': formEnviar(id); break;
     case 'envWhats': envWhats(id); break;

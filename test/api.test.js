@@ -154,3 +154,31 @@ test('envia a nota por e-mail pela Focus (operador pode)', async () => {
   assert.deepEqual(env.body, { emails:['cliente@ex.com'] });
   assert.deepEqual(docs['empresas/E1/notas/R1'].enviada_para, ['cliente@ex.com']);
 });
+
+// ---------- certificado digital pelo sistema ----------
+const { default: certificado } = await import('../api/certificado.js');
+test('certificado: só o dono envia; senha e arquivo vão para a Focus e não são gravados', async () => {
+  membros['E1|U3'] = 'dono'; process.env.FOCUS_TOKEN_PRINCIPAL = 'princ';
+  const fetchOrig = globalThis.fetch, focusCalls = [];
+  globalThis.fetch = async (url, opt = {}) => {
+    const u = new URL(url);
+    if (u.pathname === '/auth/v1/user' && opt.headers.Authorization === 'Bearer t3') return { ok:true, status:200, text:async () => '{"id":"U3"}', json:async () => ({ id:'U3' }) };
+    if (u.host === 'api.focusnfe.com.br'){
+      focusCalls.push({ url:u.pathname + u.search, method:opt.method, body:opt.body ? JSON.parse(opt.body) : null, auth:opt.headers.Authorization });
+      const body = u.pathname === '/v2/empresas' && (opt.method || 'GET') === 'GET' ? [{ id:77, cnpj:'11222333000181' }] : { id:77, certificado_valido_ate:'2027-10-01T10:00:00-03:00', certificado_cnpj:'11222333000181' };
+      return { ok:true, status:200, text:async () => JSON.stringify(body) };
+    }
+    return fetchOrig(url, opt);
+  };
+  let r = await chamar(certificado, 't2', { empresa_id:'E1', arquivo_base64:'A'.repeat(800), senha:'x' });
+  assert.equal(r.code, 403);
+  r = await chamar(certificado, 't3', { empresa_id:'E1', arquivo_base64:'A'.repeat(800), senha:'segredo', manifestacao:true });
+  assert.equal(r.code, 200); assert.equal(r.body.ok, true);
+  const put = focusCalls.find(c => c.method === 'PUT');
+  assert.equal(put.url, '/v2/empresas/77'); assert.equal(put.body.senha_certificado, 'segredo'); assert.equal(put.body.habilita_manifestacao, true);
+  assert.equal(put.auth, 'Basic ' + Buffer.from('princ:').toString('base64'));
+  const grav = chamadas.find(c => c.url === '/rest/v1/rpc/gravar_campo_empresa');
+  assert.equal(grav.body.valor.valido_ate, '2027-10-01T10:00:00-03:00');
+  assert.ok(!JSON.stringify(grav.body).includes('segredo') && !JSON.stringify(grav.body).includes('AAAA'));
+  globalThis.fetch = fetchOrig; delete process.env.FOCUS_TOKEN_PRINCIPAL;
+});
