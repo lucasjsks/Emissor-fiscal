@@ -204,6 +204,8 @@ a{color:var(--brand);font-weight:600;text-decoration:none}a:hover{text-decoratio
 nav .nav-brand img{width:38px;height:38px;display:block}
 body.fora header{display:none}
 @media(min-width:1000px){body.fora main,body.fora .amb{margin-left:0}}
+.rej{border:1px solid #f4c7c2;background:#fffafa;border-radius:14px;padding:14px 16px;margin:10px 0}.rej-t{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--bad);margin-bottom:3px}
+.msg.ok{background:var(--brand-soft);color:var(--brand-ink);border:1px solid #bfe3d3}
 /* navegação: barra inferior no celular */
 nav{background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 nav button{border-radius:12px;padding:6px 2px 6px;gap:2px;font-weight:550;transition:color .15s}
@@ -923,6 +925,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardImpressao()}
   ${cardBalanca()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
@@ -1033,7 +1036,7 @@ function formCliente(c){
   <div class="row">${fld('cDoc','CPF ou CNPJ *',fmtDoc(c.doc),'inputmode="numeric" autocomplete="off"')}${fld('cNome','Nome / razão social *',c.nome)}</div>
   <div id="cAutoInfo" class="small" style="margin-top:4px">${c.id ? '' : 'Com CNPJ, os dados vêm da Receita. Com CPF, digite o CEP para preencher o endereço.'}</div>
   <div class="row">${sel('cInd','Indicador de IE',c.ind_ie,[['9','Não contribuinte'],['1','Contribuinte ICMS'],['2','Contribuinte isento']])}${fld('cIe','Inscrição estadual',c.ie,'inputmode="numeric"')}</div>
-  ${fld('cEmail','E-mail (para envio da nota)',c.email,'type="email"')}
+  <div class="row">${fld('cEmail','E-mail (para envio da nota)',c.email,'type="email"')}${fld('cFone','WhatsApp (para envio da nota)',c.telefone,'inputmode="tel"')}</div>
   <div class="row">${fld('cLog','Logradouro *',c.logradouro)}${fld('cNum','Número *',c.numero)}</div>
   <div class="row">${fld('cBai','Bairro *',c.bairro)}${fld('cCep','CEP * (preenche o endereço)',c.cep,'inputmode="numeric" autocomplete="off"')}</div>
   <div class="row">${fld('cMun','Município *',c.municipio)}${fld('cCodMun','Código IBGE *',c.cod_municipio,'inputmode="numeric"')}${sel('cUf','UF',c.uf,UFS.map(u => [u,u]))}</div>
@@ -1041,7 +1044,7 @@ function formCliente(c){
   <div class="actions">${c.id ? `<button class="btn bad" data-act="delCli" data-id="${esc(c.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarCli" data-id="${esc(c.id || '')}">Salvar</button></div>`);
 }
 async function salvarCli(id){
-  const o = { doc:dig(val('cDoc')), nome:val('cNome').toUpperCase(), ind_ie:val('cInd'), ie:dig(val('cIe')), email:val('cEmail'),
+  const o = { doc:dig(val('cDoc')), nome:val('cNome').toUpperCase(), ind_ie:val('cInd'), ie:dig(val('cIe')), email:val('cEmail'), telefone:val('cFone'),
     logradouro:val('cLog'), numero:val('cNum'), bairro:val('cBai'), cep:dig(val('cCep')), municipio:val('cMun'), cod_municipio:dig(val('cCodMun')), uf:val('cUf') };
   if (id) o.id = id;
   const errs = [];
@@ -1094,6 +1097,7 @@ async function emitirNfce(){
   const res = await emitirServidor('65', payload, nota, {}, '#errV'); if (!res) return;
   S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; S.busca = '';
   render(); verNota(res.nota);
+  if (res.nota.status === 'autorizada' && ((emp() || {}).impressao || {}).auto && (res.nota.focus || {}).qrcode_url) imprimirCupom(res.nota);
 }
 async function emitirNfe(){
   const { e, cli, inter, naoContrib, precisaDifal } = nfeCtx(), n = S.nfe, L = nfeLinhas(), T = totais(L), errs = [];
@@ -1236,7 +1240,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -1980,7 +1984,9 @@ function statusMsg(n){
 function linksFocus(n){
   const f = n.focus || {}, base = n.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
   const url = c => /^https?:/.test(c) ? c : base + c, L = [];
-  if (f.caminho_danfe) L.push(`<a class="btn pri" href="${esc(url(f.caminho_danfe))}" target="_blank" rel="noopener">🖨 ${n.modelo === '65' ? 'Imprimir cupom fiscal' : 'Imprimir DANFE'}</a>`);
+  if (n.modelo === '65' && n.status === 'autorizada' && f.qrcode_url) L.push(`<button class="btn pri" data-act="imprimirCupom" data-id="${esc(n.id)}">🖨 Imprimir cupom</button>`);
+  else if (f.caminho_danfe) L.push(`<a class="btn pri" href="${esc(url(f.caminho_danfe))}" target="_blank" rel="noopener">🖨 ${n.modelo === '65' ? 'Imprimir cupom fiscal' : 'Imprimir DANFE'}</a>`);
+  if (n.status === 'autorizada' && (f.caminho_danfe || f.qrcode_url)) L.push(`<button class="btn" data-act="enviarNota" data-id="${esc(n.id)}">📤 Enviar ao cliente</button>`);
   if (f.caminho_xml_nota_fiscal) L.push(`<a class="btn" href="${esc(url(f.caminho_xml_nota_fiscal))}" target="_blank" rel="noopener">XML</a>`);
   return L.join('');
 }
@@ -1989,8 +1995,9 @@ function verNota(n){
   const tit = (n.op === 'dev_venda' ? 'Devolução de venda' : n.op === 'dev_compra' ? 'Devolução de compra' : n.modelo === '65' ? 'Cupom' : 'NF-e') + ' nº ' + n.numero;
   const btn = (act, txt, cls = '') => `<button class="btn ${cls}" data-act="${act}" data-id="${esc(n.id)}">${txt}</button>`;
   const erros = (n.focus && Array.isArray(n.focus.erros)) ? n.focus.erros : [];
+  S.notaAberta = n;
   openModal(`${mhead(tit)}${statusMsg(n)}
-  ${erros.length ? erros.map(x => `<div class="v erro">${esc(x.mensagem || JSON.stringify(x))}</div>`).join('') : ''}
+  ${['rejeitada','denegada','erro_envio'].includes(n.status) ? explicarRejeicao(n) : erros.length ? erros.map(x => `<div class="v erro">${esc(x.mensagem || JSON.stringify(x))}</div>`).join('') : ''}
   ${(n.devolucoes || []).length ? `<div class="msg warn">Devolvida: ${n.devolucoes.map(d => `NF-e nº ${d.numero} (${brl(d.total)})`).join(', ')}</div>` : ''}
   ${notaProblema(n) ? `<a class="btn whats" href="${esc(linkSuporte(resumoNotaSuporte(n)))}" target="_blank" rel="noopener" style="width:100%;margin-top:8px">${WHATS_SVG} Pedir ajuda ao suporte sobre esta nota</a>` : ''}
   <div class="actions">
@@ -2039,7 +2046,7 @@ async function acoesV5(a, t, id){
 /* ---------- preenchimento automático por CNPJ (Receita, via BrasilAPI) e CEP (ViaCEP) ---------- */
 const AUTO = {
   empresa:{ doc:'eCnpj', info:'eAutoInfo', nome:'eRazao', fantasia:'eFant', fone:'eFone', email:null, regime:'eReg', log:'eLog', num:'eNum', bai:'eBai', cep:'eCep', mun:'eMun', ibge:'eCodMun', uf:'eUf' },
-  cliente:{ doc:'cDoc', info:'cAutoInfo', nome:'cNome', fantasia:null, fone:null, email:'cEmail', regime:null, log:'cLog', num:'cNum', bai:'cBai', cep:'cCep', mun:'cMun', ibge:'cCodMun', uf:'cUf' }
+  cliente:{ doc:'cDoc', info:'cAutoInfo', nome:'cNome', fantasia:null, fone:'cFone', email:'cEmail', regime:null, log:'cLog', num:'cNum', bai:'cBai', cep:'cCep', mun:'cMun', ibge:'cCodMun', uf:'cUf' }
 };
 const autoUltimo = {};
 function setCampo(id, v){ const el = id && document.getElementById(id); if (el && v !== undefined && v !== null && String(v).trim() !== '') el.value = String(v).trim(); }
@@ -3082,6 +3089,132 @@ function vInicio(){
   </div></div>`;
 }
 
+/* ================== IMPRESSÃO DIRETA, REJEIÇÕES EXPLICADAS E ENVIO AO CLIENTE ================== */
+const urlFocus = (n, c) => !c ? '' : /^https?:/.test(c) ? c : (n.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br') + c;
+// ---------- impressão do cupom na impressora térmica (80 ou 58 mm) ----------
+function cupomCss(papel){
+  const w = papel === '58' ? 48 : 72;
+  return `@page{margin:0}*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#000}
+body{width:${w + 8}mm;padding:3mm 4mm 6mm;font:${papel === '58' ? '9.5px' : '11px'}/1.32 "Courier New",Courier,monospace}
+.cupom{border:0;padding:0;margin:0;max-width:none;background:#fff;font:inherit;color:#000}
+.cupom .c{text-align:center;overflow-wrap:anywhere}.cupom hr{border:0;border-top:1px dashed #000;margin:5px 0}
+.cupom table{width:100%;border-collapse:collapse}.cupom td{vertical-align:top;padding:1px 0}.cupom .r{text-align:right;white-space:nowrap}
+.cupom svg{width:${papel === '58' ? 30 : 36}mm!important;height:auto!important}.cupom .qr{border:1px solid #000;padding:6px;margin:6px auto;width:30mm;text-align:center}
+.cupom [style*="color"]{color:#000!important}`;
+}
+function imprimirCupom(n){
+  const papel = ((emp() || {}).impressao || {}).papel === '58' ? '58' : '80', f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+  const d = f.contentDocument;
+  d.open(); d.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Cupom ${n.numero}</title><style>${cupomCss(papel)}</style></head><body>${cupomHtml(n, emp())}</body></html>`); d.close();
+  setTimeout(() => {
+    try { // página do tamanho exato do cupom: a térmica corta logo depois do QR Code
+      const mm = Math.ceil(d.body.scrollHeight * 25.4 / 96) + 4, st = d.createElement('style');
+      st.textContent = `@page{size:${papel}mm ${mm}mm;margin:0}`; d.head.appendChild(st);
+      f.contentWindow.focus(); f.contentWindow.print();
+    } catch(_){ toast('Não foi possível abrir a impressão.'); }
+    setTimeout(() => f.remove(), 60000);
+  }, 250);
+}
+function cardImpressao(){
+  const i = (emp() || {}).impressao || {};
+  return `<div class="card"><h3 style="margin-top:0">Impressão do cupom</h3>
+    <p class="small">O cupom sai direto na impressora térmica, sem abrir outra página.</p>
+    ${pode('empresa') ? `<div class="row">${sel('impPapel', 'Largura do papel', i.papel || '80', [['80','80 mm (mais comum)'],['58','58 mm (bobina estreita)']])}</div>
+    <label class="chk"><input type="checkbox" id="impAuto" ${i.auto ? 'checked' : ''}> Abrir a impressão sozinho logo depois de emitir o cupom</label>
+    <div class="actions"><button class="btn" data-act="salvarImpressao">Salvar impressão</button></div>
+    <p class="small">Dica para imprimir sem nenhuma janela: no computador do caixa, crie um atalho do Chrome com <b>--kiosk-printing</b> no final do destino e deixe a térmica como impressora padrão. Na dúvida, chame o suporte.</p>`
+    : `<p>Papel ${i.papel || '80'} mm${i.auto ? ' · imprime sozinho ao emitir' : ''}</p>`}</div>`;
+}
+async function salvarImpressao(){
+  const e = clone(emp()); e.impressao = { papel:val('impPapel') === '58' ? '58' : '80', auto:$('#impAuto').checked };
+  await safe(() => put('empresas', e), 'Impressão salva.');
+}
+
+// ---------- rejeições da SEFAZ explicadas ----------
+const REJ = {
+  '204':['Esta nota já tinha sido enviada antes (mesmo número).', 'Toque em "Consultar situação" para ver se a primeira foi autorizada. Se foi, não precisa emitir de novo.', null],
+  '539':['Esta nota já tinha sido enviada antes (mesmo número).', 'Toque em "Consultar situação". Se a anterior foi autorizada, não emita de novo; se não, emita outra vez, que o sistema usa o próximo número.', null],
+  '213':['O certificado digital cadastrado na Focus é de outra empresa.', 'No painel da Focus, abra esta empresa e envie o certificado A1 com o mesmo CNPJ.', null],
+  '225':['A nota foi montada com algum campo fora do padrão da SEFAZ.', 'Chame o suporte pelo botão abaixo: a mensagem já leva o detalhe do erro.', null],
+  '228':['A data de emissão está muito antiga.', 'Confira se a data e a hora do computador ou celular estão certas e emita de novo.', null],
+  '209':['A inscrição estadual da sua empresa está inválida.', 'Na aba Empresa, confira a inscrição estadual (só números, sem pontos).', 'empresa'],
+  '230':['A inscrição estadual da sua empresa não está cadastrada na SEFAZ.', 'Na aba Empresa, confira a inscrição estadual. Se estiver certa, fale com o contador: pode haver pendência no cadastro da SEFAZ.', 'empresa'],
+  '232':['Faltou a inscrição estadual do cliente.', 'Na aba Clientes, informe a inscrição estadual do cliente ou marque que ele não é contribuinte.', 'cliente'],
+  '233':['A inscrição estadual do cliente não está cadastrada na SEFAZ.', 'Na aba Clientes, confira a IE. Se o cliente não tiver IE, marque "Não contribuinte".', 'cliente'],
+  '234':['A inscrição estadual do cliente não pertence ao CNPJ dele.', 'Na aba Clientes, confira a IE e o CNPJ do cliente.', 'cliente'],
+  '301':['Uso denegado: a SEFAZ encontrou irregularidade no cadastro da sua empresa.', 'Esta nota não pode ser usada. Fale com o contador para regularizar a inscrição estadual na SEFAZ.', null],
+  '302':['Uso denegado: a SEFAZ encontrou irregularidade no cadastro do cliente.', 'Esta nota não pode ser usada. O cliente precisa regularizar a inscrição estadual dele.', null],
+  '321':['Nota de devolução sem a nota original informada.', 'Informe a chave de acesso da nota que está sendo devolvida.', null],
+  '327':['O CFOP do produto não serve para devolução.', 'Confira o CFOP no cadastro do produto ou no perfil de tributação.', 'produto'],
+  '528':['O valor do ICMS não bate com a base e a alíquota.', 'Confira a alíquota e a redução de base do ICMS no cadastro do produto.', 'produto'],
+  '564':['A soma dos itens não bate com o total da nota.', 'Normalmente é arredondamento. Emita de novo; se repetir, chame o suporte.', null],
+  '610':['O total da nota não bate com a soma dos valores.', 'Emita de novo; se repetir, chame o suporte.', null],
+  '629':['O valor de um item não bate com quantidade × preço.', 'Confira a quantidade e o preço do item. Se repetir, chame o suporte.', 'produto'],
+  '590':['O produto está com CST, mas sua empresa é do Simples Nacional (usa CSOSN).', 'No cadastro do produto, troque para CSOSN (ex.: 102, ou 500 com ST). Ou confira o regime na aba Empresa.', 'produto'],
+  '591':['O produto está com CSOSN, mas sua empresa não é do Simples Nacional (usa CST).', 'No cadastro do produto, use CST (ex.: 00, ou 60 com ST). Ou confira o regime na aba Empresa.', 'produto'],
+  '694':['Venda para consumidor final de outro estado sem o DIFAL.', 'Na aba Empresa, configure o DIFAL do estado do cliente.', 'empresa'],
+  '696':['Cliente não contribuinte precisa estar marcado como consumidor final.', 'Na NF-e, marque "Consumidor final" para este cliente.', null],
+  '717':['Esta operação não é permitida no cupom (NFC-e).', 'Use a aba NF-e para esta venda (por exemplo, cliente de outro estado ou com entrega).', null],
+  '778':['O NCM do produto não existe na tabela oficial.', 'Abra o produto e corrija o NCM. Use a consulta da tabela NCM no fim da aba Produtos.', 'produto'],
+  '806':['Produto com substituição tributária sem o CEST.', 'Abra o produto e informe o CEST.', 'produto'],
+  '865':['O total pago é menor que o valor da nota.', 'Confira as formas de pagamento antes de emitir.', null],
+  '866':['O valor pago é maior que a nota, mas faltou o troco.', 'Informe o valor recebido em dinheiro para o sistema calcular o troco.', null],
+  '869':['O valor do troco está errado.', 'Confira os valores recebidos e emita de novo.', null],
+  '464':['O código do QR Code (CSC) está errado.', 'No painel da Focus, confira o CSC e o ID do token da NFC-e desta empresa (vêm do site da SEFAZ-PI).', null]
+};
+function explicarRejeicao(n){
+  const f = n.focus || {}, txt = [f.status_sefaz, f.mensagem_sefaz, f.mensagem, ...(Array.isArray(f.erros) ? f.erros.map(x => x.mensagem) : [])].filter(Boolean).join(' ');
+  const cod = String(f.status_sefaz || (txt.match(/rejei[çc][ãa]o:?\s*(\d{3})|\b(\d{3})\s*[-—]/i) || []).slice(1).find(Boolean) || '');
+  const r = REJ[cod]; if (!r && !txt) return '';
+  const nItem = +((txt.match(/nItem\D{0,3}(\d+)/i) || [])[1] || 0), item = nItem && (n.itens || [])[nItem - 1];
+  const p = item && S.produtos.find(x => x.id === item.pid);
+  const acao = !r ? '' : r[2] === 'produto' ? (p ? `<button class="btn" data-act="editProd" data-id="${esc(p.id)}">Abrir o produto ${esc(p.descricao)}</button>` : '<button class="btn" data-tab="produtos">Ir para Produtos</button>')
+    : r[2] === 'empresa' ? '<button class="btn" data-tab="empresa">Ir para Empresa</button>' : r[2] === 'cliente' ? '<button class="btn" data-tab="clientes">Ir para Clientes</button>' : '';
+  return `<div class="rej"><div class="rej-t">O que aconteceu</div><div>${r ? esc(r[0]) : 'A SEFAZ recusou a nota com esta mensagem:'}${item ? ` <span class="small">(item ${nItem}: ${esc(item.d)})</span>` : ''}</div>
+    ${!r ? `<div class="small" style="margin-top:4px">${esc(txt)}</div>` : ''}
+    <div class="rej-t" style="margin-top:10px">Como resolver</div><div>${r ? esc(r[1]) : 'Confira os dados da nota. Se não souber o que corrigir, chame o suporte: a mensagem já leva o erro.'}</div>
+    ${acao ? `<div class="actions" style="margin-top:8px">${acao}</div>` : ''}${cod ? `<div class="small" style="margin-top:6px">Código da SEFAZ: ${esc(cod)}</div>` : ''}</div>`;
+}
+
+// ---------- enviar a nota ao cliente ----------
+function clienteDaNota(n){ const d = dig(n.destDoc || (n.payload || {}).cpf_destinatario || (n.payload || {}).cnpj_destinatario || (n.payload || {}).cpf_destinatario); return d ? S.clientes.find(c => c.doc === d) : null; }
+function textoEnvio(n){
+  const e = emp(), f = n.focus || {}, nfce = n.modelo === '65';
+  return [`Olá! Segue a sua nota fiscal de ${e.fantasia || e.razao}.`, `${nfce ? 'Cupom fiscal (NFC-e)' : 'NF-e'} nº ${n.numero} · ${brl(n.total)} · ${fmtData(n.data)}`,
+    f.caminho_danfe ? `Ver a nota: ${urlFocus(n, f.caminho_danfe)}` : '', !nfce && f.caminho_xml_nota_fiscal ? `XML: ${urlFocus(n, f.caminho_xml_nota_fiscal)}` : '',
+    f.qrcode_url ? `Consultar na SEFAZ: ${f.qrcode_url}` : '', n.chave ? `Chave de acesso: ${fmtChave(n.chave)}` : '', '', 'Obrigado pela preferência!'].filter(x => x !== '').join('\n').replace(/\n\nObrigado/, '\n\nObrigado');
+}
+function formEnviar(id){
+  const n = S.notas.find(x => x.id === id) || S.notaAberta; if (!n) return;
+  const c = clienteDaNota(n), fone = (c && c.telefone) || S.ultimoFone || '', mail = (c && c.email) || '';
+  openModal(`${mhead('Enviar a nota ao cliente')}
+  <p class="small">${n.modelo === '65' ? 'Cupom' : 'NF-e'} nº ${n.numero} · ${brl(n.total)}${c ? ' · ' + esc(c.nome) : ''}</p>
+  <h3>Pelo WhatsApp</h3>
+  <label for="envFone">WhatsApp do cliente (com DDD)</label><input id="envFone" inputmode="tel" placeholder="(86) 99999-9999" value="${esc(fone)}">
+  <button class="btn whats block" data-act="envWhats" data-id="${esc(n.id)}" style="margin-top:8px">${WHATS_SVG} Enviar pelo WhatsApp</button>
+  <p class="small">Abre o WhatsApp com a mensagem pronta e o link da nota. Sem número, você escolhe o contato lá.</p>
+  <h3>Por e-mail</h3>
+  <label for="envMail">E-mail do cliente</label><input id="envMail" type="email" placeholder="cliente@email.com" value="${esc(mail)}">
+  <button class="btn block" data-act="envEmail" data-id="${esc(n.id)}" style="margin-top:8px">✉ Enviar por e-mail (DANFE e XML anexos)</button>
+  <div id="errM"></div>`);
+}
+function envWhats(id){
+  const n = S.notas.find(x => x.id === id); if (!n) return;
+  let f = dig(val('envFone')); if (f.length === 10 || f.length === 11) f = '55' + f;
+  if (f && f.length < 12) return $('#errM').innerHTML = '<div class="msg err">Confira o número: DDD + número.</div>';
+  if (f) S.ultimoFone = val('envFone');
+  window.open(`https://wa.me/${f}?text=${encodeURIComponent(textoEnvio(n))}`, '_blank', 'noopener');
+}
+async function envEmail(id, btn){
+  const mails = val('envMail').split(/[;,\s]+/).filter(Boolean);
+  if (!mails.length || mails.some(m => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m))) return $('#errM').innerHTML = '<div class="msg err">Informe um e-mail válido.</div>';
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Enviando…</div>';
+  try { const r = await api('evento', { empresa_id:S.empId, tipo:'email', ref:id, emails:mails });
+    if (!r.ok) throw new Error(r.mensagem || 'Não foi possível enviar.'); $('#errM').innerHTML = `<div class="msg ok">E-mail enviado para ${esc(mails.join(', '))}.</div>`; }
+  catch(e){ $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; } finally { btn.disabled = false; }
+}
+
 /* ================== SUPORTE (WhatsApp) ================== */
 const SUPORTE_WHATS = '5586981931921'; // (86) 98193-1921
 const WHATS_SVG = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M16 3C8.8 3 3 8.7 3 15.8c0 2.5.7 4.9 2.1 7L3 29l6.4-2c2 1.1 4.3 1.7 6.6 1.7 7.2 0 13-5.7 13-12.8S23.2 3 16 3zm0 23.4c-2.1 0-4.1-.6-5.9-1.7l-.4-.3-3.8 1.2 1.2-3.7-.3-.4c-1.2-1.8-1.9-3.9-1.9-6 0-5.9 4.9-10.7 11-10.7s11 4.8 11 10.7-4.9 10.9-10.9 10.9zm6-8c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.2-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.7s1.2 3.1 1.4 3.4c.2.2 2.3 3.5 5.6 4.9.8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg>';
@@ -3125,6 +3258,11 @@ document.addEventListener('click', async ev => {
     case 'editEmp': formEmpresa(emp()); break;
     case 'salvarEmp': salvarEmp(id); break;
     case 'salvarBalanca': salvarBalanca(); break;
+    case 'salvarImpressao': salvarImpressao(); break;
+    case 'imprimirCupom': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirCupom(n); break; }
+    case 'enviarNota': formEnviar(id); break;
+    case 'envWhats': envWhats(id); break;
+    case 'envEmail': await envEmail(id, t); break;
     case 'delEmp': confirmar('Excluir esta empresa? Os produtos, clientes e notas dela deixam de aparecer.', 'confDelEmp', id); break;
     case 'confDelEmp': if (await safe(() => del('empresas', id), 'Empresa excluída.')){ closeModal(); setEmp((S.empresas.find(e => e.id !== id) || {}).id || null); } break;
     case 'novoProd': formProduto(); break;

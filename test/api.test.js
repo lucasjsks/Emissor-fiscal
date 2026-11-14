@@ -142,3 +142,15 @@ test('notas recebidas: operação não realizada exige motivo; ciência grava a 
   assert.equal(env.url, `/v2/nfes_recebidas/${chave}/manifesto`); assert.deepEqual(env.body, { tipo:'ciencia' });
   assert.equal(docs[`empresas/E1/recebidas/${chave}`].manifestacao, 'ciencia');
 });
+
+test('envia a nota por e-mail pela Focus (operador pode)', async () => {
+  docs['empresas/E1/notas/R1'] = { ref:'R1', modelo:'65', status:'autorizada' };
+  let r = await chamar(evento, 't1', { empresa_id:'E1', tipo:'email', ref:'R1', emails:['x'] });
+  assert.equal(r.code, 400);
+  focusResp = { status:200, body:{} };
+  r = await chamar(evento, 't1', { empresa_id:'E1', tipo:'email', ref:'R1', emails:['cliente@ex.com'] });
+  assert.equal(r.code, 200); assert.equal(r.body.ok, true);
+  const env = chamadas.find(c => c.url === '/v2/nfce/R1/email');
+  assert.deepEqual(env.body, { emails:['cliente@ex.com'] });
+  assert.deepEqual(docs['empresas/E1/notas/R1'].enviada_para, ['cliente@ex.com']);
+});
