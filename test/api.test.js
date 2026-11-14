@@ -105,3 +105,40 @@ test('limparPayload não altera o original', () => {
   const p = { inscricao_estadual_emitente:'1', items:[{ _rtc:1, a:1 }] }, o = limparPayload(p);
   assert.equal(p.items[0]._rtc, 1); assert.deepEqual(o.items[0], { a:1 });
 });
+
+// ---------- notas recebidas (Manifestação do Destinatário) ----------
+const { default: recebidas } = await import('../api/recebidas.js');
+const rec = (n, v, extra = {}) => ({ chave_nfe:'2226111122233300018155001000000' + String(n).padStart(3, '0') + '1000000017', nome_emitente:'FORNECEDOR ' + n,
+  documento_emitente:'08635703000602', valor_total:'100.50', data_emissao:'2026-11-10T10:00:00-03:00', situacao:'autorizada', manifestacao_destinatario:'nulo', nfe_completa:false, versao:v, ...extra });
+
+test('notas recebidas: operador não acessa', async () => {
+  const r = await chamar(recebidas, 't1', { empresa_id:'E1', acao:'buscar' });
+  assert.equal(r.code, 403);
+});
+
+test('notas recebidas: busca a partir da última versão, grava todas de uma vez e guarda a versão', async () => {
+  docs['empresas/E1'].mde = undefined; docs['empresas/E1'].mde_versao = 5;
+  focusResp = { status:200, body:[rec(1, 6), rec(2, 9, { situacao:'cancelada' })] };
+  const lotes = []; const fetchOrig = globalThis.fetch;
+  globalThis.fetch = async (url, opt = {}) => { if (String(url).includes('/rest/v1/docs?on_conflict') && opt.body) lotes.push(JSON.parse(opt.body)); return fetchOrig(url, opt); };
+  const r = await chamar(recebidas, 't2', { empresa_id:'E1', acao:'buscar' });
+  assert.equal(r.code, 200); assert.equal(r.body.gravadas, 2);
+  const busca = chamadas.find(c => c.url.startsWith('/v2/nfes_recebidas'));
+  assert.equal(busca.url, '/v2/nfes_recebidas?cnpj=11222333000181&versao=5');
+  assert.equal(lotes.length, 1); assert.equal(lotes[0].length, 2);
+  assert.equal(lotes[0][1].data.situacao, 'cancelada'); assert.equal(lotes[0][0].col, 'empresas/E1/recebidas');
+  const v = chamadas.find(c => c.url === '/rest/v1/rpc/gravar_campo_empresa');
+  assert.deepEqual(v.body.caminho, ['mde']); assert.equal(v.body.valor.versao, 9);
+});
+
+test('notas recebidas: operação não realizada exige motivo; ciência grava a manifestação', async () => {
+  const chave = rec(1, 1).chave_nfe;
+  let r = await chamar(recebidas, 't2', { empresa_id:'E1', acao:'manifestar', chave, tipo:'nao_realizada', justificativa:'curto' });
+  assert.equal(r.code, 400);
+  focusResp = { status:200, body:{ status:'evento_registrado', status_sefaz:'135', mensagem_sefaz:'Evento registrado e vinculado a NF-e' } };
+  r = await chamar(recebidas, 't2', { empresa_id:'E1', acao:'manifestar', chave, tipo:'ciencia' });
+  assert.equal(r.code, 200); assert.equal(r.body.ok, true);
+  const env = chamadas.find(c => c.url.endsWith('/manifesto'));
+  assert.equal(env.url, `/v2/nfes_recebidas/${chave}/manifesto`); assert.deepEqual(env.body, { tipo:'ciencia' });
+  assert.equal(docs[`empresas/E1/recebidas/${chave}`].manifestacao, 'ciencia');
+});
