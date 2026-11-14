@@ -59,6 +59,16 @@ export default rota(async (req, b) => {
     return { ok:true, nota:n };
   }
 
+  if (tipo === 'email'){
+    const emails = (Array.isArray(b.emails) ? b.emails : []).map(m => String(m).trim()).filter(m => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)).slice(0, 10);
+    if (!emails.length) throw new Falha('Informe um e-mail válido.');
+    const r = await focus('POST', base + '/email', { emails });
+    if (!(r.status >= 200 && r.status < 300)) return { ok:false, mensagem:mensagemFocus(r.body) || `A Focus não enviou o e-mail (HTTP ${r.status}).` };
+    n.enviada_para = [...new Set([...(n.enviada_para || []), ...emails])];
+    await putDoc(path, n, u.id);
+    return { ok:true, nota:n };
+  }
+
   if (tipo === 'cce'){
     if (n.modelo !== '55') throw new Falha('Carta de correção só existe para NF-e.');
     const texto = String(b.texto || '').replace(/\s+/g, ' ').trim();
