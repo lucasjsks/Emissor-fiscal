@@ -1476,9 +1476,6 @@ function vCaixa(){
     ${(cx.movs || []).length ? `<h3>Movimentos</h3><div class="list">${cx.movs.map(m => `<div class="it"><div class="grow"><div class="t">${m.tipo === 'sangria' ? 'Sangria' : 'Suprimento'}</div><div class="s">${fmtData(m.em)}${m.motivo ? ' · ' + esc(m.motivo) : ''}</div></div>
       <b class="num" style="color:${m.tipo === 'sangria' ? 'var(--bad)' : 'var(--ok)'}">${m.tipo === 'sangria' ? '−' : '+'}${brl(m.valor)}</b></div>`).join('')}</div>` : ''}
     <div class="actions"><button class="btn" data-act="movCaixa" data-t="sangria">Sangria</button><button class="btn" data-act="movCaixa" data-t="suprimento">Suprimento</button><button class="btn pri" data-act="fecharCaixa">Fechar caixa</button></div></div>`;
-  const fechados = S.caixas.filter(c => c.fechado_em && (pode('relatorio') || c.aberto_por === meuCaixaKey())).sort((a, b) => b.fechado_em.localeCompare(a.fechado_em)).slice(0, 10);
-  if (fechados.length) h += `<div class="card"><h3 style="margin-top:0">Caixas fechados</h3><div class="list">${fechados.map(c => `<div class="it" data-act="verCaixa" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
-    <div class="t">${fmtData(c.aberto_em)} → ${fmtData(c.fechado_em).slice(-5)}</div><div class="s">${(c.resumo || {}).qtd || 0} vendas · ${brl((c.resumo || {}).total)}</div></div>${difTag(c.diferenca)}</div>`).join('')}</div></div>`;
   if (pode('relatorio')) h += vRelatorio();
   return h;
 }
