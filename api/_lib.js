@@ -14,8 +14,9 @@ export function env(k){
 export const ambiente = () => process.env.FOCUS_AMBIENTE === 'producao' ? 'producao' : 'homologacao';
 // notas recebidas (MD-e) só existem de verdade em produção: usa produção assim que o token de produção existir
 export const ambienteMde = () => process.env.FOCUS_TOKEN_PRODUCAO ? 'producao' : ambiente();
-export const focusBase = (amb = ambiente()) => amb === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
-const focusToken = (amb = ambiente()) => amb === 'producao' ? env('FOCUS_TOKEN_PRODUCAO') : env('FOCUS_TOKEN_HOMOLOGACAO');
+// 'principal' = token principal da conta (API de empresas, que só existe em produção)
+export const focusBase = (amb = ambiente()) => amb === 'producao' || amb === 'principal' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+const focusToken = (amb = ambiente()) => amb === 'principal' ? env('FOCUS_TOKEN_PRINCIPAL') : amb === 'producao' ? env('FOCUS_TOKEN_PRODUCAO') : env('FOCUS_TOKEN_HOMOLOGACAO');
 
 // data/hora de Brasília no formato usado pelo sistema
 export function isoBR(){ return new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 19) + '-03:00'; }

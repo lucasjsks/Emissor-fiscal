@@ -24,6 +24,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 - **Impressão direta do cupom:** `imprimirCupom(n)` imprime nosso cupom (com QR real) num iframe em 80 ou 58 mm, página do tamanho exato do conteúdo; config `empresa.impressao` {papel, auto}; com `auto`, imprime logo após autorizar. Botão principal da nota 65 autorizada.
 - **Rejeições explicadas:** `REJ` (código SEFAZ → o que aconteceu / como resolver / onde ir) e `explicarRejeicao(n)` na tela da nota; acha o item por `nItem` e oferece abrir o produto.
 - **Enviar ao cliente:** `formEnviar` — WhatsApp (wa.me com texto, link do DANFE, consulta SEFAZ, chave; número do cliente em `cliente.telefone`) e e-mail pela Focus (`evento` tipo `email` → POST `/v2/{nfce|nfe}/REF/email`, guarda `enviada_para`). E-mail ainda não testado em envio real.
+- **Certificado digital pelo sistema:** aba Empresa → quadro "Certificado digital A1" (só dono). `api/certificado.js` recebe o .pfx em base64 + senha (+ CSC de produção e opção de ligar a Manifestação) e manda para a API de empresas da Focus (só produção, `FOCUS_TOKEN_PRINCIPAL`, `focus(...,{amb:'principal'})`): acha a empresa pelo CNPJ (PUT) ou cria (POST com os dados da empresa). Arquivo e senha **nunca** são gravados nem logados; só `empresa.certificado` {valido_ate, cnpj, enviado_em, focus_id, manifestacao}. Alerta no Início quando faltar ≤30 dias ou vencer.
 - **Cupom rápido:** Enter na busca adiciona por código interno/GTIN exato (leitor), `3*código` multiplica, etiqueta de balança (13 dígitos começando com 2; config em `empresa.balanca` {ativo, digitos 4|5, tipo preco|peso}; produto achado pelo código interno), atalhos (`produto.favorito`), teclas F2/F4/F6/F7/F8/F9 e Del. Quantidades com até 4 casas (`rq`).
 - Testar o banco: `npm run test:banco` (precisa de Postgres local; `test/banco/prelude.sql` imita o Supabase).
 - Papéis: dono > gerente > operador. Checar no servidor (`papelDe`) e no RLS (`pode_gravar`/`pode_apagar`), não só na tela.
@@ -34,7 +35,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 
 ## Fluxo de trabalho
 - Trabalhar em branch e abrir PR; o Lucas faz o merge (a Vercel publica a `main`).
-- Variáveis da Vercel: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FOCUS_TOKEN_HOMOLOGACAO, FOCUS_AMBIENTE (e FOCUS_TOKEN_PRODUCAO quando for para produção).
+- Variáveis da Vercel: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, FOCUS_TOKEN_HOMOLOGACAO, FOCUS_AMBIENTE, FOCUS_TOKEN_PRINCIPAL (API de empresas/certificado) e FOCUS_TOKEN_PRODUCAO quando for para produção. `salvarEmp` preserva os campos da empresa que não estão no formulário.
 
 ## Roteiro
 1. Fundação (feito e validado em homologação): login, multiempresa, emissão real de NFC-e e NF-e.
