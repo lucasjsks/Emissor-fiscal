@@ -931,9 +931,6 @@ function vEmpresa(){
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
     <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}
-  <div class="card"><h3 style="margin-top:0">Ligação com a Focus NFe</h3>
-    <p class="small">O certificado A1 e o CSC são enviados pelo quadro <b>Certificado digital</b> acima e vão direto para a Focus NFe — o arquivo e a senha nunca ficam guardados neste sistema. Os tokens da API ficam só no servidor (Vercel).</p>
-    <p>ID do CSC: <b>${esc(e.csc_id || '—')}</b></p></div>
   <div class="card"><h3 style="margin-top:0">Armazenamento</h3><p class="small">${S.mode === 'db' ? 'Dados salvos na nuvem — abra este link em qualquer aparelho.' : 'Esta visualização não acessa a nuvem: os dados ficam só neste navegador.'}</p></div>`;
 }
 
@@ -1907,8 +1904,7 @@ async function carregarMembros(){
 function cardUsuarios(){
   if (!SB) return '';
   const nomePapel = { dono:'dono', gerente:'gerente', operador:'operador' };
-  const conta = `<div class="card"><h3 style="margin-top:0">Sua conta</h3><p>${esc(S.meuEmail)}${S.papelEmp ? ' · <b>' + nomePapel[S.papelEmp] + '</b> nesta empresa' : ''}</p>
-    <div class="actions"><button class="btn" data-act="sair">Sair</button></div></div>`;
+  const conta = `<div class="card"><h3 style="margin-top:0">Sua conta</h3><p>${esc(S.meuEmail)}${S.papelEmp ? ' · <b>' + nomePapel[S.papelEmp] + '</b> nesta empresa' : ''}</p></div>`;
   return conta; // cada empresa tem um único usuário (o dono): não há convites
 }
 
