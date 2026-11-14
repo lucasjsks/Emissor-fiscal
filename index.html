@@ -279,14 +279,14 @@ const PAG_NOME = Object.fromEntries(PAGAMENTOS);
 const CBS_2026 = 0.9, IBS_2026 = 0.1; // alíquotas de teste de 2026 (destaque informativo)
 
 /* ================== estado e armazenamento ================== */
-const S = { tab:'inicio', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
+const S = { tab:'inicio', recebidas:[], recFiltro:'pend', recBusca:'', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
   nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estFiltro:'todos', estBusca:'', cpView:'notas', cpBusca:'', cpMes:'', cm:null, conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
 let db = null, unsubs = [], local = {};
 const LS = 'emissor-fiscal-v1';
 S.nfe = { op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } };
 function lsLoad(){ try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch(e){ return {}; } }
 function lsSave(){ try { localStorage.setItem(LS, JSON.stringify(local)); } catch(e){} }
-const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes','fornecedores','compras','vinculos'];
+const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes','fornecedores','compras','vinculos','recebidas'];
 // compras_xml (XML original das notas de compra) é lido só sob demanda
 const colOf = k => k === 'empresas' ? 'empresas' : `empresas/${S.empId}/${k}`;
 const emp = () => S.empresas.find(e => e.id === S.empId) || null;
@@ -2094,7 +2094,7 @@ function autoPreencher(t){
 }
 
 /* ================== COMPRAS E ESTOQUE ================== */
-Object.assign(ACT_PERM, { devCompra:'produto', emitirDevCompra:'produto', dcTudo:'produto', dcNada:'produto', novaCompra:'produto', corrigirCompra:'produto', lancarCompraXml:'produto', salvarCompra:'produto', confEstornar:'produto',
+Object.assign(ACT_PERM, { recBuscar:'produto', recAceitar:'produto', recRecusar:'produto', recManif:'produto', recDanfe:'produto', recXml:'produto', devCompra:'produto', emitirDevCompra:'produto', dcTudo:'produto', dcNada:'produto', novaCompra:'produto', corrigirCompra:'produto', lancarCompraXml:'produto', salvarCompra:'produto', confEstornar:'produto',
   salvarAjuste:'produto', salvarMinimo:'produto', novoFornecedor:'produto', editFornecedor:'produto', salvarFornecedor:'produto', delFornecedor:'produto', confDelFornecedor:'produto' });
 AUTO.fornecedor = { doc:'fnCnpj', info:'fnAutoInfo', nome:'fnNome', fantasia:'fnFant', fone:'fnFone', email:'fnEmail', regime:null, log:'fnLog', num:'fnNum', bai:'fnBai', cep:'fnCep', mun:'fnMun', ibge:'fnIbge', uf:'fnUf' };
 const temSaldo = p => typeof p.estoque === 'number';
@@ -2144,8 +2144,11 @@ function parseCompraXml(txt){
 /* ---------- aba Compras ---------- */
 function vCompras(){
   const v = S.cpView || 'notas';
-  return `<h2>Compras</h2><div class="seg" style="margin-bottom:12px">${[['notas','Notas de compra'],['fornecedores','Fornecedores']].map(([k, l]) => `<button data-act="cpView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
-    + (v === 'notas' ? vNotasCompra() : vFornecedores());
+  const nPend = S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave)).length;
+  if (v === 'recebidas' && pode('produto') && !S.recAuto){ S.recAuto = true; const m = (emp() || {}).mde || {};
+    if (!m.sinc_em || Date.now() - new Date(m.sinc_em) > 15 * 60e3) setTimeout(() => recBuscar(null, true), 50); }
+  return `<h2>Compras</h2><div class="seg" style="margin-bottom:12px">${[['notas','Notas de compra'], ...(pode('produto') ? [['recebidas', `Recebidas da SEFAZ${nPend ? ` (${nPend})` : ''}`]] : []), ['fornecedores','Fornecedores']].map(([k, l]) => `<button data-act="cpView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
+    + (v === 'notas' ? vNotasCompra() : v === 'recebidas' ? vRecebidas() : vFornecedores());
 }
 function vNotasCompra(){
   const q = norm(S.cpBusca || ''), mes = S.cpMes || '';
@@ -2166,6 +2169,111 @@ function vNotasCompra(){
       <div class="s">${dataBR(c.data_emissao)} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</div></div>
       <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 60)} (faltam ${mais})</button></div>` : ''}`
       : `<div class="empty">${S.compras.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
+}
+
+/* ---------- notas recebidas da SEFAZ (Manifestação do Destinatário) ---------- */
+const MANIF = { nulo:['Aguardando resposta','w'], ciencia:['Ciência dada','w'], confirmacao:['Confirmada',''], desconhecimento:['Não reconhecida','b'], nao_realizada:['Não realizada','b'] };
+const compraDaChave = ch => S.compras.find(c => c.chave === ch && c.status !== 'estornada');
+const recPendente = r => r.situacao !== 'cancelada' && ['nulo','ciencia'].includes(r.manifestacao || 'nulo');
+function prazoRec(r){ // ciência/confirmação: 180 dias; desconhecimento é mais curto — usamos 10 dias como alerta
+  const d = Math.floor((Date.now() - new Date(String(r.data_emissao).slice(0, 10) + 'T12:00:00-03:00')) / 864e5); return d;
+}
+function vRecebidas(){
+  const m = (emp() || {}).mde || {}, f = S.recFiltro || 'pend', q = norm(S.recBusca || '');
+  let L = [...S.recebidas].sort((a, b) => String(b.data_emissao).localeCompare(String(a.data_emissao)));
+  const filtros = { pend:recPendente, lanc:r => !!compraDaChave(r.chave), recus:r => ['desconhecimento','nao_realizada'].includes(r.manifestacao), canc:r => r.situacao === 'cancelada', todas:() => true };
+  const n = Object.fromEntries(Object.entries(filtros).map(([k, fn]) => [k, S.recebidas.filter(fn).length]));
+  L = L.filter(filtros[f] || filtros.pend);
+  if (q) L = L.filter(r => norm(r.emitente_nome).includes(q) || r.emitente_doc.includes(dig(q) || '@') || r.chave.includes(dig(q) || '@'));
+  return `<div class="card"><div class="row" style="align-items:center"><div style="flex:1"><b>Notas emitidas contra o seu CNPJ</b>
+      <div class="small">A SEFAZ avisa toda nota de fornecedor emitida para ${esc(fmtDoc((emp() || {}).cnpj))}. Responda cada uma: aceite e dê entrada no estoque, ou recuse.${m.sinc_em ? `<br>Última busca: ${fmtData(m.sinc_em)}` : ''}</div></div>
+      <div style="flex:0 0 auto"><button class="btn pri" data-act="recBuscar">↻ Buscar notas agora</button></div></div>
+    ${m.ambiente === 'homologacao' || (!m.ambiente && S.ambiente !== 'producao') ? '<div class="msg warn" style="margin-top:8px">O sistema está em homologação. A SEFAZ de testes não traz as notas reais dos fornecedores: elas aparecem quando o token de produção da Focus for cadastrado.</div>' : ''}</div>
+  <div class="card"><input id="recBusca" placeholder="Buscar por fornecedor, CNPJ ou chave" value="${esc(S.recBusca || '')}" autocomplete="off">
+    <div class="seg" style="margin-top:8px">${[['pend','Aguardando resposta'],['lanc','Lançadas'],['recus','Recusadas'],['canc','Canceladas'],['todas','Todas']].map(([k, l]) => `<button data-act="recFiltro" data-f="${k}" class="${f === k ? 'on' : ''}">${l} (${n[k]})</button>`).join('')}</div></div>
+  <div class="card">${L.length ? `<div class="list">${L.map(r => { const c = compraDaChave(r.chave), [ml, mc] = MANIF[r.manifestacao] || MANIF.nulo;
+    return `<div class="it" data-act="verRecebida" data-id="${esc(r.chave)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(r.emitente_nome)}</div>
+      <div class="s">${fmtDoc(r.emitente_doc)} · emitida ${dataBR(r.data_emissao)}${recPendente(r) && prazoRec(r) > 7 ? ` · <b style="color:var(--warn)">há ${prazoRec(r)} dias</b>` : ''}</div></div>
+      <div style="text-align:right"><b class="num">${brl(r.valor)}</b><br>${r.situacao === 'cancelada' ? '<span class="tag b">cancelada pelo fornecedor</span>' : c ? '<span class="tag">lançada</span>' : `<span class="tag ${mc}">${ml}</span>`}</div></div>`; }).join('')}</div>`
+    : `<div class="empty">${S.recebidas.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma nota recebida ainda. Clique em "Buscar notas agora".'}</div>`}</div>`;
+}
+async function recBuscar(btn, silencioso){
+  if (btn) btn.disabled = true;
+  try { const r = await api('recebidas', { empresa_id:S.empId, acao:'buscar' }); if (!silencioso) toast(r.gravadas ? `${r.gravadas} nota(s) atualizada(s).` : 'Nenhuma nota nova.'); }
+  catch(e){ if (!silencioso) toast(e.message); else S.recErro = e.message; }
+  finally { if (btn) btn.disabled = false; }
+}
+function verRecebida(chave){
+  const r = S.recebidas.find(x => x.chave === chave); if (!r) return;
+  const c = compraDaChave(chave), [ml] = MANIF[r.manifestacao] || MANIF.nulo, aberta = r.situacao !== 'cancelada', resp = ['confirmacao','desconhecimento','nao_realizada'].includes(r.manifestacao);
+  openModal(`${mhead('Nota recebida')}
+  <div class="card" style="margin:0 0 10px"><b>${esc(r.emitente_nome)}</b> <span class="small">${fmtDoc(r.emitente_doc)}</span><br>
+    <span class="small">Emitida em ${dataBR(r.data_emissao)} · valor <b>${brl(r.valor)}</b><br>Chave ${fmtChave(r.chave)}</span><br>
+    <span class="small">Situação na SEFAZ: <b>${r.situacao === 'cancelada' ? 'cancelada pelo fornecedor' : esc(r.situacao)}</b> · sua resposta: <b>${ml}</b>${r.manifestado_em ? ' em ' + fmtData(r.manifestado_em) : ''}</span></div>
+  ${c ? `<div class="msg ok">Esta nota já deu entrada no estoque (compra nº ${esc(c.numero)}).</div><div class="actions" style="margin-top:0"><button class="btn" data-act="verCompra" data-id="${esc(c.id)}">Ver a compra</button></div>` : ''}
+  ${!aberta ? '<div class="msg warn">O fornecedor cancelou esta nota. Não há o que fazer com ela.</div>' : ''}
+  ${aberta && !c && !['desconhecimento','nao_realizada'].includes(r.manifestacao) ? `<h3>Aceitar</h3>
+    <button class="btn pri block" data-act="recAceitar" data-id="${esc(chave)}">✓ Aceitar e dar entrada no estoque</button>
+    <p class="small">O sistema avisa a SEFAZ (ciência), baixa a nota completa e abre a conferência dos itens. Ao lançar, a operação é confirmada na SEFAZ.</p>
+    ${r.manifestacao !== 'confirmacao' ? `<button class="btn block" data-act="recRecusar" data-t="confirmacao" data-id="${esc(chave)}">Confirmar sem dar entrada no estoque</button>
+    <p class="small">Para compras de uso e consumo (material de limpeza, escritório) que não vão para o estoque.</p>` : ''}` : ''}
+  ${aberta && !resp ? `<h3>Recusar</h3>
+    <button class="btn bad block" data-act="recRecusar" data-t="nao_realizada" data-id="${esc(chave)}">A compra não aconteceu (devolvi ou recusei a mercadoria)</button>
+    <button class="btn bad block" data-act="recRecusar" data-t="desconhecimento" data-id="${esc(chave)}" style="margin-top:8px">Não reconheço esta nota (não comprei deste fornecedor)</button>` : ''}
+  ${r.completa || r.manifestacao !== 'nulo' ? `<div class="actions"><button class="btn" data-act="recDanfe" data-id="${esc(chave)}">📄 Ver nota (DANFE)</button><button class="btn" data-act="recXml" data-id="${esc(chave)}">⤓ Baixar XML</button></div>` : ''}
+  <div id="errM"></div>`);
+}
+async function manifestar(chave, tipo, justificativa){
+  const r = await api('recebidas', { empresa_id:S.empId, acao:'manifestar', chave, tipo, justificativa });
+  if (!r.ok) throw new Error(r.mensagem || 'A SEFAZ não registrou a resposta.');
+  return r;
+}
+async function xmlRecebida(chave){
+  const r = S.recebidas.find(x => x.chave === chave);
+  if (r && (r.manifestacao || 'nulo') === 'nulo') await manifestar(chave, 'ciencia');
+  const x = await api('recebidas', { empresa_id:S.empId, acao:'xml', chave });
+  if (!x.ok) throw new Error(x.mensagem);
+  return x.xml;
+}
+async function recAceitar(chave, btn){
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Avisando a SEFAZ e baixando a nota completa…</div>';
+  try {
+    const xml = await xmlRecebida(chave); closeModal();
+    S.confirmarAoLancar = chave;
+    importarXmls([{ name:`NFe${chave}.xml`, text:async () => xml }]);
+  } catch(e){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+// depois de lançar a compra vinda de uma nota recebida, confirma a operação na SEFAZ
+async function confirmarRecebidaLancada(chave){
+  const r = S.recebidas.find(x => x.chave === chave);
+  if (!r || r.manifestacao === 'confirmacao') return;
+  try { await manifestar(chave, 'confirmacao'); } catch(e){ toast('Compra lançada, mas a confirmação na SEFAZ falhou: ' + e.message + ' Abra a nota em Recebidas e confirme.'); }
+}
+function formRecusar(chave, tipo){
+  const nr = tipo === 'nao_realizada', conf = tipo === 'confirmacao';
+  openModal(`${mhead(conf ? 'Confirmar a compra' : nr ? 'A compra não aconteceu' : 'Não reconheço esta nota')}
+  <p>${conf ? 'A SEFAZ registra que você <b>recebeu</b> a mercadoria (confirmação da operação). Os itens <b>não</b> entram no estoque, porque são de uso e consumo.' : nr ? 'Use quando a mercadoria não chegou, foi devolvida na entrega ou você recusou o recebimento. A SEFAZ registra que a operação <b>não foi realizada</b>.'
+    : 'Use quando você <b>não fez</b> esta compra (pode ser erro do fornecedor ou uso indevido do seu CNPJ). A SEFAZ registra o <b>desconhecimento</b> da operação. Faça isso logo: o prazo é curto.'}</p>
+  ${nr ? '<label for="recJust">Motivo (mínimo 15 letras)</label><input id="recJust" placeholder="Ex.: mercadoria recusada na entrega por avaria">' : ''}
+  <div class="msg warn">Essa resposta vai para a SEFAZ e não pode ser desfeita.</div><div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="verRecebida" data-id="${esc(chave)}">Voltar</button><button class="btn ${conf ? "pri" : "bad"}" data-act="recManif" data-t="${tipo}" data-id="${esc(chave)}">${conf ? 'Confirmar na SEFAZ' : 'Enviar para a SEFAZ'}</button></div>`);
+}
+async function recManif(chave, tipo, btn){
+  const just = tipo === 'nao_realizada' ? val('recJust') : '';
+  if (tipo === 'nao_realizada' && just.length < 15) return $('#errM').innerHTML = '<div class="msg err">Escreva o motivo com pelo menos 15 letras.</div>';
+  btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
+  try { await manifestar(chave, tipo, just); toast({ confirmacao:'Operação confirmada na SEFAZ.', nao_realizada:'Registrado: operação não realizada.', desconhecimento:'Registrado: nota não reconhecida.' }[tipo]); closeModal(); }
+  catch(e){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function recDanfe(chave, btn){
+  btn.disabled = true;
+  try { const xml = await xmlRecebida(chave), D = danfeDeXml(xml); imprimirDoc(`DANFE ${D.numero} - ${D.emit.nome}`, DANFE_CSS, danfeOficialHtml(D)); }
+  catch(e){ toast(e.message); } finally { btn.disabled = false; }
+}
+async function recXml(chave, btn){
+  btn.disabled = true;
+  try { const xml = await xmlRecebida(chave); if (await salvarArquivo(`NFe${chave}.xml`, new Blob([xml], { type:'application/xml' }))) toast('XML baixado.'); }
+  catch(e){ toast(e.message); } finally { btn.disabled = false; }
 }
 
 /* ---------- importação de XML (uma ou várias notas) ---------- */
@@ -2265,6 +2373,7 @@ async function lancarCompraXml(btn){
     const semPreco = novos.filter(i => !(numIn(i.preco) > 0)).length;
     S.filaFeitas = (S.filaFeitas || 0) + 1; closeModal();
     toast(`Nota ${x.numero} lançada: ${itens.length} item(ns) no estoque.${semPreco ? ' Defina o preço dos produtos novos.' : ''}`);
+    if (x.chave && S.recebidas.some(r => r.chave === x.chave)) confirmarRecebidaLancada(x.chave);
     proximoXml();
   } catch(err){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
 }
@@ -2753,6 +2862,14 @@ async function acoesEstoque(a, t, id){
     case 'confEstornar': t.disabled = true; await confEstornar(id); t.disabled = false; return true;
     case 'lancarCompraXml': await lancarCompraXml(t); return true;
     case 'pularXml': closeModal(); proximoXml(); return true;
+    case 'recBuscar': await recBuscar(t); return true;
+    case 'recFiltro': S.recFiltro = t.dataset.f; render(); return true;
+    case 'verRecebida': verRecebida(id); return true;
+    case 'recAceitar': await recAceitar(id, t); return true;
+    case 'recRecusar': formRecusar(id, t.dataset.t); return true;
+    case 'recManif': await recManif(id, t.dataset.t, t); return true;
+    case 'recDanfe': await recDanfe(id, t); return true;
+    case 'recXml': await recXml(id, t); return true;
     case 'cancelarFila': S.filaXml = []; S.compraImport = null; closeModal(); return true;
     case 'novaCompra': novaCompra(); return true;
     case 'devCompra': formDevCompra(id); return true;
@@ -2789,6 +2906,7 @@ async function acoesEstoque(a, t, id){
 }
 function inputEstoque(t){
   if (t.id === 'estBusca'){ S.estBusca = t.value; later(); return true; }
+  if (t.id === 'recBusca'){ S.recBusca = t.value; later(); return true; }
   if (t.id === 'cpBusca'){ S.cpBusca = t.value; S.cpLim = 60; later(); return true; }
   if (t.dataset.dq !== undefined && S.dc){ S.dc.q[+t.dataset.dq] = t.value; const D = calcDevCompra(), el = $('#dcTot');
     if (el) el.innerHTML = D.linhas.length ? `${D.ipi ? linhaTot('IPI devolvido', D.ipi, 'small') : ''}${D.st ? linhaTot('ICMS-ST devolvido', D.st, 'small') : ''}${linhaTot('Total da devolução', D.total, 'big')}` : '<div class="small">Nenhum item marcado.</div>';
@@ -2924,6 +3042,8 @@ function alertasInicio(){
     const semPreco = P.filter(p => !(num(p.preco) > 0)).length;
     if (semPreco) add('warn', `${semPreco} produto(s) sem preço de venda`, 'irPara', 'data-tab="produtos"');
     const parc = []; S.compras.filter(c => c.status !== 'estornada').forEach(c => (c.duplicatas || []).forEach(d => { if (d.venc >= hoje && d.venc <= em7) parc.push({ c, d }); }));
+    const recP = S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave)).length;
+    if (recP) add('warn', `${recP} nota(s) de fornecedor aguardando sua resposta na SEFAZ`, 'irPara', 'data-tab="compras" data-cv="recebidas"');
     if (parc.length) add('info', `${parc.length} parcela(s) de compra vencendo nos próximos 7 dias: ${brl(parc.reduce((a, x) => a + num(x.d.valor), 0))}`, 'irPara', 'data-tab="compras"');
   }
   return A;
@@ -2992,7 +3112,7 @@ let cliqueNoFundo = false;
 document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
-  if (t.dataset.tab){ if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab){ if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
   const P = () => S.produtos.find(x => x.id === id);

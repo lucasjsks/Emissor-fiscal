@@ -12,25 +12,30 @@ export function env(k){
 }
 
 export const ambiente = () => process.env.FOCUS_AMBIENTE === 'producao' ? 'producao' : 'homologacao';
-export const focusBase = () => ambiente() === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
-const focusToken = () => ambiente() === 'producao' ? env('FOCUS_TOKEN_PRODUCAO') : env('FOCUS_TOKEN_HOMOLOGACAO');
+// notas recebidas (MD-e) só existem de verdade em produção: usa produção assim que o token de produção existir
+export const ambienteMde = () => process.env.FOCUS_TOKEN_PRODUCAO ? 'producao' : ambiente();
+export const focusBase = (amb = ambiente()) => amb === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+const focusToken = (amb = ambiente()) => amb === 'producao' ? env('FOCUS_TOKEN_PRODUCAO') : env('FOCUS_TOKEN_HOMOLOGACAO');
 
 // data/hora de Brasília no formato usado pelo sistema
 export function isoBR(){ return new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 19) + '-03:00'; }
 
 // ---------- Focus NFe ----------
-export async function focus(method, path, body){
+// opcoes.amb: força o ambiente; opcoes.texto: devolve o corpo como texto (ex.: XML) e os cabeçalhos
+export async function focus(method, path, body, opcoes = {}){
+  const amb = opcoes.amb || ambiente();
   let r;
   try {
-    r = await fetch(focusBase() + path, {
+    r = await fetch(focusBase(amb) + path, {
       method,
-      headers:{ Authorization:'Basic ' + Buffer.from(focusToken() + ':').toString('base64'), 'Content-Type':'application/json' },
+      headers:{ Authorization:'Basic ' + Buffer.from(focusToken(amb) + ':').toString('base64'), 'Content-Type':'application/json' },
       body:body === undefined ? undefined : JSON.stringify(body)
     });
-  } catch(e){ return { status:0, body:{ mensagem:'Não foi possível conectar à Focus NFe: ' + e.message } }; }
+  } catch(e){ return { status:0, body:{ mensagem:'Não foi possível conectar à Focus NFe: ' + e.message }, headers:{ get:() => null } }; }
   const t = await r.text(); let j;
+  if (opcoes.texto) return { status:r.status, texto:t, headers:r.headers || { get:() => null } };
   try { j = t ? JSON.parse(t) : {}; } catch { j = { mensagem:t.slice(0, 500) }; }
-  return { status:r.status, body:j };
+  return { status:r.status, body:j, headers:r.headers || { get:() => null } };
 }
 
 export function mensagemFocus(r = {}){
@@ -75,6 +80,12 @@ export const rpc = (fn, args) => sb('/rest/v1/rpc/' + fn, { method:'POST', body:
 export async function getDoc(path){
   const rows = await sb('/rest/v1/docs?select=data&path=eq.' + encodeURIComponent(path));
   return rows && rows[0] ? rows[0].data : null;
+}
+// grava vários documentos numa chamada só
+export async function putDocs(lista, userId){
+  if (!lista.length) return;
+  await sb('/rest/v1/docs?on_conflict=path', { method:'POST', prefer:'resolution=merge-duplicates,return=minimal',
+    body:lista.map(({ path, data }) => ({ path, col:path.replace(/\/[^/]+$/, ''), empresa_id:path.split('/')[1], data, atualizado_por:userId || null })) });
 }
 export async function putDoc(path, data, userId){
   const col = path.replace(/\/[^/]+$/, ''), empresa_id = path.startsWith('empresas/') ? path.split('/')[1] : null;
