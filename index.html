@@ -241,6 +241,47 @@ nav .nav-brand,nav .nav-sec{display:none}
 @media(min-width:1000px){#suporte{bottom:24px;right:24px;padding:11px 18px 11px 13px}#suporte span{display:inline}}
 .btn.whats{background:#25d366;border-color:#1fb457;color:#fff;text-decoration:none}.btn.whats:hover{background:#1fb457;text-decoration:none}.btn.whats svg{width:20px;height:20px}
 @media print{#suporte{display:none}}
+/* ===== PDV (frente de caixa em tela cheia) ===== */
+body.pdv header,body.pdv #nav,body.pdv #ambBar,body.pdv #suporte{display:none!important}
+body.pdv main,body.pdv #main,body.pdv main>*{margin:0!important;padding:0!important;max-width:none!important}
+body.pdv .pdv-wrap{padding:0!important}
+body.pdv{background:#e9eef5}
+.pdv-wrap{display:flex;flex-direction:column;height:100vh;height:100dvh;font-size:15px}
+.pdv-top{display:flex;align-items:center;gap:14px;background:#0f1d33;color:#fff;padding:8px 16px;flex:0 0 auto}
+.pdv-top .marca{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;letter-spacing:.2px}.pdv-top .marca img{width:28px;height:28px}
+.pdv-top .marca small{font-weight:600;color:#7dd3a7;font-size:12px;border:1px solid #2f6b52;border-radius:6px;padding:1px 6px}
+.pdv-top .info{flex:1;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:#c7d2e3}.pdv-top .info b{color:#fff}
+.pdv-top .relogio{font-variant-numeric:tabular-nums;font-size:20px;font-weight:700}
+.pdv-top button{background:#1f3352;color:#fff;border:1px solid #33507a;border-radius:8px;padding:7px 12px;font-weight:600;cursor:pointer}.pdv-top button:hover{background:#2a4469}
+.pdv-top .sair{background:#5b1e24;border-color:#86313a}
+.pdv-body{flex:1;display:grid;grid-template-columns:1fr 400px;gap:12px;padding:12px;min-height:0}
+.pdv-esq,.pdv-dir{display:flex;flex-direction:column;gap:12px;min-height:0}
+.pdv-box{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(15,29,51,.12);padding:12px 14px}
+.pdv-ult{display:flex;align-items:center;gap:16px;background:#0f1d33;color:#fff}
+.pdv-ult .d{flex:1;font-size:22px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pdv-ult .q{color:#9fb3cf;font-size:15px}
+.pdv-ult .v{font-size:30px;font-weight:800;color:#7dd3a7;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pdv-itens{flex:1;overflow:auto;padding:0}
+.pdv-itens table{width:100%;border-collapse:collapse}.pdv-itens th{position:sticky;top:0;background:#f3f6fa;text-align:left;font-size:12px;color:#55627a;text-transform:uppercase;padding:8px 10px;z-index:1}
+.pdv-itens td{padding:7px 10px;border-bottom:1px solid #eef1f5;font-variant-numeric:tabular-nums}.pdv-itens tr:last-child td{background:#f0faf4}
+.pdv-itens .n{text-align:right;white-space:nowrap}.pdv-itens .qbtn{border:1px solid #cfd7e3;background:#fff;border-radius:6px;width:26px;height:26px;cursor:pointer;font-weight:700}
+.pdv-itens .rm{border:0;background:none;color:#b42318;font-size:18px;cursor:pointer}
+.pdv-vazio{display:flex;align-items:center;justify-content:center;height:100%;color:#8a94a6;font-size:18px;text-align:center;padding:30px}
+.pdv-busca{position:relative}.pdv-busca input{font-size:20px;padding:14px 16px;height:auto;border:2px solid #2563eb}
+.pdv-busca .results{position:absolute;left:0;right:0;bottom:100%;margin-bottom:6px;background:#fff;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.2);max-height:50vh;overflow:auto;z-index:5}
+.pdv-busca .results:empty{display:none}
+.pdv-atalhos{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.pdv-atalhos button{border:1px solid #cfd7e3;background:#f7f9fc;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px}
+.pdv-total{background:#0f1d33;color:#fff;text-align:right}.pdv-total .r{font-size:13px;color:#9fb3cf;text-transform:uppercase;letter-spacing:.5px}
+.pdv-total .v{font-size:46px;font-weight:800;color:#7dd3a7;line-height:1.1;font-variant-numeric:tabular-nums}
+.pdv-total .sub{display:flex;justify-content:space-between;font-size:13px;color:#c7d2e3;margin-top:4px}
+.pdv-pags{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pdv-pags button{border:1px solid #cfd7e3;background:#f7f9fc;border-radius:10px;padding:10px 8px;cursor:pointer;font-weight:700;text-align:left}
+.pdv-pags button:hover{background:#eaf1fb;border-color:#2563eb}.pdv-pags kbd{float:right;background:#0f1d33;color:#fff;border-radius:5px;padding:1px 6px;font-size:11px;font-family:inherit}
+.pdv-dir .scroll{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;min-height:0}
+.pdv-troco{display:flex;justify-content:space-between;align-items:center;font-size:24px;font-weight:800;color:#0b7a4b}
+.pdv-falta{display:flex;justify-content:space-between;align-items:center;font-size:20px;font-weight:800;color:#b42318}
+.pdv-fim{display:flex;gap:8px}.pdv-fim .btn{padding:16px 10px;font-size:17px}.pdv-fim .pri{flex:2}
+.pdv-rod{flex:0 0 auto;background:#0f1d33;color:#9fb3cf;font-size:12px;padding:6px 16px;display:flex;gap:16px;flex-wrap:wrap}.pdv-rod b{color:#fff;background:#1f3352;border-radius:4px;padding:0 5px}
+.pdv-ok{text-align:center}.pdv-ok .icone{font-size:46px;color:#0b7a4b}.pdv-ok .troco{font-size:34px;font-weight:800;color:#0b7a4b;margin:6px 0}
+@media(max-width:900px){.pdv-body{grid-template-columns:1fr;overflow:visible}.pdv-top{flex-wrap:wrap;gap:8px}.pdv-top .relogio{font-size:16px}.pdv-top button{padding:6px 9px;font-size:13px}.pdv-itens .hm{display:none}.pdv-ult .d{font-size:17px;white-space:normal}.pdv-ult .v{font-size:22px}.pdv-busca input{font-size:16px}.pdv-wrap{overflow-x:hidden}.pdv-wrap{height:auto;min-height:100vh}.pdv-itens{max-height:45vh}.pdv-total .v{font-size:36px}.pdv-top .info{display:none}}
 </style>
 </head>
 <body>
@@ -727,12 +768,15 @@ function render(){
   const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
   $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' ? '' : 'none';
+  if (S.pdv && (fora || S.tab !== 'venda' || !e)) S.pdv = false;
+  document.body.classList.toggle('pdv', !!S.pdv);
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
   else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
-  } else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, empresa:vEmpresa })[S.tab]();
+  } else if (S.pdv && S.tab === 'venda') m.innerHTML = vPdv();
+  else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -753,7 +797,7 @@ function pagResumo(total){
 function vVenda(){
   if (!S.produtos.length) return `<h2>Cupom fiscal (NFC-e)</h2><div class="card empty">Cadastre pelo menos um produto para começar a vender.${pode('produto') ? '<br><br><button class="btn pri" data-act="novoProd">Cadastrar produto</button>' : ''}</div>`;
   const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), lim = num(e.limite_cpf_nfce || 10000);
-  return `<h2>Cupom fiscal (NFC-e)</h2>${bannerCorrecao(S.reenviar65, 'limpar')}
+  return `<div class="row" style="align-items:center"><h2 style="flex:1;min-width:220px">Cupom fiscal (NFC-e)</h2><button class="btn pri" data-act="pdvAbrir" title="Frente de caixa em tela cheia">🖥 Abrir PDV (tela cheia)</button></div>${bannerCorrecao(S.reenviar65, 'limpar')}
   <div class="grid2"><div>
     <div class="card"><label for="busca">Buscar produto (nome, código ou código de barras)</label>
       <input id="busca" autocomplete="off" placeholder="Digite ou passe o leitor…" value="${esc(S.busca)}">
@@ -787,6 +831,74 @@ function vVenda(){
       <div class="actions"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Limpar</button><button class="btn pri" data-act="emitirNfce" ${L.length ? '' : 'disabled'}>${S.conting ? 'Emitir em contingência' : 'Emitir cupom'}</button></div>
       <p class="small">Venda para CNPJ não sai em NFC-e: use a aba NF-e. CPF obrigatório a partir de ${brl(lim)}.</p>
     </div></div></div>`;
+}
+// ---------- PDV: frente de caixa profissional (tela cheia) ----------
+function vPdv(){
+  const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), lim = num(e.limite_cpf_nfce || 10000), cx = caixaAberto();
+  const ult = L[L.length - 1], qtdItens = r2(L.reduce((a, l) => a + l.qtd, 0));
+  const F = S.produtos.filter(p => p.favorito).sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')).slice(0, 12);
+  const teclas = { '01':'F4', '17':'F6', '04':'F7', '03':'F8' };
+  const agora = new Date(), hora = agora.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), data = agora.toLocaleDateString('pt-BR');
+  return `<div class="pdv-wrap">
+  <div class="pdv-top"><div class="marca"><img src="img/logo.png" alt="">NotaOne <small>PDV</small></div>
+    <div class="info"><span>Empresa <b>${esc(e.fantasia || e.razao || '')}</b></span><span>Caixa <b>${cx ? 'aberto' : 'fechado'}</b></span>${ambAtual() !== 'producao' ? '<span style="color:#fbbf24"><b style="color:#fbbf24">HOMOLOGAÇÃO</b> · sem valor fiscal</span>' : ''}${!navigator.onLine ? '<span style="color:#fca5a5"><b style="color:#fca5a5">SEM INTERNET</b></span>' : ''}</div>
+    <div class="relogio" id="pdvRelogio" title="${data}">${hora}</div>
+    <button data-act="pdvTela">${document.fullscreenElement ? '⤡ Sair da tela cheia' : '⤢ Tela cheia'}</button><button class="sair" data-act="pdvSair">Fechar PDV</button></div>
+  ${bannerCorrecao(S.reenviar65, 'limpar') ? `<div style="padding:12px 12px 0">${bannerCorrecao(S.reenviar65, 'limpar')}</div>` : ''}
+  <div class="pdv-body"><div class="pdv-esq">
+    <div class="pdv-box pdv-ult">${ult ? `<div style="flex:1;min-width:0"><div class="d">${esc(ult.p.descricao)}</div><div class="q">${qtdTxt(ult.qtd)} ${esc(ult.p.unidade || 'UN')} × ${brl(ult.preco)}</div></div><div class="v">${brl(r2(ult.c.bruto - ult.descItem))}</div>`
+      : `<div class="d" style="color:#9fb3cf">${cx ? 'Caixa livre — passe o primeiro produto' : 'Caixa fechado'}</div>`}</div>
+    <div class="pdv-box pdv-itens">${L.length ? `<table><tr><th class="hm">#</th><th class="hm">Código</th><th>Descrição</th><th class="n">Qtd</th><th class="n hm">Unitário</th><th class="n">Total</th><th></th></tr>
+      ${L.map((l, i) => `<tr><td class="hm">${i + 1}</td><td class="hm">${esc(l.p.codigo || l.p.gtin || '')}</td><td><span data-act="descItem" data-i="${i}" style="cursor:pointer" title="Dar desconto">${esc(l.p.descricao)}</span>${l.descItem ? ` <span class="small" style="color:#b42318">desc. −${brl(l.descItem)}</span>` : ''}${temSaldo(l.p) && l.p.estoque - l.qtd < 0 ? ' <span class="small" style="color:#b42318">sem estoque</span>' : ''}</td>
+        <td class="n"><button class="qbtn" data-act="qtd" data-i="${i}" data-d="-1">−</button> ${qtdTxt(l.qtd)} ${esc(l.p.unidade || 'UN')} <button class="qbtn" data-act="qtd" data-i="${i}" data-d="1">+</button></td>
+        <td class="n hm">${brl(l.preco)}</td><td class="n"><b>${brl(r2(l.c.bruto - l.descItem))}</b></td><td><button class="rm" data-act="rmItem" data-i="${i}" title="Remover item">×</button></td></tr>`).join('')}</table>`
+      : `<div class="pdv-vazio">${cx ? 'Passe o leitor ou digite o nome/código do produto e tecle <b>&nbsp;Enter</b>.' : 'O caixa está fechado. Feche o PDV e abra o caixa na aba <b>&nbsp;Caixa</b>.'}</div>`}</div>
+    <div class="pdv-box pdv-busca"><div class="results" id="resV">${resultadosHtml(separarMult(S.busca).q, 'addCart')}</div>
+      <input id="busca" autocomplete="off" placeholder="Código de barras, código ou nome do produto  (ex.: 3*7891234567890)" value="${esc(S.busca)}" ${cx ? '' : 'disabled'}>
+      ${F.length ? `<div class="pdv-atalhos">${F.map(p => `<button data-act="addCart" data-id="${esc(p.id)}">${esc(p.descricao)} · <b>${brl(p.preco)}</b></button>`).join('')}</div>` : ''}</div>
+  </div><div class="pdv-dir">
+    <div class="pdv-box pdv-total"><div class="r">Total a pagar</div><div class="v">${brl(T.nota)}</div>
+      <div class="sub"><span>${L.length} item(ns) · ${qtdTxt(qtdItens)} un.</span><span>Subtotal ${brl(T.prod)}${T.desc ? ' · desc. −' + brl(T.desc) : ''}</span></div></div>
+    <div class="scroll"><div class="pdv-box">
+      <div class="pdv-pags">${PAGAMENTOS.slice(0, 4).map(([c, n]) => `<button data-act="addPag" data-c="${c}" ${L.length ? '' : 'disabled'}>${n}<kbd>${teclas[c]}</kbd></button>`).join('')}</div>
+      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Outras formas</summary><div class="pdv-pags" style="margin-top:6px">${PAGAMENTOS.slice(4).map(([c, n]) => `<button data-act="addPag" data-c="${c}" ${L.length ? '' : 'disabled'}>${n}</button>`).join('')}</div></details>
+      ${S.pags.length ? `<div class="list" style="margin-top:8px">${S.pags.map((p, i) => `<div class="it" style="padding:6px 0"><div class="grow"><b>${esc(PAG_NOME[p.forma])}</b></div>
+        <input id="pv${i}" data-pv="${i}" data-rs inputmode="decimal" style="width:130px;text-align:right;font-size:17px" value="${esc(p.valor)}"><button class="x" data-act="rmPag" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}</div>` : ''}
+      ${pg.falta > 0 && S.pags.length ? `<div class="pdv-falta"><span>Falta</span><span>${brl(pg.falta)}</span></div>` : ''}
+      ${pg.troco > 0 ? `<div class="pdv-troco"><span>Troco</span><span>${brl(pg.troco)}</span></div>` : ''}
+    </div>
+    <div class="pdv-box">
+      <label for="descTot" style="margin-top:0">Desconto no total <span class="small">(F10)</span></label>
+      <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="descTipo" data-t="${t}" class="${S.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
+        <input id="descTot" ${S.descTotal.tipo === '%' ? '' : 'data-rs'} inputmode="decimal" placeholder="0" value="${esc(S.descTotal.tipo === '%' ? semRS(S.descTotal.v) : S.descTotal.v)}"></div>
+      <label for="cpf">CPF na nota <span class="small">(F3)</span> ${T.nota >= lim ? '<b style="color:var(--bad)">obrigatório</b>' : ''}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
+      ${CONTINGENCIA_DISPONIVEL ? `<label class="chk"><input type="checkbox" data-act="contOn" ${S.conting ? 'checked' : ''}> Contingência offline</label>` : ''}
+    </div></div>
+    <div id="errV"></div>
+    <div class="pdv-fim"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Cancelar venda</button><button class="btn pri" data-act="emitirNfce" ${L.length && cx ? '' : 'disabled'}>${S.conting ? 'Finalizar em contingência' : 'Finalizar venda'} (F9)</button></div>
+  </div></div>
+  <div class="pdv-rod"><span><b>F2</b> produto</span><span><b>F3</b> CPF</span><span><b>F4</b> dinheiro</span><span><b>F6</b> PIX</span><span><b>F7</b> débito</span><span><b>F8</b> crédito</span><span><b>F9</b> finalizar</span><span><b>F10</b> desconto</span><span><b>3*código</b> quantidade</span><span><b>Del</b> remove o último item</span><span><b>Esc</b> limpa a busca</span></div>
+  </div>`;
+}
+async function pdvAbrir(){
+  S.pdv = true; S.tab = 'venda'; render();
+  try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(_){}
+  render(); const b = $('#busca'); if (b) b.focus();
+}
+async function pdvSair(){ S.pdv = false; try { if (document.fullscreenElement) await document.exitFullscreen(); } catch(_){} render(); window.scrollTo(0, 0); }
+async function pdvTela(){
+  try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch(_){ toast('O navegador não deixou entrar em tela cheia. Tecle F11.'); }
+}
+document.addEventListener('fullscreenchange', () => { if (S.pdv) render(); });
+setInterval(() => { const r = document.getElementById('pdvRelogio'); if (r) r.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); }, 10000);
+// depois de autorizar no PDV: tela rápida com troco e próxima venda
+function pdvConcluido(nota, troco){
+  const ok = nota.status === 'autorizada' || nota.status === 'contingencia';
+  openModal(`<div class="pdv-ok" id="pdvOk"><div class="icone">${ok ? '✔' : '!'}</div><h2 style="margin:4px 0">${nota.status === 'contingencia' ? 'Cupom em contingência' : 'Venda concluída'}</h2>
+    <p class="small">Cupom nº ${nota.numero} · ${brl(nota.total)}</p>${troco > 0 ? `<div class="small">Troco</div><div class="troco">${brl(troco)}</div>` : ''}
+    <div class="actions" style="justify-content:center">${nota.status === 'autorizada' && (nota.focus || {}).qrcode_url ? `<button class="btn" data-act="pdvImprimir" data-id="${esc(nota.id)}">Imprimir cupom</button>` : ''}
+      <button class="btn" data-act="verNota" data-id="${esc(nota.id)}">Ver cupom</button><button class="btn pri" data-act="pdvNova">Nova venda (Enter)</button></div></div>`);
+  setTimeout(() => { const b = document.querySelector('[data-act=pdvNova]'); if (b) b.focus(); }, 50);
 }
 function formDescItem(i){
   const ci = S.cart[i], p = S.produtos.find(x => x.id === ci.pid), bruto = r2(ci.qtd * num(p.preco));
@@ -1150,8 +1262,9 @@ async function emitirNfce(){
     itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, cfop:l.c.cfop, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc })), payload,
     form:{ cart:clone(S.cart), pags:clone(S.pags), descTotal:clone(S.descTotal), cpf:S.cpf, nomeCons:S.nomeCons } };
   const res = await emitirServidor('65', payload, nota, {}, '#errV', S.reenviar65); if (!res) return;
+  const trocoVenda = pagResumo(totais(cartLinhas()).nota).troco;
   S.reenviar65 = null; S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; S.busca = '';
-  render(); verNota(res.nota);
+  render(); if (S.pdv) pdvConcluido(res.nota, trocoVenda); else verNota(res.nota);
   if (res.nota.status === 'autorizada' && ((emp() || {}).impressao || {}).auto && (res.nota.focus || {}).qrcode_url) imprimirCupom(res.nota);
 }
 async function emitirNfe(){
@@ -3154,7 +3267,7 @@ function bip(ok){
   try { const A = window.__ac || (window.__ac = new (window.AudioContext || window.webkitAudioContext)()), o = A.createOscillator(), g = A.createGain();
     o.frequency.value = ok ? 1500 : 220; g.gain.value = 0.08; o.connect(g); g.connect(A.destination); o.start(); o.stop(A.currentTime + (ok ? 0.06 : 0.35)); } catch(_){}
 }
-function limparBusca(){ S.busca = ''; render(); const b = $('#busca'); if (b){ b.value = ''; $('#resV').innerHTML = ''; if (ponteiroFino()) b.focus(); } }
+function limparBusca(){ S.busca = ''; render(); const b = $('#busca'); if (b){ b.value = ''; $('#resV').innerHTML = ''; if (ponteiroFino() || S.pdv) b.focus(); } }
 const separarMult = txt => { const m = String(txt || '').trim().match(/^(\d+(?:[.,]\d+)?)\s*[*xX]\s*(.+)$/); return m ? { mult:numIn(m[1]), q:m[2].trim() } : { mult:1, q:String(txt || '').trim() }; };
 // etiqueta de balança: 13 dígitos começando com 2 → 2 | código (4 ou 5) | valor (6 dígitos, posições 7 a 12) | verificador
 function lerBalanca(cod){
@@ -3194,7 +3307,14 @@ function atalhosHtml(){
 }
 const TECLAS_CUPOM = '<div class="small teclas"><b>F2</b> buscar · <b>F4</b> dinheiro · <b>F6</b> PIX · <b>F7</b> débito · <b>F8</b> crédito · <b>F9</b> emitir · <b>3*código</b> multiplica · <b>Del</b> remove o último item</div>';
 function teclaCupom(ev){
-  if (S.tab !== 'venda' || $('#modal').classList.contains('on')) return false;
+  if (S.tab !== 'venda') return false;
+  if ($('#modal').classList.contains('on')){
+    if (S.pdv && $('#pdvOk') && (ev.key === 'Enter' || ev.key === 'Escape')){ ev.preventDefault(); closeModal(); render(); const b = $('#busca'); if (b) b.focus(); return true; }
+    return false;
+  }
+  if (S.pdv && ev.key === 'F3'){ ev.preventDefault(); const c = $('#cpf'); if (c){ c.focus(); c.select(); } return true; }
+  if (S.pdv && ev.key === 'F10'){ ev.preventDefault(); const c = $('#descTot'); if (c){ c.focus(); c.select(); } return true; }
+  if (S.pdv && ev.key === 'Escape' && ev.target.id === 'busca'){ ev.preventDefault(); limparBusca(); return true; }
   const k = ev.key, clique = sel => { const b = document.querySelector(sel); if (b && !b.disabled) b.click(); };
   const formas = { F4:'01', F6:'17', F7:'04', F8:'03' };
   if (k === 'F2'){ const b = $('#busca'); if (b){ b.focus(); b.select(); } }
@@ -3611,6 +3731,12 @@ document.addEventListener('click', async ev => {
     case 'descItem': formDescItem(+t.dataset.i); break;
     case 'aplDescItem': aplDescItem(+t.dataset.i); break;
     case 'remDescItem': S.cart[+t.dataset.i].desc = 0; closeModal(); render(); break;
+    case 'pdvAbrir': pdvAbrir(); break;
+    case 'pdvSair': pdvSair(); break;
+    case 'pdvTela': pdvTela(); break;
+    case 'pdvNova': closeModal(); render(); { const b = $('#busca'); if (b) b.focus(); } break;
+    case 'pdvImprimir': imprimirCupom(S.notas.find(n => n.id === id)); break;
+    case 'rmItem': S.cart.splice(+t.dataset.i, 1); render(); { const b = $('#busca'); if (b && S.pdv) b.focus(); } break;
     case 'limpar': S.reenviar65 = null; S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; render(); break;
     case 'emitirNfce': t.disabled = true; await emitirNfce(); t.disabled = false; break;
     case 'addNfe': { const p = P(); S.nfe.itens.push({ pid:id, qtd:1, preco:num(p.preco), desc:'' }); S.buscaNfe = ''; render(); break; }
