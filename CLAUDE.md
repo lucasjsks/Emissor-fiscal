@@ -35,6 +35,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 - Validado em homologação (12/11/2026, empresa piloto em Campo Maior/PI, Simples): emissão de NFC-e, cupom oficial e XML, cancelamento, pagamento dividido/troco, NF-e com consulta de situação e fechamento de caixa — tudo autorizado pela SEFAZ-PI.
 - Ainda **não validados** em envio real: campos de ICMS-ST, DIFAL, devolução (de venda e de compra), carta de correção, inutilização e IBS/CBS. Ao receber rejeições, ajustar e registrar aqui.
 - **Campos em reais:** todo input de dinheiro leva `data-rs` (ou `data-rs="idDoSelect"` quando há opção R$/%); ao sair do campo vira `R$ 9,00` (`formatarRS`, `numRS` entende `9`, `9,5`, `9.5`, `1.250`), ao entrar mostra só `9,00` selecionado. `num`/`numIn` ignoram o `R$`. Campos de %, quantidade e peso não levam `data-rs`.
+- **Gravar a empresa:** o RLS não deixa o cliente inserir em `empresas` (só `criar_empresa`), e `upsert` passa pela regra de inserção; por isso o `set` do shim usa `update` para o caminho `empresas/<id>`. Nunca voltar a usar upsert ali.
 - Datas no formato `YYYY-MM-DDTHH:MM:SS-03:00` (`isoNow()`/`isoBR()`).
 
 ## Fluxo de trabalho
