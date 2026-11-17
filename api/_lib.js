@@ -64,7 +64,7 @@ export function statusDe(r = {}){
 export function resumoFocus(r = {}){
   const o = {};
   ['status','status_sefaz','mensagem_sefaz','chave_nfe','numero','serie','protocolo','caminho_xml_nota_fiscal','caminho_danfe',
-   'qrcode_url','url_consulta_nf','mensagem','codigo','erros'].forEach(k => { if (r[k] !== undefined) o[k] = r[k]; });
+   'qrcode_url','url_consulta_nf','data_autorizacao','mensagem','codigo','erros'].forEach(k => { if (r[k] !== undefined) o[k] = r[k]; });
   return o;
 }
 

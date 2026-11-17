@@ -207,6 +207,11 @@ body.fora header{display:none}
 .rej{border:1px solid #f4c7c2;background:#fffafa;border-radius:14px;padding:14px 16px;margin:10px 0}.rej-t{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--bad);margin-bottom:3px}
 .msg.ok{background:var(--brand-soft);color:var(--brand-ink);border:1px solid #bfe3d3}
 .amb-card.prod{border:1px solid #bfe3d3;background:linear-gradient(180deg,#f3fbf7,#fff)}
+.nfe-h{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:16px}.nfe-h>span:first-child{width:26px;height:26px;border-radius:50%;background:var(--brand-soft);color:var(--brand-ink);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 26px}
+.nfe-sec h4{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 2px}
+.nfe-dest{display:flex;flex-direction:column;gap:2px;background:#f8f9fb;border:1px solid var(--line-2);border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13.5px}.nfe-dest span{color:#475467}
+@media(min-width:1000px){.nfe-grid{grid-template-columns:minmax(0,1fr) 360px;align-items:start}.nfe-resumo{position:sticky;top:76px}}
+.danfe-prev{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;margin-top:10px}.danfe-prev iframe{display:block;width:100%;border:0;height:600px}
 /* navegação: barra inferior no celular */
 nav{background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 nav button{border-radius:12px;padding:6px 2px 6px;gap:2px;font-weight:550;transition:color .15s}
@@ -286,7 +291,7 @@ const S = { tab:'inicio', recebidas:[], recFiltro:'pend', recBusca:'', empresas:
   nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estFiltro:'todos', estBusca:'', cpView:'notas', cpBusca:'', cpMes:'', cm:null, conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
 let db = null, unsubs = [], local = {};
 const LS = 'emissor-fiscal-v1';
-S.nfe = { op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } };
+S.nfe = nfeVazia();
 function lsLoad(){ try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch(e){ return {}; } }
 function lsSave(){ try { localStorage.setItem(LS, JSON.stringify(local)); } catch(e){} }
 const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes','fornecedores','compras','vinculos','recebidas'];
@@ -796,55 +801,84 @@ function aplDescItem(i){
 /* ---------- NF-e ---------- */
 function vNfe(){
   const n = S.nfe, { e, cli, inter, precisaDifal } = nfeCtx(), L = nfeLinhas(), T = totais(L), simples = String(e.regime) !== '3';
-  const ti = [['9','Sem frete'],['0','Por conta do emitente (CIF)'],['1','Por conta do destinatário (FOB)'],['2','Terceiros']];
+  const ti = [['9','9 - Sem frete'],['0','0 - Por conta do emitente (CIF)'],['1','1 - Por conta do destinatário (FOB)'],['2','2 - Por conta de terceiros'],['3','3 - Próprio, por conta do emitente'],['4','4 - Próprio, por conta do destinatário']];
+  const pres = [['1','1 - Presencial'],['2','2 - Internet'],['3','3 - Teleatendimento'],['5','5 - Presencial fora do estabelecimento'],['9','9 - Outros (não presencial)']];
+  const sec = (num, tit, corpo, extra = '') => `<div class="card nfe-sec"><h3 class="nfe-h"><span>${num}</span>${tit}${extra}</h3>${corpo}</div>`;
+  const nf = (path, rot, v, attrs = '') => `<div><label>${rot}</label><input data-nf="${path}" value="${esc(v ?? '')}" ${attrs}></div>`;
+  const tr = n.transp, vo = n.vol, dup = r2(n.dups.reduce((a, d) => a + numIn(d.valor), 0)), transps = (e.transportadoras || []);
   return `<h2>NF-e (modelo 55)${n.op !== 'venda' ? ' — <span style="color:var(--warn)">' + (n.op === 'dev_venda' ? 'devolução de venda' : 'devolução de compra') + '</span>' : ''}</h2>
-  <div class="grid2"><div>
-    <div class="card"><label for="nfeCli">Destinatário</label>
-      <select id="nfeCli"><option value="">Selecione o cliente…</option>${S.clientes.map(c => `<option value="${esc(c.id)}" ${c.id === n.clienteId ? 'selected' : ''}>${esc(c.nome)} — ${fmtDoc(c.doc)}</option>`).join('')}</select>
-      ${!S.clientes.length ? '<p class="small">Nenhum cliente cadastrado. <a href="#" data-act="novoCli">Cadastrar agora</a></p>' : ''}
-      ${cli ? `<p class="small">${esc(cli.municipio || '')}/${esc(cli.uf || '')} · ${({'1':'Contribuinte ICMS','2':'Contribuinte isento','9':'Não contribuinte'})[cli.ind_ie || '9']}${inter ? ' · <span class="tag w">interestadual — CFOP 6xxx</span>' : ''}</p>` : ''}
-      <label for="nfeOp">Operação</label><select id="nfeOp">${OPS.map(([c, t]) => `<option value="${c}" ${n.op === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      ${n.op !== 'venda' ? `<label for="nfeRef">Chave de acesso da nota ${n.op === 'dev_venda' ? 'de venda que está sendo devolvida' : 'de compra (do fornecedor)'} *</label>
-        <input id="nfeRef" inputmode="numeric" placeholder="44 dígitos" value="${esc(fmtChave(n.ref))}"><div class="small" id="refInfo" style="margin-top:4px">${refInfo(n.ref)}</div>
-        <p class="small">Devolução: CFOP ${n.op === 'dev_venda' ? '1202/2202 (1411/2411 com ST)' : '5202/6202 (5411/6411 com ST)'} automático e pagamento "sem pagamento". Se a nota original teve ICMS-ST, confira com a SEFAZ-PI como devolver o imposto.</p>` : ''}
-      <label for="nfeNat">Natureza da operação</label><input id="nfeNat" value="${esc(n.natureza)}">
-    </div>
-    ${precisaDifal ? `<div class="card"><h3 style="margin-top:0">DIFAL — ${esc(cli.uf)}</h3>
-      <p class="small">Venda interestadual a não contribuinte. Informe a carga da UF de destino. O sistema guarda esses valores para as próximas notas com destino a ${esc(cli.uf)}.</p>
-      <div class="row">${fld('dfAliq','Alíquota interna ' + esc(cli.uf) + ' (%) *', n.difal.aliq, 'inputmode="decimal"')}${fld('dfFcp','FCP ' + esc(cli.uf) + ' (%)', n.difal.fcp, 'inputmode="decimal"')}</div>
-      ${sel('dfMet','Base de cálculo', n.difal.metodo, [['dupla','Base dupla (LC 190/2022)'],['unica','Base única']])}
-      ${simples ? '<div class="msg warn" style="margin-top:8px">Empresa do Simples Nacional: confirme se o DIFAL é exigido nesta operação antes de destacar.</div>' : ''}
-      ${T.difal ? linhaTot('DIFAL para ' + esc(cli.uf), T.difal) + (T.fcpDest ? linhaTot('FCP para ' + esc(cli.uf), T.fcpDest) : '') + '<p class="small">Recolhido por GNRE — não soma no total da nota.</p>' : ''}
-    </div>` : ''}
-    <div class="card"><label for="buscaNfe">Adicionar produto</label><input id="buscaNfe" autocomplete="off" placeholder="Buscar…" value="${esc(S.buscaNfe)}">
-      <div class="results" id="resN">${resultadosHtml(S.buscaNfe, 'addNfe')}</div>
-      <h3>Itens</h3>
-      ${L.length ? `<div class="list">${L.map((l, i) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${esc(l.p.descricao)}</div>
-        <div class="s">NCM ${fmtNcm(l.p.ncm)} · CFOP ${l.c.cfop} · ${esc(l.c.cst)}${l.c.st ? ` · ST ${brl(l.c.st)} (MVA ${String(l.c.stMva).replace('.', ',')}%)` : ''}${l.c.icms ? ` · ICMS ${brl(l.c.icms)}` : ''}</div></div>
-        <div class="g3"><div><label>Qtd</label><input id="nq${i}" data-nq="${i}" inputmode="decimal" value="${l.qtd}"></div>
-        <div><label>Valor unit.</label><input id="np${i}" data-np="${i}" inputmode="decimal" value="${String(l.preco).replace('.', ',')}"></div>
-        <div><label>Desc. R$</label><input id="nd${i}" data-nd="${i}" inputmode="decimal" placeholder="0,00" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
-        <div style="display:flex;width:100%;align-items:center;gap:8px;margin-top:6px"><b class="num" style="flex:1">${brl(r2(l.c.bruto - l.descItem))}</b>
-        <button class="btn sm bad" data-act="rmNfe" data-i="${i}">Remover</button></div></div>`).join('')}</div>` : '<div class="empty">Nenhum item.</div>'}
-    </div></div>
-    <div><div class="card">
-      <h3 style="margin-top:0">Valores da nota</h3>
-      <label for="nDescTot">Desconto no total</label>
-      <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="nDescTipo" data-t="${t}" class="${n.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
-        <input id="nDescTot" inputmode="decimal" placeholder="0" value="${esc(n.descTotal.v)}"></div>
-      <div class="row">${fld('nFrete','Frete (R$)', n.vFrete, 'inputmode="decimal" placeholder="0,00"')}${fld('nSeguro','Seguro (R$)', n.vSeguro, 'inputmode="decimal" placeholder="0,00"')}${fld('nOutras','Outras despesas (R$)', n.vOutras, 'inputmode="decimal" placeholder="0,00"')}</div>
-      <p class="small">Desconto, frete, seguro e outras são rateados entre os itens pelo valor.</p>
-      <div style="margin-top:10px">${linhaTot('Produtos', T.prod)}${T.desc ? linhaTot('Desconto', -T.desc, 'small') : ''}${T.frete ? linhaTot('Frete', T.frete, 'small') : ''}${T.seguro ? linhaTot('Seguro', T.seguro, 'small') : ''}${T.outras ? linhaTot('Outras despesas', T.outras, 'small') : ''}
-      ${T.icms ? linhaTot('ICMS próprio (BC ' + brl(T.icmsBase) + ')', T.icms, 'small') : ''}${T.st ? linhaTot('ICMS-ST (BC ' + brl(T.stBase) + ')', T.st, 'small') : ''}${T.fcpSt ? linhaTot('FCP-ST', T.fcpSt, 'small') : ''}
-      ${linhaTot('IBS/CBS (2026, informativo)', T.cbs + T.ibs, 'small')}${linhaTot('Total da nota', T.nota, 'big')}</div>
-      <label for="nfeFrete">Modalidade do frete</label><select id="nfeFrete">${ti.map(([c, t]) => `<option value="${c}" ${n.frete === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      ${n.op === 'venda' ? `<label for="nfePag">Pagamento</label><select id="nfePag">${PAGAMENTOS.map(([c, t]) => `<option value="${c}" ${n.pag === c ? 'selected' : ''}>${t}</option>`).join('')}<option value="90" ${n.pag === '90' ? 'selected' : ''}>Sem pagamento</option></select>` : ''}
-      <label for="nfeObs">Informações complementares</label><textarea id="nfeObs" rows="3">${esc(n.obs)}</textarea>
-      <div id="errN"></div>
-      <div class="actions"><button class="btn bad" data-act="limparNfe">Limpar</button><button class="btn pri" data-act="emitirNfe" ${L.length && cli ? '' : 'disabled'}>${n.op === 'venda' ? 'Emitir NF-e' : 'Emitir devolução'}</button></div>
-    </div></div></div>`;
+  <div class="grid2 nfe-grid"><div>
+  ${sec(1, 'Dados da nota', `<div class="row"><div><label for="nfeOp">Tipo de operação</label><select id="nfeOp">${OPS.map(([c, t]) => `<option value="${c}" ${n.op === c ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div><label for="nfeNat">Natureza da operação</label><input id="nfeNat" value="${esc(n.natureza)}"></div></div>
+    <div class="row"><div><label>Finalidade</label><input value="${n.op === 'venda' ? '1 - Normal' : '4 - Devolução'}" disabled></div>
+      <div><label>Tipo</label><input value="${n.op === 'dev_venda' ? '0 - Entrada' : '1 - Saída'}" disabled></div>
+      <div><label for="nfeSaida">Data/hora de saída</label><input id="nfeSaida" type="datetime-local" value="${esc(n.saida)}"></div></div>
+    ${n.op === 'venda' ? `<label for="nfePres">Indicador de presença do comprador</label><select id="nfePres">${pres.map(([c, t]) => `<option value="${c}" ${n.presenca === c ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}
+    ${n.op !== 'venda' ? `<label for="nfeRef">Chave de acesso da nota ${n.op === 'dev_venda' ? 'de venda que está sendo devolvida' : 'de compra (do fornecedor)'} *</label>
+      <input id="nfeRef" inputmode="numeric" placeholder="44 dígitos" value="${esc(fmtChave(n.ref))}"><div class="small" id="refInfo" style="margin-top:4px">${refInfo(n.ref)}</div>
+      <p class="small">Devolução: CFOP ${n.op === 'dev_venda' ? '1202/2202 (1411/2411 com ST)' : '5202/6202 (5411/6411 com ST)'} automático e pagamento "sem pagamento".</p>` : ''}
+    <p class="small">Série ${esc(e.serie_nfe)} · próximo número <b>${esc(e.prox_nfe)}</b> · emissão na hora do envio.</p>`)}
+  ${sec(2, 'Destinatário', `<div class="row" style="align-items:flex-end"><div style="flex:3"><label for="nfeCli">Cliente</label>
+      <select id="nfeCli"><option value="">Selecione o cliente…</option>${S.clientes.map(c => `<option value="${esc(c.id)}" ${c.id === n.clienteId ? 'selected' : ''}>${esc(c.nome)} — ${fmtDoc(c.doc)}</option>`).join('')}</select></div>
+      ${pode('cliente') ? '<div style="flex:0 0 auto"><button class="btn" data-act="novoCli">+ Novo cliente</button></div>' : ''}</div>
+    ${cli ? `<div class="nfe-dest"><b>${esc(cli.nome)}</b><span>${fmtDoc(cli.doc)}${cli.ie ? ' · IE ' + esc(cli.ie) : ''} · ${({'1':'Contribuinte ICMS','2':'Contribuinte isento','9':'Não contribuinte'})[cli.ind_ie || '9']}</span>
+      <span>${esc(cli.logradouro || '')}${cli.numero ? ', ' + esc(cli.numero) : ''} — ${esc(cli.bairro || '')} — ${esc(cli.municipio || '')}/${esc(cli.uf || '')}${cli.cep ? ' · CEP ' + esc(cli.cep) : ''}</span>
+      ${inter ? '<span class="tag w" style="align-self:flex-start">interestadual — CFOP 6xxx</span>' : ''}</div>` : ''}`)}
+  ${precisaDifal ? `<div class="card"><h3 style="margin-top:0">DIFAL — ${esc(cli.uf)}</h3>
+    <p class="small">Venda interestadual a não contribuinte. Informe a carga da UF de destino. O sistema guarda esses valores para as próximas notas com destino a ${esc(cli.uf)}.</p>
+    <div class="row">${fld('dfAliq','Alíquota interna ' + esc(cli.uf) + ' (%) *', n.difal.aliq, 'inputmode="decimal"')}${fld('dfFcp','FCP ' + esc(cli.uf) + ' (%)', n.difal.fcp, 'inputmode="decimal"')}</div>
+    ${sel('dfMet','Base de cálculo', n.difal.metodo, [['dupla','Base dupla (LC 190/2022)'],['unica','Base única']])}
+    ${simples ? '<div class="msg warn" style="margin-top:8px">Empresa do Simples Nacional: confirme se o DIFAL é exigido nesta operação antes de destacar.</div>' : ''}
+    ${T.difal ? linhaTot('DIFAL para ' + esc(cli.uf), T.difal) + (T.fcpDest ? linhaTot('FCP para ' + esc(cli.uf), T.fcpDest) : '') + '<p class="small">Recolhido por GNRE — não soma no total da nota.</p>' : ''}</div>` : ''}
+  ${sec(3, 'Produtos', `<label for="buscaNfe">Adicionar produto</label><input id="buscaNfe" autocomplete="off" placeholder="Nome, código ou código de barras…" value="${esc(S.buscaNfe)}">
+    <div class="results" id="resN">${resultadosHtml(S.buscaNfe, 'addNfe')}</div>
+    ${L.length ? `<div class="list" style="margin-top:6px">${L.map((l, i) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${i + 1}. ${esc(l.p.descricao)}</div>
+      <div class="s">NCM ${fmtNcm(l.p.ncm)} · CFOP ${l.c.cfop} · CST/CSOSN ${esc(l.c.cst)} · ${esc(l.p.unidade || 'UN')}${l.c.st ? ` · ST ${brl(l.c.st)} (MVA ${String(l.c.stMva).replace('.', ',')}%)` : ''}${l.c.icms ? ` · ICMS ${brl(l.c.icms)}` : ''}</div></div>
+      <div class="g3"><div><label>Quantidade</label><input id="nq${i}" data-nq="${i}" inputmode="decimal" value="${String(l.qtd).replace('.', ',')}"></div>
+      <div><label>Valor unitário</label><input id="np${i}" data-np="${i}" inputmode="decimal" value="${String(l.preco).replace('.', ',')}"></div>
+      <div><label>Desconto (R$)</label><input id="nd${i}" data-nd="${i}" inputmode="decimal" placeholder="0,00" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
+      <div style="display:flex;width:100%;align-items:center;gap:8px;margin-top:6px"><b class="num" style="flex:1">${brl(r2(l.c.bruto - l.descItem))}</b>
+      <button class="btn sm bad" data-act="rmNfe" data-i="${i}">Remover</button></div></div>`).join('')}</div>` : '<div class="empty">Nenhum item.</div>'}`, L.length ? ` <span class="small" style="font-weight:500">(${L.length})</span>` : '')}
+  ${sec(4, 'Transporte', `<label for="nfeFrete">Modalidade do frete</label><select id="nfeFrete">${ti.map(([c, t]) => `<option value="${c}" ${n.frete === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    ${n.frete !== '9' ? `<h4>Transportadora</h4>
+      ${transps.length ? `<label for="nfeTrSel">Usar transportadora já cadastrada</label><select id="nfeTrSel"><option value="">— escolher —</option>${transps.map((x, k) => `<option value="${k}">${esc(x.nome)} — ${fmtDoc(x.doc)}</option>`).join('')}</select>` : ''}
+      <div class="row">${nf('transp.nome', 'Nome / razão social', tr.nome)}${nf('transp.doc', 'CNPJ / CPF', tr.doc, 'inputmode="numeric"')}</div>
+      <div class="row">${nf('transp.ie', 'Inscrição estadual', tr.ie, 'inputmode="numeric"')}${nf('transp.end', 'Endereço', tr.end)}</div>
+      <div class="row">${nf('transp.mun', 'Município', tr.mun)}${nf('transp.uf', 'UF', tr.uf, 'maxlength="2" style="text-transform:uppercase"')}</div>
+      <h4>Veículo</h4><div class="row">${nf('transp.placa', 'Placa', tr.placa, 'maxlength="7" style="text-transform:uppercase"')}${nf('transp.veicUf', 'UF do veículo', tr.veicUf, 'maxlength="2" style="text-transform:uppercase"')}${nf('transp.rntc', 'RNTC / ANTT', tr.rntc)}</div>
+      <h4>Volumes</h4><div class="row">${nf('vol.qtd', 'Quantidade', vo.qtd, 'inputmode="numeric"')}${nf('vol.esp', 'Espécie', vo.esp, 'placeholder="CAIXA, FARDO…"')}${nf('vol.marca', 'Marca', vo.marca)}</div>
+      <div class="row">${nf('vol.num', 'Numeração', vo.num)}${nf('vol.pesoB', 'Peso bruto (kg)', vo.pesoB, 'inputmode="decimal"')}${nf('vol.pesoL', 'Peso líquido (kg)', vo.pesoL, 'inputmode="decimal"')}</div>`
+    : '<p class="small">Sem transporte (o cliente leva ou a entrega não tem frete destacado).</p>'}`)}
+  ${n.op === 'venda' ? sec(5, 'Pagamento e cobrança', `<div class="seg" style="margin-bottom:8px">${[['avista','À vista'],['prazo','A prazo (duplicatas)']].map(([k, l]) => `<button data-act="nfeCond" data-v="${k}" class="${n.cond === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <label for="nfePag">Forma de pagamento</label><select id="nfePag">${PAGAMENTOS.map(([c, t]) => `<option value="${c}" ${n.pag === c ? 'selected' : ''}>${t}</option>`).join('')}<option value="90" ${n.pag === '90' ? 'selected' : ''}>Sem pagamento</option></select>
+    ${n.cond === 'prazo' ? `<div class="row" style="align-items:flex-end"><div><label>Nº da fatura</label><input data-nf="fatura" value="${esc(n.fatura)}" placeholder="igual ao nº da nota"></div>
+        <div><label>Parcelas</label><input id="nfeNParc" inputmode="numeric" value="${n.dups.length || ''}" placeholder="ex.: 3"></div><div><label>Intervalo (dias)</label><input id="nfeIntParc" inputmode="numeric" value="30"></div>
+        <div style="flex:0 0 auto"><button class="btn" data-act="nfeGerarDup">Gerar</button></div></div>
+      ${n.dups.map((d, k) => `<div class="g3" style="margin-top:6px"><div><label>Duplicata</label><input data-nfd="${k}:n" value="${esc(d.n)}"></div><div><label>Vencimento</label><input type="date" data-nfd="${k}:venc" value="${esc(d.venc)}"></div>
+        <div><label>Valor</label><div style="display:flex;gap:4px"><input data-nfd="${k}:valor" inputmode="decimal" value="${esc(d.valor)}"><button class="x" data-act="nfeRemDup" data-i="${k}" aria-label="Remover parcela">×</button></div></div></div>`).join('')}
+      <div class="actions" style="margin-top:6px"><button class="btn sm" data-act="nfeAddDup">+ Parcela</button></div>
+      <div class="total small" id="nfeDupTot"><span>Soma das duplicatas</span><span class="num" style="color:${Math.abs(dup - T.nota) > 0.009 ? 'var(--bad)' : 'var(--ok)'}">${brl(dup)}</span></div>` : ''}`) : ''}
+  ${sec(n.op === 'venda' ? 6 : 5, 'Informações adicionais', `<label for="nfeObs">Informações complementares (vão impressas no DANFE)</label><textarea id="nfeObs" rows="3">${esc(n.obs)}</textarea>
+    <label for="nfeFisco">Informações de interesse do fisco (opcional)</label><textarea id="nfeFisco" rows="2">${esc(n.fisco)}</textarea>`)}
+  </div>
+  <div><div class="card nfe-resumo">
+    <h3 style="margin-top:0">Totais da nota</h3>
+    <label for="nDescTot">Desconto no total</label>
+    <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="nDescTipo" data-t="${t}" class="${n.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
+      <input id="nDescTot" inputmode="decimal" placeholder="0" value="${esc(n.descTotal.v)}"></div>
+    <div class="row">${fld('nFrete','Frete (R$)', n.vFrete, 'inputmode="decimal" placeholder="0,00"')}${fld('nSeguro','Seguro (R$)', n.vSeguro, 'inputmode="decimal" placeholder="0,00"')}${fld('nOutras','Outras (R$)', n.vOutras, 'inputmode="decimal" placeholder="0,00"')}</div>
+    <p class="small">Desconto, frete, seguro e outras são rateados entre os itens pelo valor.</p>
+    <div style="margin-top:10px">${linhaTot('Produtos', T.prod)}${T.desc ? linhaTot('Desconto', -T.desc, 'small') : ''}${T.frete ? linhaTot('Frete', T.frete, 'small') : ''}${T.seguro ? linhaTot('Seguro', T.seguro, 'small') : ''}${T.outras ? linhaTot('Outras despesas', T.outras, 'small') : ''}
+    ${T.icms ? linhaTot('ICMS próprio (BC ' + brl(T.icmsBase) + ')', T.icms, 'small') : ''}${T.st ? linhaTot('ICMS-ST (BC ' + brl(T.stBase) + ')', T.st, 'small') : ''}${T.fcpSt ? linhaTot('FCP-ST', T.fcpSt, 'small') : ''}
+    ${linhaTot('IBS/CBS (2026, informativo)', T.cbs + T.ibs, 'small')}${linhaTot('Total da nota', T.nota, 'big')}</div>
+    <div id="errN"></div>
+    <div class="actions"><button class="btn bad" data-act="limparNfe">Limpar</button><button class="btn pri" data-act="emitirNfe" ${L.length && cli ? '' : 'disabled'}>${n.op === 'venda' ? 'Emitir NF-e' : 'Emitir devolução'}</button></div>
+    ${!cli || !L.length ? `<p class="small">${!cli ? 'Falta escolher o destinatário. ' : ''}${!L.length ? 'Falta adicionar produtos.' : ''}</p>` : ''}
+  </div></div></div>`;
 }
-const nfeVazia = () => ({ op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'', difal:{ aliq:'', fcp:'', metodo:'dupla' } });
+function nfeVazia(){ return { op:'venda', ref:'', clienteId:'', natureza:'VENDA DE MERCADORIA', itens:[], frete:'9', pag:'15', obs:'', fisco:'', descTotal:{ tipo:'R$', v:'' }, vFrete:'', vSeguro:'', vOutras:'',
+  difal:{ aliq:'', fcp:'', metodo:'dupla' }, presenca:'1', saida:'', cond:'avista', fatura:'', dups:[],
+  transp:{ nome:'', doc:'', ie:'', end:'', mun:'', uf:'', placa:'', veicUf:'', rntc:'' }, vol:{ qtd:'', esp:'', marca:'', num:'', pesoB:'', pesoL:'' } }; }
 function selCliente(id){
   S.nfe.clienteId = id;
   const { e, cli } = nfeCtx(), cfg = cli && e.difal_uf && e.difal_uf[cli.uf];
@@ -1112,16 +1146,38 @@ async function emitirNfe(){
   if (T.frete > 0 && n.frete === '9') errs.push('Há valor de frete, mas a modalidade está "Sem frete". Escolha quem paga o frete.');
   if (precisaDifal && !(numIn(n.difal.aliq) > 0)) errs.push(`Informe a alíquota interna de ${esc(cli.uf)} para calcular o DIFAL.`);
   if (precisaDifal && numIn(n.difal.aliq) > 0 && numIn(n.difal.aliq) <= 12) errs.push('A alíquota interna do destino parece baixa demais (≤ 12%). Confira.');
+  const tr = n.transp, trDoc = dig(tr.doc);
+  if (n.frete !== '9' && tr.nome && trDoc && !(trDoc.length === 14 ? cnpjOk(trDoc) : trDoc.length === 11 ? cpfOk(trDoc) : false)) errs.push('O CNPJ/CPF da transportadora está inválido.');
+  if (n.frete !== '9' && tr.placa && !/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(tr.placa.toUpperCase().replace(/[^A-Z0-9]/g, ''))) errs.push('Placa do veículo inválida (ex.: ABC1D23 ou ABC1234).');
+  if (n.op === 'venda' && n.cond === 'prazo'){
+    if (!n.dups.length) errs.push('Venda a prazo: gere as duplicatas (parcelas).');
+    else {
+      if (Math.abs(r2(n.dups.reduce((a, d) => a + numIn(d.valor), 0)) - T.nota) > 0.009) errs.push('A soma das duplicatas precisa ser igual ao total da nota.');
+      if (n.dups.some(d => !d.venc || d.venc < isoNow().slice(0, 10))) errs.push('Confira os vencimentos das duplicatas (não podem estar no passado).');
+    }
+  }
   errs.push(...errosEmissao(L));
   if (errs.length) return $('#errN').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
   const numero = e.prox_nfe, serie = e.serie_nfe, ref = `nfe-${serie}-${numero}-${uid().slice(0, 6)}`;
-  const payload = { ...baseEmitente(e), natureza_operacao:n.natureza.toUpperCase(), data_emissao:isoNow(), data_entrada_saida:isoNow(), serie, numero,
-    tipo_documento:n.op === 'dev_venda' ? '0' : '1', finalidade_emissao:n.op === 'venda' ? '1' : '4', local_destino:inter ? '2' : '1', consumidor_final:naoContrib ? '1' : '0', presenca_comprador:n.op === 'venda' ? '1' : '0',
+  const payload = { ...baseEmitente(e), natureza_operacao:n.natureza.toUpperCase(), data_emissao:isoNow(), data_entrada_saida:n.saida && n.saida > isoNow().slice(0, 16) ? n.saida.slice(0, 16) + ':00-03:00' : isoNow(), serie, numero,
+    tipo_documento:n.op === 'dev_venda' ? '0' : '1', finalidade_emissao:n.op === 'venda' ? '1' : '4', local_destino:inter ? '2' : '1', consumidor_final:naoContrib ? '1' : '0', presenca_comprador:n.op === 'venda' ? (n.presenca || '1') : '0',
     nome_destinatario:cli.nome, [cli.doc.length === 11 ? 'cpf_destinatario' : 'cnpj_destinatario']:cli.doc,
     indicador_inscricao_estadual_destinatario:cli.ind_ie || '9', logradouro_destinatario:cli.logradouro, numero_destinatario:cli.numero,
     bairro_destinatario:cli.bairro, municipio_destinatario:cli.municipio, codigo_municipio_destinatario:cli.cod_municipio, uf_destinatario:cli.uf, cep_destinatario:cli.cep,
     modalidade_frete:n.frete, items:L.map((l, i) => itemFocus(i, i + 1, l.p, l.qtd, l.preco, l.c)),
-    formas_pagamento:n.op === 'venda' ? [{ forma_pagamento:n.pag, valor_pagamento:n.pag === '90' ? 0 : T.nota }] : [{ forma_pagamento:'90', valor_pagamento:0 }], ...totaisPayload(T) };
+    formas_pagamento:n.op === 'venda' ? [{ indicador_pagamento:n.cond === 'prazo' ? '1' : '0', forma_pagamento:n.pag, valor_pagamento:n.pag === '90' ? 0 : T.nota }] : [{ forma_pagamento:'90', valor_pagamento:0 }], ...totaisPayload(T) };
+  if (n.frete !== '9'){
+    if (tr.nome) Object.assign(payload, { nome_transportador:tr.nome.toUpperCase().slice(0, 60), ...(trDoc ? { [trDoc.length === 14 ? 'cnpj_transportador' : 'cpf_transportador']:trDoc } : {}),
+      ...(dig(tr.ie) ? { inscricao_estadual_transportador:dig(tr.ie) } : {}), ...(tr.end ? { endereco_transportador:tr.end.slice(0, 60) } : {}),
+      ...(tr.mun ? { municipio_transportador:tr.mun.slice(0, 60) } : {}), ...(tr.uf ? { uf_transportador:tr.uf.toUpperCase() } : {}) });
+    if (tr.placa) Object.assign(payload, { veiculo_placa:tr.placa.toUpperCase().replace(/[^A-Z0-9]/g, ''), ...(tr.veicUf ? { veiculo_uf:tr.veicUf.toUpperCase() } : {}), ...(tr.rntc ? { veiculo_rntc:tr.rntc } : {}) });
+    const vo = n.vol;
+    if (vo.qtd || vo.esp || vo.pesoB || vo.pesoL) payload.volumes = [{ ...(dig(vo.qtd) ? { quantidade:+dig(vo.qtd) } : {}), ...(vo.esp ? { especie:vo.esp.toUpperCase() } : {}), ...(vo.marca ? { marca:vo.marca } : {}),
+      ...(vo.num ? { numero:vo.num } : {}), ...(numIn(vo.pesoB) ? { peso_bruto:Math.round(numIn(vo.pesoB) * 1000) / 1000 } : {}), ...(numIn(vo.pesoL) ? { peso_liquido:Math.round(numIn(vo.pesoL) * 1000) / 1000 } : {}) }];
+  }
+  if (n.op === 'venda' && n.cond === 'prazo' && n.dups.length) Object.assign(payload, { ...(n.fatura ? { numero_fatura:n.fatura } : {}), valor_original_fatura:T.nota, valor_desconto_fatura:0, valor_liquido_fatura:T.nota,
+    duplicatas:n.dups.map((d, k) => ({ numero:String(d.n || k + 1).padStart(3, '0'), data_vencimento:d.venc, valor:numIn(d.valor) })) });
+  if (n.fisco) payload.informacoes_adicionais_fisco = n.fisco;
   if (n.op !== 'venda') payload.notas_referenciadas = [{ chave_nfe:dig(n.ref) }];
   if (cli.ie && cli.ind_ie === '1') payload.inscricao_estadual_destinatario = cli.ie;
   if (cli.email) payload.email_destinatario = cli.email;
@@ -1130,12 +1186,17 @@ async function emitirNfe(){
   if (obs) payload.informacoes_adicionais_contribuinte = obs;
   const nota = { id:ref, ref, modelo:'55', serie, numero, data:payload.data_emissao, total:T.nota, destNome:cli.nome, destDoc:cli.doc, destUf:cli.uf, destMun:cli.municipio,
     natureza:payload.natureza_operacao, pag:n.op === 'venda' ? n.pag : '90', status:'simulada', ambiente:'homologacao', tot:T, obs, emitida_por:S.meuId || null,
+    cond:n.op === 'venda' ? n.cond : 'avista', dups:payload.duplicatas || [],
     op:n.op, refChave:n.op !== 'venda' ? dig(n.ref) : '', chave:gerarChave(e, '55', serie, numero, payload.data_emissao), ...(n.compraId ? { compra_id:n.compraId, dev_itens:n.devItens } : {}),
     itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, ncm:l.p.ncm, cfop:l.c.cfop, cst:l.c.cst, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc, st:l.c.st })), payload };
   const novaEmp = { ...e, prox_nfe:numero + 1 };
   if (precisaDifal) novaEmp.difal_uf = { ...(e.difal_uf || {}), [cli.uf]:{ aliq:numIn(n.difal.aliq), fcp:numIn(n.difal.fcp), metodo:n.difal.metodo } };
   const res = await emitirServidor('55', payload, nota, { difal_uf:precisaDifal ? { uf:cli.uf, cfg:novaEmp.difal_uf[cli.uf] } : null,
     refChave:n.op === 'dev_venda' ? dig(n.ref) : null }, '#errN'); if (!res) return;
+  if (n.frete !== '9' && tr.nome && trDoc && !(e.transportadoras || []).some(x => x.doc === trDoc) && pode('empresa')){
+    const ee = clone(emp()); ee.transportadoras = [...(ee.transportadoras || []), { nome:tr.nome.toUpperCase(), doc:trDoc, ie:dig(tr.ie), end:tr.end, mun:tr.mun, uf:tr.uf.toUpperCase(), placa:tr.placa.toUpperCase(), veicUf:tr.veicUf.toUpperCase(), rntc:tr.rntc }].slice(-30);
+    put('empresas', ee).catch(() => {});
+  }
   S.nfe = nfeVazia(); S.buscaNfe = '';
   render(); verNota(res.nota);
 }
@@ -1971,9 +2032,11 @@ function linksFocus(n){
   const f = n.focus || {}, base = n.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
   const url = c => /^https?:/.test(c) ? c : base + c, L = [];
   if (n.modelo === '65' && n.status === 'autorizada' && f.qrcode_url) L.push(`<button class="btn pri" data-act="imprimirCupom" data-id="${esc(n.id)}">🖨 Imprimir cupom</button>`);
-  else if (f.caminho_danfe) L.push(`<a class="btn pri" href="${esc(url(f.caminho_danfe))}" target="_blank" rel="noopener">🖨 ${n.modelo === '65' ? 'Imprimir cupom fiscal' : 'Imprimir DANFE'}</a>`);
+  else if (n.modelo === '55') L.push(`<button class="btn pri" data-act="imprimirDanfe" data-id="${esc(n.id)}">🖨 Imprimir / salvar PDF (DANFE)</button>`);
+  else if (f.caminho_danfe) L.push(`<a class="btn pri" href="${esc(url(f.caminho_danfe))}" target="_blank" rel="noopener">🖨 Imprimir cupom fiscal</a>`);
   if (n.status === 'autorizada' && (f.caminho_danfe || f.qrcode_url)) L.push(`<button class="btn" data-act="enviarNota" data-id="${esc(n.id)}">📤 Enviar ao cliente</button>`);
   if (f.caminho_xml_nota_fiscal) L.push(`<a class="btn" href="${esc(url(f.caminho_xml_nota_fiscal))}" target="_blank" rel="noopener">XML</a>`);
+  if (n.modelo === '55' && f.caminho_danfe) L.push(`<a class="btn" href="${esc(url(f.caminho_danfe))}" target="_blank" rel="noopener">PDF da Focus</a>`);
   return L.join('');
 }
 function verNota(n){
@@ -1993,9 +2056,9 @@ function verNota(n){
     ${venda && aut && pode('devolucao') ? btn('devolver', 'Fazer devolução') : ''}
     ${aut && pode('cancelar') ? btn('cancelarNota', 'Cancelar nota', 'bad') : ''}
   </div>
-  ${n.modelo === '65' ? cupomHtml(n, e) : danfeHtml(n, e)}
+  ${n.modelo === '65' ? cupomHtml(n, e) : danfePreview(n)}
   ${ev.length ? `<h3>Eventos</h3>${ev.map(x => `<div class="v ${x.tipo === 'cce' ? 'info' : 'erro'}"><b>${x.tipo === 'cce' ? `Carta de correção ${x.seq}ª` : 'Cancelamento'}</b> · ${fmtData(x.em)} — ${esc(x.texto)}</div>`).join('')}` : ''}
-  ${S.dl && !(n.focus || {}).caminho_danfe ? `<div class="actions">${btn('imprimir', n.modelo === '65' ? 'Baixar prévia (80 mm)' : 'Baixar prévia do DANFE')}</div>` : ''}`);
+  ${n.modelo === '65' && S.dl && !(n.focus || {}).caminho_danfe ? `<div class="actions">${btn('imprimir', 'Baixar prévia (80 mm)')}</div>` : ''}`);
 }
 async function eventoServidor(body, ok){
   try {
@@ -3149,6 +3212,44 @@ async function enviarCertificado(btn){
   finally { btn.disabled = false; }
 }
 
+/* ---------- DANFE da NF-e emitida, no padrão nacional ---------- */
+function danfeDeNota(n){
+  const e = emp() || {}, p = n.payload || {}, T = n.tot || {}, f = n.focus || {}, cli = S.clientes.find(c => c.doc === dig(p.cnpj_destinatario || p.cpf_destinatario)) || {};
+  const its = Array.isArray(p.items) ? p.items : [];
+  return { modelo:'55', tpNF:p.tipo_documento || (n.op === 'dev_venda' ? '0' : '1'), numero:n.numero, serie:n.serie, natOp:n.natureza || p.natureza_operacao,
+    chave:chaveOk(n.chave || '') && ['autorizada','cancelada'].includes(n.status) ? dig(n.chave) : '', dhEmi:n.data, dhSaiEnt:p.data_entrada_saida || n.data,
+    protocolo:f.protocolo ? `${f.protocolo}${f.data_autorizacao ? ' - ' + dataHoraBR(f.data_autorizacao) : ''}` : '',
+    emit:{ nome:e.razao, l1:[e.logradouro, e.numero].filter(Boolean).join(', '), l2:[e.bairro, e.cep && fmtCep(e.cep)].filter(Boolean).join(' - '),
+      l3:`${e.municipio || ''} - ${e.uf || ''}${e.telefone ? ' Fone/Fax: ' + e.telefone : ''}`, ie:e.ie, iest:'', im:'', doc:e.cnpj },
+    dest:{ nome:p.nome_destinatario || n.destNome, doc:p.cnpj_destinatario || p.cpf_destinatario || n.destDoc, end:[p.logradouro_destinatario, p.numero_destinatario].filter(Boolean).join(', '),
+      bairro:p.bairro_destinatario, cep:p.cep_destinatario, mun:p.municipio_destinatario || n.destMun, uf:p.uf_destinatario || n.destUf, fone:cli.telefone || '', ie:p.inscricao_estadual_destinatario || '' },
+    dup:(p.duplicatas || n.dups || []).map(d => ({ n:d.numero || d.n, venc:d.data_vencimento || d.venc, valor:d.valor })),
+    tot:{ vBC:T.icmsBase, vICMS:T.icms, vBCST:T.stBase, vST:T.st, vProd:T.prod, vFrete:T.frete, vSeg:T.seguro, vDesc:T.desc, vOutro:T.outras, vIPI:0,
+      vICMSUFDest:T.difal, vFCPUFDest:T.fcpDest, vTotTrib:r2(num(T.cbs) + num(T.ibs)), vNF:n.total },
+    transp:{ mod:p.modalidade_frete, nome:p.nome_transportador, doc:p.cnpj_transportador || p.cpf_transportador, ie:p.inscricao_estadual_transportador, end:p.endereco_transportador,
+      mun:p.municipio_transportador, uf:p.uf_transportador, placa:p.veiculo_placa, ufPlaca:p.veiculo_uf, antt:p.veiculo_rntc,
+      ...(((p.volumes || [])[0]) ? { qVol:p.volumes[0].quantidade, esp:p.volumes[0].especie, marca:p.volumes[0].marca, nVol:p.volumes[0].numero, pesoB:p.volumes[0].peso_bruto, pesoL:p.volumes[0].peso_liquido } : {}) },
+    itens:(its.length ? its : []).map(i => ({ cProd:i.codigo_produto, xProd:i.descricao, ncm:i.codigo_ncm, cst:(i.icms_origem || '0') + (i.icms_situacao_tributaria || ''), cfop:i.cfop, un:i.unidade_comercial,
+      q:i.quantidade_comercial, vun:i.valor_unitario_comercial, vtot:i.valor_bruto, vdesc:i.valor_desconto, vbc:i.icms_base_calculo, vicms:i.icms_valor, vipi:0, picms:i.icms_aliquota, pipi:0 })),
+    infCpl:[p.notas_referenciadas && p.notas_referenciadas[0] ? 'Nota referenciada: ' + fmtChave(p.notas_referenciadas[0].chave_nfe) : '', p.informacoes_adicionais_contribuinte || n.obs || ''].filter(Boolean).join(' | '),
+    fisco:p.informacoes_adicionais_fisco || '' };
+}
+function avisoDanfe(n){
+  return n.status === 'cancelada' ? 'NF-e CANCELADA' : n.status !== 'autorizada' ? 'NOTA NÃO AUTORIZADA — SEM VALOR FISCAL'
+    : n.ambiente !== 'producao' ? 'EMITIDA EM HOMOLOGAÇÃO — SEM VALOR FISCAL' : '';
+}
+function imprimirDanfeNota(n){ const D = danfeDeNota(n); imprimirDoc(`DANFE ${D.numero} - ${D.dest.nome || ''}`, DANFE_CSS, danfeOficialHtml(D, avisoDanfe(n))); }
+// prévia na tela: o mesmo DANFE, reduzido para caber na janela
+function danfePreview(n){
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${DANFE_CSS}html,body{background:#fff}body{padding:8px;transform-origin:0 0}</style></head><body>${danfeOficialHtml(danfeDeNota(n), avisoDanfe(n))}</body></html>`;
+  return `<div class="danfe-prev"><iframe title="DANFE" srcdoc="${esc(html)}" onload="ajustarPreview(this)"></iframe></div>`;
+}
+function ajustarPreview(f){
+  try { const d = f.contentDocument, w = f.clientWidth, larg = d.body.scrollWidth || 760, k = Math.min(1, w / larg);
+    d.body.style.transform = `scale(${k})`; f.style.height = Math.ceil(d.body.scrollHeight * k) + 'px'; } catch(_){}
+}
+window.ajustarPreview = ajustarPreview;
+
 /* ================== IMPRESSÃO DIRETA, REJEIÇÕES EXPLICADAS E ENVIO AO CLIENTE ================== */
 const urlFocus = (n, c) => !c ? '' : /^https?:/.test(c) ? c : (n.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br') + c;
 // ---------- impressão do cupom na impressora térmica (80 ou 58 mm) ----------
@@ -3322,6 +3423,7 @@ document.addEventListener('click', async ev => {
     case 'enviarCertificado': await enviarCertificado(t); break;
     case 'formAmbiente': formAmbiente(t.dataset.v); break;
     case 'trocarAmbiente': await trocarAmbiente(t.dataset.v, t); break;
+    case 'imprimirDanfe': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirDanfeNota(n); break; }
     case 'imprimirCupom': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirCupom(n); break; }
     case 'enviarNota': formEnviar(id); break;
     case 'envWhats': envWhats(id); break;
@@ -3356,6 +3458,16 @@ document.addEventListener('click', async ev => {
     case 'addNfe': { const p = P(); S.nfe.itens.push({ pid:id, qtd:1, preco:num(p.preco), desc:'' }); S.buscaNfe = ''; render(); break; }
     case 'rmNfe': S.nfe.itens.splice(+t.dataset.i, 1); render(); break;
     case 'limparNfe': S.nfe = nfeVazia(); render(); break;
+    case 'nfeCond': S.nfe.cond = t.dataset.v; if (t.dataset.v === 'prazo' && S.nfe.pag !== '15' && S.nfe.pag !== '05') S.nfe.pag = '15'; render(); break;
+    case 'nfeAddDup': S.nfe.dups.push({ n:String(S.nfe.dups.length + 1).padStart(3, '0'), venc:isoNow().slice(0, 10), valor:'' }); render(); break;
+    case 'nfeRemDup': S.nfe.dups.splice(+t.dataset.i, 1); render(); break;
+    case 'nfeGerarDup': {
+      const qn = parseInt(val('nfeNParc')), dias = parseInt(val('nfeIntParc')) || 30, tot = totais(nfeLinhas()).nota;
+      if (!(qn >= 1 && qn <= 120)) { toast('Informe o número de parcelas.'); break; }
+      if (!(tot > 0)) { toast('Adicione os produtos antes de gerar as parcelas.'); break; }
+      const base = Math.floor(tot / qn * 100) / 100, hoje0 = isoNow().slice(0, 10);
+      S.nfe.dups = Array.from({ length:qn }, (_, k) => ({ n:String(k + 1).padStart(3, '0'), venc:diaMais(hoje0, dias * (k + 1)), valor:String(k === qn - 1 ? r2(tot - base * (qn - 1)) : base).replace('.', ',') }));
+      render(); break; }
     case 'exportar': t.disabled = true; await exportar(); t.disabled = false; break;
     case 'importarBackup': formBackup(); break;
     case 'salvarBackup': salvarBackup(); break;
@@ -3385,6 +3497,11 @@ document.addEventListener('input', ev => {
   else if (t.id === 'nomeCons'){ S.nomeCons = t.value; }
   else if (t.id === 'nfeNat'){ S.nfe.natureza = t.value; }
   else if (t.id === 'nfeObs'){ S.nfe.obs = t.value; }
+  else if (t.id === 'nfeFisco'){ S.nfe.fisco = t.value; }
+  else if (t.dataset.nf !== undefined){ const [a, b] = t.dataset.nf.split('.'); if (b) S.nfe[a][b] = t.value; else S.nfe[a] = t.value; }
+  else if (t.dataset.nfd !== undefined){ const [k, f] = t.dataset.nfd.split(':'); S.nfe.dups[+k][f] = t.value;
+    const el = $('#nfeDupTot'); if (el){ const tot = r2(S.nfe.dups.reduce((a, d) => a + numIn(d.valor), 0)), T = totais(nfeLinhas());
+      el.innerHTML = `<span>Soma das duplicatas</span><span class="num" style="color:${Math.abs(tot - T.nota) > 0.009 ? 'var(--bad)' : 'var(--ok)'}">${brl(tot)}</span>`; } }
 });
 // re-renderiza depois que o foco já foi para o próximo campo (não perde o toque no celular)
 let laterT; const later = () => { clearTimeout(laterT); laterT = setTimeout(render, 0); };
@@ -3403,8 +3520,11 @@ document.addEventListener('change', ev => {
   else if (t.id === 'nfeCli'){ selCliente(t.value); }
   else if (t.dataset.papel !== undefined){ if (!pode('usuarios')) return; safe(() => db.collection('usuarios').doc(t.dataset.papel).update({ papel:t.value }), 'Papel alterado.'); }
   else if (t.id === 'bkFile'){ if (t.files[0]) lerBackup(t.files[0]); }
-  else if (t.id === 'nfeFrete'){ S.nfe.frete = t.value; }
+  else if (t.id === 'nfeFrete'){ S.nfe.frete = t.value; render(); }
   else if (t.id === 'nfePag'){ S.nfe.pag = t.value; }
+  else if (t.id === 'nfePres'){ S.nfe.presenca = t.value; }
+  else if (t.id === 'nfeSaida'){ S.nfe.saida = t.value; }
+  else if (t.id === 'nfeTrSel' && t.value !== ''){ const x = (emp().transportadoras || [])[+t.value]; if (x) S.nfe.transp = { nome:x.nome || '', doc:fmtDoc(x.doc), ie:x.ie || '', end:x.end || '', mun:x.mun || '', uf:x.uf || '', placa:x.placa || '', veicUf:x.veicUf || '', rntc:x.rntc || '' }; render(); }
 });
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') closeModal();
