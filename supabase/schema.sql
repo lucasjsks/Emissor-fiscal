@@ -153,6 +153,26 @@ begin
   return novo;
 end $$;
 
+-- um CNPJ só pode estar em UMA empresa do sistema (contas diferentes não podem cadastrar a mesma empresa).
+-- Confere ao criar e quando o CNPJ é trocado; empresas antigas repetidas continuam podendo salvar outros dados.
+create index if not exists docs_empresas_cnpj on public.docs ((regexp_replace(coalesce(data->>'cnpj', ''), '\D', '', 'g'))) where col = 'empresas';
+create or replace function public.cnpj_unico() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare d text := regexp_replace(coalesce(new.data->>'cnpj', ''), '\D', '', 'g');
+begin
+  if new.col <> 'empresas' or d = '' then return new; end if;
+  if tg_op = 'UPDATE' and d = regexp_replace(coalesce(old.data->>'cnpj', ''), '\D', '', 'g') then return new; end if;
+  perform pg_advisory_xact_lock(hashtext('cnpj_unico:' || d));
+  if exists (select 1 from public.docs x where x.col = 'empresas' and x.path <> new.path
+             and regexp_replace(coalesce(x.data->>'cnpj', ''), '\D', '', 'g') = d) then
+    raise exception 'Este CNPJ já está cadastrado no NotaOne em outra conta. Se a empresa é sua, entre com a conta dela ou fale com o suporte.';
+  end if;
+  return new;
+end $$;
+drop trigger if exists cnpj_unico on public.docs;
+create trigger cnpj_unico before insert or update on public.docs
+  for each row execute function public.cnpj_unico();
+
 create or replace function public.listar_membros(e text)
 returns table (user_id uuid, email text, papel text, criado_em timestamptz, pendente boolean)
 language sql stable security definer set search_path = public, auth as $$

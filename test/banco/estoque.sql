@@ -41,3 +41,9 @@ select data->>'estoque' final_6 from docs where path='empresas/'||:'e'||'/produt
 select data->>'tipo' tipo, data->>'qtd' qtd, data->>'saldo' saldo from docs where col='empresas/'||:'e'||'/movimentos' order by atualizado_em, data->>'em';
 delete from docs where path='empresas/'||:'e'; -- tem nota: nao apaga
 select count(*) empresa_continua from docs where path='empresas/'||:'e';
+-- CNPJ repetido em outra conta: recusa ao criar e ao trocar o CNPJ
+reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','outro@x.com'); set role authenticated;
+select public.criar_empresa('{"razao":"COPIA","cnpj":"11.222.333/0001-81"}');  -- deve falhar: CNPJ já existe
+select public.criar_empresa('{"razao":"OUTRA LOJA","cnpj":"11444777000161"}') as e2 \gset
+update docs set data = data || '{"cnpj":"11222333000181"}' where path='empresas/'||:'e2';  -- deve falhar
+update docs set data = data || '{"razao":"OUTRA LOJA LTDA"}' where path='empresas/'||:'e2' returning data->>'razao' as salvou_sem_trocar_cnpj;
