@@ -814,7 +814,7 @@ function vNfe(){
       <div><label for="nfeNat">Natureza da operação</label><input id="nfeNat" value="${esc(n.natureza)}"></div></div>
     <div class="row"><div><label>Finalidade</label><input value="${n.op === 'venda' ? '1 - Normal' : '4 - Devolução'}" disabled></div>
       <div><label>Tipo</label><input value="${n.op === 'dev_venda' ? '0 - Entrada' : '1 - Saída'}" disabled></div>
-      <div><label for="nfeSaida">Data/hora de saída</label><input id="nfeSaida" type="datetime-local" value="${esc(n.saida)}"></div></div>
+      <div><label for="nfeSaida">Data/hora de saída</label><input id="nfeSaida" type="datetime-local" value="${esc(n.saida || isoNow().slice(0, 16))}"></div></div>
     ${n.op === 'venda' ? `<label for="nfePres">Indicador de presença do comprador</label><select id="nfePres">${pres.map(([c, t]) => `<option value="${c}" ${n.presenca === c ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}
     ${n.op !== 'venda' ? `<label for="nfeRef">Chave de acesso da nota ${n.op === 'dev_venda' ? 'de venda que está sendo devolvida' : 'de compra (do fornecedor)'} *</label>
       <input id="nfeRef" inputmode="numeric" placeholder="44 dígitos" value="${esc(fmtChave(n.ref))}"><div class="small" id="refInfo" style="margin-top:4px">${refInfo(n.ref)}</div>
