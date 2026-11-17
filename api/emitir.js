@@ -9,6 +9,10 @@ export function limparPayload(p){
   return o;
 }
 
+// rejeições em que o número já ficou usado na SEFAZ: a correção sai com número novo
+const NUMERO_PERDIDO = ['204','205','206','539','301','302','303'];
+export const numeroPerdido = n => NUMERO_PERDIDO.includes(String((n.focus || {}).status_sefaz || '')) || /duplicidade|inutilizad|denega/i.test(String((n.focus || {}).mensagem_sefaz || ''));
+
 export default rota(async (req, b) => {
   const u = await usuario(req);
   const { empresa_id, modelo, payload, nota, extras = {} } = b;
@@ -21,21 +25,45 @@ export default rota(async (req, b) => {
 
   const emp = await getDoc('empresas/' + empresa_id);
   if (!emp) throw new Falha('Empresa não encontrada.', 404);
-  const serie = String((modelo === '65' ? emp.serie_nfce : emp.serie_nfe) || '1');
-  const numero = await rpc('proximo_numero', { e:empresa_id, campo:modelo === '65' ? 'prox_nfce' : 'prox_nfe' });
+  const amb = ambienteEmp(emp), tipo = modelo === '65' ? 'nfce' : 'nfe';
+
+  // correção de nota rejeitada: reenvia com o MESMO número e a mesma referência (a Focus aceita reenviar
+  // uma referência rejeitada). Se a rejeição deixou o número usado (duplicidade/denegação), vai com número novo.
+  let antiga = null;
+  if (b.reenviar){
+    antiga = await getDoc(`empresas/${empresa_id}/notas/${b.reenviar}`);
+    if (!antiga || antiga.modelo !== modelo) throw new Falha('A nota que você está corrigindo não foi encontrada.');
+    if (!['rejeitada','erro_envio'].includes(antiga.status)) throw new Falha('Essa nota não está rejeitada: não dá para reenviar. Abra a nota e confira a situação.');
+    if ((antiga.ambiente || 'homologacao') !== amb) throw new Falha('Essa nota foi feita no outro ambiente (teste/produção). Emita uma nota nova.');
+    if (antiga.corrigida_por) throw new Falha(`Essa nota já foi corrigida e reenviada como nº ${antiga.corrigida_por.numero}.`);
+    // antes de reenviar, confere na Focus se a nota não chegou a ser autorizada (ex.: queda de internet no envio)
+    const c = await focus('GET', `/v2/${tipo}/${encodeURIComponent(antiga.ref)}`, undefined, { amb });
+    const cs = c.status === 200 ? statusDe(c.body || {}) : null;
+    if (cs && cs !== 'rejeitada'){
+      const atual = { ...antiga, status:cs, chave:c.body.chave_nfe ? String(c.body.chave_nfe).replace(/\D/g, '') : antiga.chave, focus:{ ...resumoFocus(c.body), http:c.status } };
+      await putDoc(`empresas/${empresa_id}/notas/${antiga.ref}`, atual, u.id);
+      if (cs === 'autorizada') await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:antiga.ref, desfazer:false });
+      return { nota:atual, mensagem:'Essa nota já tinha chegado à SEFAZ e está ' + cs + '. Nada foi reenviado.' };
+    }
+  }
+  const mesmoNumero = antiga && !numeroPerdido(antiga);
+  const serie = mesmoNumero ? String(antiga.serie) : String((modelo === '65' ? emp.serie_nfce : emp.serie_nfe) || '1');
+  const numero = mesmoNumero ? antiga.numero : await rpc('proximo_numero', { e:empresa_id, campo:modelo === '65' ? 'prox_nfce' : 'prox_nfe' });
   // a referência leva o ambiente para não colidir quando a numeração recomeça em produção
-  const ref = `${empresa_id.slice(0, 8)}-${modelo}-${serie}-${numero}${ambienteEmp(emp) === 'producao' ? '-p' : ''}`;
+  const ref = mesmoNumero ? antiga.ref : `${empresa_id.slice(0, 8)}-${modelo}-${serie}-${numero}${amb === 'producao' ? '-p' : ''}`;
   const envio = limparPayload({ ...payload, cnpj_emitente:emp.cnpj, serie, numero });
   if (Array.isArray(envio.duplicatas) && envio.duplicatas.length && !envio.numero_fatura) envio.numero_fatura = String(numero); // fatura com o número real da nota
 
-  const amb = ambienteEmp(emp);
-  const resp = await focus('POST', `/v2/${modelo === '65' ? 'nfce' : 'nfe'}?ref=${encodeURIComponent(ref)}`, envio, { amb });
+  const resp = await focus('POST', `/v2/${tipo}?ref=${encodeURIComponent(ref)}`, envio, { amb });
   const r = resp.body || {};
   const status = (resp.status === 0 || resp.status >= 500) ? 'erro_envio' : statusDe(r);
+  const tentativas = mesmoNumero ? [...(antiga.tentativas || []), { em:antiga.data, status:antiga.status, cod:(antiga.focus || {}).status_sefaz || '', motivo:(antiga.focus || {}).mensagem_sefaz || (antiga.focus || {}).mensagem || '' }].slice(-20) : undefined;
   const final = { ...nota, id:ref, ref, numero, serie, empresa_id, status, ambiente:amb, payload:envio,
     chave:r.chave_nfe ? String(r.chave_nfe).replace(/\D/g, '') : null, focus:{ ...resumoFocus(r), http:resp.status },
-    emitida_por:u.id, data:payload.data_emissao || isoBR() };
+    emitida_por:u.id, data:payload.data_emissao || isoBR(), ...(tentativas ? { tentativas } : {}),
+    ...(antiga && !mesmoNumero ? { corrige:{ ref:antiga.ref, numero:antiga.numero } } : {}) };
   await putDoc(`empresas/${empresa_id}/notas/${ref}`, final, u.id);
+  if (antiga && !mesmoNumero) await putDoc(`empresas/${empresa_id}/notas/${antiga.ref}`, { ...antiga, corrigida_por:{ ref, numero, em:final.data } }, u.id);
   // estoque: venda autorizada tira do saldo; devolução de venda devolve (a função não aplica duas vezes)
   if (status === 'autorizada') await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:ref, desfazer:false });
 

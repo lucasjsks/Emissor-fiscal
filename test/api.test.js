@@ -31,7 +31,7 @@ beforeEach(() => {
       }
       if (u.pathname === '/rest/v1/docs' && opt.method === 'POST'){ docs[body.path] = body.data; return json(null, 201); }
     }
-    if (u.host === 'homologacao.focusnfe.com.br') return json(focusResp.body, focusResp.status);
+    if (u.host === 'homologacao.focusnfe.com.br'){ const fr = typeof focusResp === 'function' ? focusResp(opt.method || 'GET') : focusResp; return json(fr.body, fr.status); }
     throw new Error('URL inesperada ' + url);
   };
 });
@@ -215,4 +215,36 @@ test('ambiente: só o dono troca; produção exige certificado válido e troca a
   r = await chamar(ambienteRota, 't3', { empresa_id:'E1', ambiente:'homologacao' });
   assert.equal(r.code, 200); assert.equal(d.prox_nfce, 7); assert.equal(d.numeracao.producao.prox_nfce, 151);
   globalThis.fetch = fetchOrig; delete process.env.FOCUS_TOKEN_PRINCIPAL;
+});
+
+// ---------- corrigir nota rejeitada e reenviar ----------
+test('reenvio de nota rejeitada usa o mesmo número e a mesma referência', async () => {
+  docs['empresas/E1/notas/R1'] = { id:'R1', ref:'R1', modelo:'55', numero:3, serie:'2', status:'rejeitada', ambiente:'homologacao', data:'2026-11-17T10:00:00-03:00', focus:{ status_sefaz:'225', mensagem_sefaz:'Falha no Schema' } };
+  docs['empresas/E1'].prox_nfe = 4;
+  focusResp = m => m === 'GET' ? { status:200, body:{ status:'erro_autorizacao' } } : { status:201, body:{ status:'autorizado', chave_nfe:'NFe1' } };
+  const r = await chamar(emitir, 't2', { empresa_id:'E1', modelo:'55', payload, nota:{ total:10 }, reenviar:'R1' });
+  assert.equal(r.body.nota.status, 'autorizada'); assert.equal(r.body.nota.numero, 3); assert.equal(r.body.nota.ref, 'R1');
+  assert.equal(docs['empresas/E1'].prox_nfe, 4, 'não gasta número novo');
+  assert.ok(chamadas.some(c => c.method === 'POST' && c.url === '/v2/nfe?ref=R1'));
+  assert.equal(docs['empresas/E1/notas/R1'].tentativas[0].cod, '225');
+});
+
+test('reenvio após duplicidade (539) sai com número novo e marca a antiga', async () => {
+  docs['empresas/E1/notas/R2'] = { id:'R2', ref:'R2', modelo:'55', numero:1, serie:'2', status:'rejeitada', ambiente:'homologacao', focus:{ status_sefaz:'539', mensagem_sefaz:'Duplicidade de NF-e' } };
+  focusResp = m => m === 'GET' ? { status:200, body:{ status:'erro_autorizacao' } } : { status:201, body:{ status:'autorizado' } };
+  const r = await chamar(emitir, 't2', { empresa_id:'E1', modelo:'55', payload, nota:{}, reenviar:'R2' });
+  assert.equal(r.body.nota.numero, 3); assert.notEqual(r.body.nota.ref, 'R2');
+  assert.equal(docs['empresas/E1/notas/R2'].corrigida_por.numero, 3);
+  const r2 = await chamar(emitir, 't2', { empresa_id:'E1', modelo:'55', payload, nota:{}, reenviar:'R2' });
+  assert.equal(r2.code, 400, 'não deixa corrigir duas vezes');
+});
+
+test('reenvio não manda de novo se a nota já estava autorizada na Focus', async () => {
+  docs['empresas/E1/notas/R3'] = { id:'R3', ref:'R3', modelo:'65', numero:5, serie:'1', status:'erro_envio', ambiente:'homologacao' };
+  focusResp = m => m === 'GET' ? { status:200, body:{ status:'autorizado', chave_nfe:'NFe99' } } : { status:500, body:{} };
+  const r = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{}, reenviar:'R3' });
+  assert.equal(r.body.nota.status, 'autorizada'); assert.equal(r.body.nota.chave, '99');
+  assert.ok(!chamadas.some(c => c.method === 'POST' && c.url.startsWith('/v2/nfce')));
+  docs['empresas/E1/notas/R4'] = { id:'R4', ref:'R4', modelo:'65', numero:6, status:'autorizada', ambiente:'homologacao' };
+  assert.equal((await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{}, reenviar:'R4' })).code, 400);
 });
