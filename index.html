@@ -334,7 +334,7 @@ const CBS_2026 = 0.9, IBS_2026 = 0.1; // alíquotas de teste de 2026 (destaque i
 
 /* ================== estado e armazenamento ================== */
 const S = { tab:'inicio', recebidas:[], recFiltro:'pend', recBusca:'', empresas:[], empId:null, produtos:[], clientes:[], notas:[], cart:[], busca:'', pags:[], descTotal:{ tipo:'R$', v:'' }, cpf:'', nomeCons:'',
-  nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estFiltro:'todos', estBusca:'', cpView:'notas', cpBusca:'', cpMes:'', cm:null, conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
+  nfe:null, caixas:[], perfis:[], inutilizacoes:[], fornecedores:[], compras:[], vinculos:[], estFiltro:'todos', estBusca:'', cpView:'notas', cpBusca:'', cpMes:null, cm:null, conting:false, relPer:'hoje', prodView:'produtos', xmlImport:null, papel:'gerente', isAdmin:true, meuId:null, usuarios:[], acessos:[], nomes:{}, userCap:null, dl:null, bkImport:null, buscaNfe:'', filtroNotas:'todas', mode:'local', dbNote:'', ncmMap:null, ncmMeta:null, ncmFull:null, ncmImport:null, ncmQ:'', filtroProd:'todos' };
 let db = null, unsubs = [], local = {};
 const LS = 'emissor-fiscal-v1';
 S.nfe = nfeVazia();
@@ -2484,24 +2484,31 @@ function vCompras(){
     + (v === 'notas' ? vNotasCompra() : v === 'recebidas' ? vRecebidas() : vFornecedores());
 }
 function vNotasCompra(){
-  const q = norm(S.cpBusca || ''), mes = S.cpMes || '';
+  // lista curta: mês atual por padrão (a busca procura em todos os meses), estornadas à parte e 30 por vez
+  const q = norm(S.cpBusca || ''), mes = S.cpMes === null || S.cpMes === undefined ? isoNow().slice(0, 7) : S.cpMes, sit = S.cpSit || 'ativas';
   let L = [...S.compras].sort((a, b) => String(b.data_emissao || '').localeCompare(String(a.data_emissao || '')) || String(b.lancado_em || '').localeCompare(String(a.lancado_em || '')));
-  if (mes) L = L.filter(c => String(c.data_emissao || '').slice(0, 7) === mes);
-  if (q) L = L.filter(c => norm(c.fornecedor_nome).includes(q) || String(c.numero || '') === (S.cpBusca || '').trim() || (dig(q).length >= 4 && dig(c.fornecedor_cnpj).includes(dig(q))));
-  const val = L.filter(c => c.status !== 'estornada'), tot = r2(val.reduce((a, c) => a + num(c.total_nota), 0));
-  const nEst = L.length - val.length, lim = S.cpLim || 60, mais = L.length - lim; L = L.slice(0, lim);
+  if (q) L = L.filter(c => norm(c.fornecedor_nome).includes(q) || String(c.numero || '') === (S.cpBusca || '').trim() || (dig(q).length >= 4 && (dig(c.fornecedor_cnpj).includes(dig(q)) || dig(c.chave || '').includes(dig(q)))));
+  else if (mes) L = L.filter(c => String(c.data_emissao || '').slice(0, 7) === mes);
+  const val = L.filter(c => c.status !== 'estornada'), tot = r2(val.reduce((a, c) => a + num(c.total_nota), 0)), nEst = L.length - val.length;
+  const nDev = val.filter(c => situacaoDev(c)).length;
+  L = sit === 'estornadas' ? L.filter(c => c.status === 'estornada') : sit === 'devolvidas' ? val.filter(c => situacaoDev(c)) : sit === 'todas' ? L : val;
+  const meses = [...new Set([isoNow().slice(0, 7), ...S.compras.map(c => String(c.data_emissao || '').slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m))])].sort().reverse();
+  const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
+  const total = L.length, lim = S.cpLim || 30, mais = L.length - lim; L = L.slice(0, lim);
   const tagC = c => { if (c.status === 'estornada') return '<span class="tag b">estornada</span>'; const d = situacaoDev(c);
     return d === 'total' ? '<span class="tag w">devolvida</span>' : d === 'parcial' ? '<span class="tag w">devolução parcial</span>' : '<span class="tag">lançada</span>'; };
   return `${pode('produto') ? `<div class="actions" style="margin:0 0 12px"><label class="btn pri" style="flex:1">⤓ Importar XML (pode escolher vários)<input type="file" id="compraXml" accept=".xml" multiple hidden></label>
       <button class="btn" data-act="novaCompra">+ Lançar nota manualmente</button></div>` : ''}
-    <div class="card"><div class="row"><div><label for="cpBusca">Buscar</label><input id="cpBusca" placeholder="Fornecedor, número ou CNPJ" value="${esc(S.cpBusca || '')}" autocomplete="off"></div>
-      <div><label for="cpMes">Mês de emissão</label><input id="cpMes" type="month" value="${esc(mes)}"></div></div>
-      <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${nEst}</b>estornadas</div></div></div>
+    <div class="card"><div class="row" style="align-items:end"><div style="flex:2 1 220px"><label for="cpBusca">Buscar</label><input id="cpBusca" placeholder="Fornecedor, número, CNPJ ou chave" value="${esc(S.cpBusca || '')}" autocomplete="off"></div>
+      <div style="flex:1 1 150px"><label for="cpMes">Mês de emissão</label><select id="cpMes" ${q ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
+      ${q ? '<p class="small" style="margin:4px 0 0">Buscando em todos os meses.</p>' : ''}
+      <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${nEst}</b>estornadas</div></div>
+      <div class="seg" style="margin-top:8px">${[['ativas','Lançadas'],['devolvidas',`Com devolução (${nDev})`],['estornadas',`Estornadas (${nEst})`],['todas','Todas']].map(([k, l]) => `<button data-act="cpSit" data-s="${k}" class="${sit === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
     <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
       <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></div>
       <div class="s">${dataBR(c.data_emissao)} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 60)} (faltam ${mais})</button></div>` : ''}`
-      : `<div class="empty">${S.compras.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
+      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 30)} (faltam ${mais})</button></div>` : ''}${total > 30 ? `<p class="small" style="text-align:center">${total} nota(s) neste filtro</p>` : ''}`
+      : `<div class="empty">${S.compras.length ? (q ? 'Nenhuma nota encontrada.' : mes ? 'Nenhuma nota de compra neste mês. Escolha outro mês ou "Todos os meses".' : 'Nenhuma nota neste filtro.') : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
 }
 
 /* ---------- notas recebidas da SEFAZ (Manifestação do Destinatário) ---------- */
@@ -2518,6 +2525,7 @@ function vRecebidas(){
   const n = Object.fromEntries(Object.entries(filtros).map(([k, fn]) => [k, S.recebidas.filter(fn).length]));
   L = L.filter(filtros[f] || filtros.pend);
   if (q) L = L.filter(r => norm(r.emitente_nome).includes(q) || r.emitente_doc.includes(dig(q) || '@') || r.chave.includes(dig(q) || '@'));
+  const limR = S.recLim || 30, maisR = L.length - limR; L = L.slice(0, limR);
   return `<div class="card"><div class="row" style="align-items:center"><div style="flex:1"><b>Notas emitidas contra o seu CNPJ</b>
       <div class="small">A SEFAZ avisa toda nota de fornecedor emitida para ${esc(fmtDoc((emp() || {}).cnpj))}. Responda cada uma: aceite e dê entrada no estoque, ou recuse.${m.sinc_em ? `<br>Última busca: ${fmtData(m.sinc_em)}` : ''}</div></div>
       <div style="flex:0 0 auto"><button class="btn pri" data-act="recBuscar">↻ Buscar notas agora</button></div></div>
@@ -2527,7 +2535,7 @@ function vRecebidas(){
   <div class="card">${L.length ? `<div class="list">${L.map(r => { const c = compraDaChave(r.chave), [ml, mc] = MANIF[r.manifestacao] || MANIF.nulo;
     return `<div class="it" data-act="verRecebida" data-id="${esc(r.chave)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(r.emitente_nome)}</div>
       <div class="s">${fmtDoc(r.emitente_doc)} · emitida ${dataBR(r.data_emissao)}${recPendente(r) && prazoRec(r) > 7 ? ` · <b style="color:var(--warn)">há ${prazoRec(r)} dias</b>` : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(r.valor)}</b><br>${r.situacao === 'cancelada' ? '<span class="tag b">cancelada pelo fornecedor</span>' : c ? '<span class="tag">lançada</span>' : `<span class="tag ${mc}">${ml}</span>`}</div></div>`; }).join('')}</div>`
+      <div style="text-align:right"><b class="num">${brl(r.valor)}</b><br>${r.situacao === 'cancelada' ? '<span class="tag b">cancelada pelo fornecedor</span>' : c ? '<span class="tag">lançada</span>' : `<span class="tag ${mc}">${ml}</span>`}</div></div>`; }).join('')}</div>${maisR > 0 ? `<div class="actions"><button class="btn" data-act="recMais">Mostrar mais ${Math.min(maisR, 30)} (faltam ${maisR})</button></div>` : ''}`
     : `<div class="empty">${S.recebidas.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma nota recebida ainda. Clique em "Buscar notas agora".'}</div>`}</div>`;
 }
 async function recBuscar(btn, silencioso){
@@ -3149,13 +3157,17 @@ async function verEstoque(id){
 
 /* ---------- fornecedores ---------- */
 function vFornecedores(){
-  const L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || '')), porCnpj = {};
+  const qf = norm(S.fnBusca || ''), limF = S.fnLim || 30, porCnpj = {};
+  let L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  if (qf) L = L.filter(f => norm(f.nome).includes(qf) || norm(f.fantasia).includes(qf) || (dig(qf).length >= 4 && dig(f.cnpj).includes(dig(qf))));
+  const maisF = L.length - limF; L = L.slice(0, limF);
   S.compras.forEach(c => { if (c.status === 'estornada') return; const x = porCnpj[c.fornecedor_cnpj] || (porCnpj[c.fornecedor_cnpj] = { n:0, v:0 }); x.n++; x.v += num(c.total_nota); });
   return `${pode('produto') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="novoFornecedor">+ Fornecedor</button></div>' : ''}
+    ${S.fornecedores.length > 8 ? `<div class="card"><input id="fnBusca" placeholder="Buscar fornecedor por nome ou CNPJ" value="${esc(S.fnBusca || '')}" autocomplete="off"></div>` : ''}
     <div class="card">${L.length ? `<div class="list">${L.map(f => { const cs = porCnpj[f.cnpj] || { n:0, v:0 };
       return `<div class="it" data-act="editFornecedor" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.fantasia || f.nome)}</div>
-        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><div style="text-align:right"><b class="num">${brl(cs.v)}</b><br><span class="small">${cs.n} compra(s)</span></div></div>`; }).join('')}</div>`
-      : '<div class="empty">Os fornecedores entram sozinhos quando você importa uma nota de compra.</div>'}</div>`;
+        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><div style="text-align:right"><b class="num">${brl(cs.v)}</b><br><span class="small">${cs.n} compra(s)</span></div></div>`; }).join('')}</div>${maisF > 0 ? `<div class="actions"><button class="btn" data-act="fnMais">Mostrar mais ${Math.min(maisF, 30)} (faltam ${maisF})</button></div>` : ''}`
+      : `<div class="empty">${S.fornecedores.length ? 'Nenhum fornecedor encontrado.' : 'Os fornecedores entram sozinhos quando você importa uma nota de compra.'}</div>`}</div>`;
 }
 function formFornecedor(f){
   f = f || { uf:'PI' };
@@ -3186,7 +3198,10 @@ async function salvarFornecedor(id){
 async function acoesEstoque(a, t, id){
   switch (a){
     case 'cpView': S.cpView = t.dataset.v; render(); return true;
-    case 'cpMais': S.cpLim = (S.cpLim || 60) + 60; render(); return true;
+    case 'cpMais': S.cpLim = (S.cpLim || 30) + 30; render(); return true;
+    case 'cpSit': S.cpSit = t.dataset.s; S.cpLim = 30; render(); return true;
+    case 'recMais': S.recLim = (S.recLim || 30) + 30; render(); return true;
+    case 'fnMais': S.fnLim = (S.fnLim || 30) + 30; render(); return true;
         case 'verCompra': verCompra(id); return true;
     case 'imprimirCompra': await gerarDanfeCompra(id, t); return true;
     case 'baixarXmlCompra': baixarXmlCompra(id); return true;
@@ -3196,7 +3211,7 @@ async function acoesEstoque(a, t, id){
     case 'lancarCompraXml': await lancarCompraXml(t); return true;
     case 'pularXml': closeModal(); proximoXml(); return true;
     case 'recBuscar': await recBuscar(t); return true;
-    case 'recFiltro': S.recFiltro = t.dataset.f; render(); return true;
+    case 'recFiltro': S.recFiltro = t.dataset.f; S.recLim = 30; render(); return true;
     case 'verRecebida': verRecebida(id); return true;
     case 'recAceitar': await recAceitar(id, t); return true;
     case 'recRecusar': formRecusar(id, t.dataset.t); return true;
@@ -3239,8 +3254,9 @@ async function acoesEstoque(a, t, id){
 }
 function inputEstoque(t){
   if (t.id === 'estBusca'){ S.estBusca = t.value; later(); return true; }
-  if (t.id === 'recBusca'){ S.recBusca = t.value; later(); return true; }
-  if (t.id === 'cpBusca'){ S.cpBusca = t.value; S.cpLim = 60; later(); return true; }
+  if (t.id === 'fnBusca'){ S.fnBusca = t.value; S.fnLim = 30; later(); return true; }
+  if (t.id === 'recBusca'){ S.recBusca = t.value; S.recLim = 30; later(); return true; }
+  if (t.id === 'cpBusca'){ S.cpBusca = t.value; S.cpLim = 30; later(); return true; }
   if (t.dataset.dq !== undefined && S.dc){ S.dc.q[+t.dataset.dq] = t.value; const D = calcDevCompra(), el = $('#dcTot');
     if (el) el.innerHTML = D.linhas.length ? `${D.ipi ? linhaTot('IPI devolvido', D.ipi, 'small') : ''}${D.st ? linhaTot('ICMS-ST devolvido', D.st, 'small') : ''}${linhaTot('Total da devolução', D.total, 'big')}` : '<div class="small">Nenhum item marcado.</div>';
     const b = $('[data-act=emitirDevCompra]'); if (b) b.disabled = !D.linhas.length; return true; }
@@ -3259,7 +3275,7 @@ function inputEstoque(t){
 }
 function changeEstoque(t){
   if (t.id === 'compraXml'){ if (t.files.length) importarXmls([...t.files]); t.value = ''; return true; }
-  if (t.id === 'cpMes'){ S.cpMes = t.value; S.cpLim = 60; render(); return true; }
+  if (t.id === 'cpMes'){ S.cpMes = t.value; S.cpLim = 30; render(); return true; }
   if (t.dataset.ci !== undefined){ const it = S.compraImport.itens[+t.dataset.ci]; it.produto_id = t.value; it.como = ''; renderCompraImport(); return true; }
   if (t.id === 'ciPerf'){ S.ciPerf = t.value; return true; }
   if (t.dataset.cm !== undefined && S.cm){ S.cm[t.dataset.cm] = t.value; if (['modelo','pagamento','fornecedor_id'].includes(t.dataset.cm)) renderCompraManual(); return true; }
