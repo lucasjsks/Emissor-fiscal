@@ -262,8 +262,9 @@ const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const dig = v => String(v ?? '').replace(/\D/g, '');
 const brl = n => (Number(n) || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-const num = v => { if (typeof v === 'number') return v; const n = parseFloat(String(v ?? '').replace(/\./g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
-const numIn = v => { const s = String(v ?? '').trim(); if (/,/.test(s)) return num(s); const n = parseFloat(s); return isNaN(n) ? 0 : n; };
+const semRS = v => String(v ?? '').replace(/R\$|\s/g, '');
+const num = v => { if (typeof v === 'number') return v; const n = parseFloat(semRS(v).replace(/\./g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+const numIn = v => { if (typeof v === 'number') return v; const s = semRS(v); if (/,/.test(s)) return num(s); const n = parseFloat(s); return isNaN(n) ? 0 : n; };
 const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^a-zA-Z0-9-]/g, '');
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -767,11 +768,11 @@ function vVenda(){
       ${linhaTot('IBS/CBS destacado (2026, informativo)', T.cbs + T.ibs, 'small')}
       <label for="descTot">Desconto no total</label>
       <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="descTipo" data-t="${t}" class="${S.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
-        <input id="descTot" inputmode="decimal" placeholder="0" value="${esc(S.descTotal.v)}"></div>
+        <input id="descTot" ${S.descTotal.tipo === '%' ? '' : 'data-rs'} inputmode="decimal" placeholder="0" value="${esc(S.descTotal.tipo === '%' ? semRS(S.descTotal.v) : S.descTotal.v)}"></div>
       <label>Pagamento <span class="small">(toque para adicionar — dá para combinar formas)</span></label>
       <div class="seg">${PAGAMENTOS.slice(0, 4).map(([c, n]) => `<button data-act="addPag" data-c="${c}">${n}</button>`).join('')}</div>
       ${S.pags.length ? `<div class="list" style="margin-top:6px">${S.pags.map((p, i) => `<div class="it" style="padding:6px 0"><div class="grow">${esc(PAG_NOME[p.forma])}</div>
-        <input id="pv${i}" data-pv="${i}" inputmode="decimal" style="width:110px;text-align:right" value="${esc(p.valor)}"><button class="x" data-act="rmPag" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}</div>` : ''}
+        <input id="pv${i}" data-pv="${i}" data-rs inputmode="decimal" style="width:110px;text-align:right" value="${esc(p.valor)}"><button class="x" data-act="rmPag" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}</div>` : ''}
       ${pg.falta > 0 && S.pags.length ? linhaTot('Falta receber', pg.falta) : ''}${pg.troco > 0 ? linhaTot('<b>Troco</b>', pg.troco) : ''}
       <label for="cpf">CPF do consumidor ${T.nota >= lim ? '<b style="color:var(--bad)">(obrigatório nesta venda)</b>' : '(opcional)'}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
       <label for="nomeCons">Nome (opcional)</label><input id="nomeCons" value="${esc(S.nomeCons)}">
@@ -787,7 +788,7 @@ function vVenda(){
 function formDescItem(i){
   const ci = S.cart[i], p = S.produtos.find(x => x.id === ci.pid), bruto = r2(ci.qtd * num(p.preco));
   openModal(`${mhead('Desconto no item')}<p><b>${esc(p.descricao)}</b><br><span class="small">${ci.qtd} × ${brl(p.preco)} = ${brl(bruto)}</span></p>
-  <div class="row" style="flex-wrap:nowrap"><select id="diTipo" style="flex:0 0 80px"><option>R$</option><option>%</option></select><input id="diV" inputmode="decimal" placeholder="0" value="${ci.desc ? String(ci.desc).replace('.', ',') : ''}"></div>
+  <div class="row" style="flex-wrap:nowrap"><select id="diTipo" style="flex:0 0 80px"><option>R$</option><option>%</option></select><input id="diV" data-rs="diTipo" inputmode="decimal" placeholder="0" value="${ci.desc ? String(ci.desc).replace('.', ',') : ''}"></div>
   <div id="errM"></div><div class="actions"><button class="btn" data-act="remDescItem" data-i="${i}">Sem desconto</button><button class="btn pri" data-act="aplDescItem" data-i="${i}">Aplicar</button></div>`);
   setTimeout(() => { const el = $('#diV'); if (el) el.focus(); }, 50);
 }
@@ -835,8 +836,8 @@ function vNfe(){
     ${L.length ? `<div class="list" style="margin-top:6px">${L.map((l, i) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${i + 1}. ${esc(l.p.descricao)}</div>
       <div class="s">NCM ${fmtNcm(l.p.ncm)} · CFOP ${l.c.cfop} · CST/CSOSN ${esc(l.c.cst)} · ${esc(l.p.unidade || 'UN')}${l.c.st ? ` · ST ${brl(l.c.st)} (MVA ${String(l.c.stMva).replace('.', ',')}%)` : ''}${l.c.icms ? ` · ICMS ${brl(l.c.icms)}` : ''}</div></div>
       <div class="g3"><div><label>Quantidade</label><input id="nq${i}" data-nq="${i}" inputmode="decimal" value="${String(l.qtd).replace('.', ',')}"></div>
-      <div><label>Valor unitário</label><input id="np${i}" data-np="${i}" inputmode="decimal" value="${String(l.preco).replace('.', ',')}"></div>
-      <div><label>Desconto (R$)</label><input id="nd${i}" data-nd="${i}" inputmode="decimal" placeholder="0,00" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
+      <div><label>Valor unitário</label><input id="np${i}" data-np="${i}" data-rs inputmode="decimal" value="${String(l.preco).replace('.', ',')}"></div>
+      <div><label>Desconto (R$)</label><input id="nd${i}" data-nd="${i}" data-rs inputmode="decimal" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
       <div style="display:flex;width:100%;align-items:center;gap:8px;margin-top:6px"><b class="num" style="flex:1">${brl(r2(l.c.bruto - l.descItem))}</b>
       <button class="btn sm bad" data-act="rmNfe" data-i="${i}">Remover</button></div></div>`).join('')}</div>` : '<div class="empty">Nenhum item.</div>'}`, L.length ? ` <span class="small" style="font-weight:500">(${L.length})</span>` : '')}
   ${sec(4, 'Transporte', `<label for="nfeFrete">Modalidade do frete</label><select id="nfeFrete">${ti.map(([c, t]) => `<option value="${c}" ${n.frete === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
@@ -855,7 +856,7 @@ function vNfe(){
         <div><label>Parcelas</label><input id="nfeNParc" inputmode="numeric" value="${n.dups.length || ''}" placeholder="ex.: 3"></div><div><label>Intervalo (dias)</label><input id="nfeIntParc" inputmode="numeric" value="30"></div>
         <div style="flex:0 0 auto"><button class="btn" data-act="nfeGerarDup">Gerar</button></div></div>
       ${n.dups.map((d, k) => `<div class="g3" style="margin-top:6px"><div><label>Duplicata</label><input data-nfd="${k}:n" value="${esc(d.n)}"></div><div><label>Vencimento</label><input type="date" data-nfd="${k}:venc" value="${esc(d.venc)}"></div>
-        <div><label>Valor</label><div style="display:flex;gap:4px"><input data-nfd="${k}:valor" inputmode="decimal" value="${esc(d.valor)}"><button class="x" data-act="nfeRemDup" data-i="${k}" aria-label="Remover parcela">×</button></div></div></div>`).join('')}
+        <div><label>Valor</label><div style="display:flex;gap:4px"><input data-nfd="${k}:valor" data-rs inputmode="decimal" value="${esc(d.valor)}"><button class="x" data-act="nfeRemDup" data-i="${k}" aria-label="Remover parcela">×</button></div></div></div>`).join('')}
       <div class="actions" style="margin-top:6px"><button class="btn sm" data-act="nfeAddDup">+ Parcela</button></div>
       <div class="total small" id="nfeDupTot"><span>Soma das duplicatas</span><span class="num" style="color:${Math.abs(dup - T.nota) > 0.009 ? 'var(--bad)' : 'var(--ok)'}">${brl(dup)}</span></div>` : ''}`) : ''}
   ${sec(n.op === 'venda' ? 6 : 5, 'Informações adicionais', `<label for="nfeObs">Informações complementares (vão impressas no DANFE)</label><textarea id="nfeObs" rows="3">${esc(n.obs)}</textarea>
@@ -865,8 +866,8 @@ function vNfe(){
     <h3 style="margin-top:0">Totais da nota</h3>
     <label for="nDescTot">Desconto no total</label>
     <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="nDescTipo" data-t="${t}" class="${n.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
-      <input id="nDescTot" inputmode="decimal" placeholder="0" value="${esc(n.descTotal.v)}"></div>
-    <div class="row">${fld('nFrete','Frete (R$)', n.vFrete, 'inputmode="decimal" placeholder="0,00"')}${fld('nSeguro','Seguro (R$)', n.vSeguro, 'inputmode="decimal" placeholder="0,00"')}${fld('nOutras','Outras (R$)', n.vOutras, 'inputmode="decimal" placeholder="0,00"')}</div>
+      <input id="nDescTot" ${n.descTotal.tipo === '%' ? '' : 'data-rs'} inputmode="decimal" placeholder="0" value="${esc(n.descTotal.tipo === '%' ? semRS(n.descTotal.v) : n.descTotal.v)}"></div>
+    <div class="row">${fld('nFrete','Frete (R$)', n.vFrete, 'data-rs inputmode="decimal"')}${fld('nSeguro','Seguro (R$)', n.vSeguro, 'data-rs inputmode="decimal"')}${fld('nOutras','Outras (R$)', n.vOutras, 'data-rs inputmode="decimal"')}</div>
     <p class="small">Desconto, frete, seguro e outras são rateados entre os itens pelo valor.</p>
     <div style="margin-top:10px">${linhaTot('Produtos', T.prod)}${T.desc ? linhaTot('Desconto', -T.desc, 'small') : ''}${T.frete ? linhaTot('Frete', T.frete, 'small') : ''}${T.seguro ? linhaTot('Seguro', T.seguro, 'small') : ''}${T.outras ? linhaTot('Outras despesas', T.outras, 'small') : ''}
     ${T.icms ? linhaTot('ICMS próprio (BC ' + brl(T.icmsBase) + ')', T.icms, 'small') : ''}${T.st ? linhaTot('ICMS-ST (BC ' + brl(T.stBase) + ')', T.st, 'small') : ''}${T.fcpSt ? linhaTot('FCP-ST', T.fcpSt, 'small') : ''}
@@ -993,7 +994,7 @@ function formEmpresa(e){
   <div class="row">${fld('eSNfce','Série NFC-e',e.serie_nfce,'inputmode="numeric"')}${fld('ePNfce','Próximo nº NFC-e',e.prox_nfce,'inputmode="numeric"')}</div>
   <div class="row">${fld('eSNfe','Série NF-e',e.serie_nfe,'inputmode="numeric"')}${fld('ePNfe','Próximo nº NF-e',e.prox_nfe,'inputmode="numeric"')}</div>
   <div class="row">${fld('eCsc','ID do CSC (só o número do ID)',e.csc_id,'inputmode="numeric"')}</div>
-  ${fld('eLim','Exigir CPF na NFC-e a partir de (R$)', String(e.limite_cpf_nfce || 10000).replace('.', ','), 'inputmode="decimal"')}
+  ${fld('eLim','Exigir CPF na NFC-e a partir de (R$)', String(e.limite_cpf_nfce || 10000).replace('.', ','), 'data-rs inputmode="decimal"')}
   <p class="small">Confira o valor-limite de identificação do consumidor com a SEFAZ-PI.</p>
   <div id="errM"></div>
   <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar dados da empresa</button></div>
@@ -1025,7 +1026,7 @@ function formProduto(p){
   openModal(`${mhead(p.id ? 'Editar produto' : 'Novo produto')}
   ${fld('pDesc','Descrição *',p.descricao)}
   <div class="row">${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
-  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','inputmode="decimal" placeholder="0,00"')}${fld('pUn','Unidade',p.unidade)}</div>
+  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}</div>
   <label class="chk"><input type="checkbox" id="pFav" ${p.favorito ? 'checked' : ''}> Mostrar como atalho no cupom (botão de toque rápido)</label>
   <p class="small">Produto vendido na balança: o <b>Código interno</b> deve ser o mesmo código cadastrado na balança.</p>
   <h3>Tributação</h3>
@@ -1531,7 +1532,7 @@ function resumoCaixaHtml(r){
 function vCaixa(){
   const cx = caixaAberto(); let h = '<h2>Caixa</h2>';
   if (!cx) h += `<div class="card"><p>Nenhum caixa aberto${S.meuId ? ' no seu usuário' : ''}. Abra o caixa para começar a vender.</p>
-    <label for="cxIni">Troco inicial na gaveta (R$)</label><input id="cxIni" inputmode="decimal" placeholder="0,00">
+    <label for="cxIni">Troco inicial na gaveta (R$)</label><input id="cxIni" data-rs inputmode="decimal">
     <div class="actions"><button class="btn pri" data-act="abrirCaixa">Abrir caixa</button></div></div>`;
   else h += `<div class="card"><b>Caixa aberto</b><div class="small">desde ${fmtData(cx.aberto_em)}</div>${resumoCaixaHtml(resumoCaixa(cx))}
     ${(cx.movs || []).length ? `<h3>Movimentos</h3><div class="list">${cx.movs.map(m => `<div class="it"><div class="grow"><div class="t">${m.tipo === 'sangria' ? 'Sangria' : 'Suprimento'}</div><div class="s">${fmtData(m.em)}${m.motivo ? ' · ' + esc(m.motivo) : ''}</div></div>
@@ -1542,7 +1543,7 @@ function vCaixa(){
 }
 function formMov(tipo){
   openModal(`${mhead(tipo === 'sangria' ? 'Sangria (retirada)' : 'Suprimento (reforço)')}
-  ${fld('mvVal','Valor (R$)', '', 'inputmode="decimal" placeholder="0,00"')}${fld('mvMot','Motivo', '', 'placeholder="' + (tipo === 'sangria' ? 'Ex.: depósito no banco' : 'Ex.: troco extra') + '"')}
+  ${fld('mvVal','Valor (R$)', '', 'data-rs inputmode="decimal"')}${fld('mvMot','Motivo', '', 'placeholder="' + (tipo === 'sangria' ? 'Ex.: depósito no banco' : 'Ex.: troco extra') + '"')}
   <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="salvarMov" data-t="${tipo}">Registrar</button></div>`);
   setTimeout(() => { const el = $('#mvVal'); if (el) el.focus(); }, 50);
 }
@@ -1559,7 +1560,7 @@ function formFechar(){
   const pend = S.notas.filter(n => n.caixa === cx.id && n.status === 'contingencia').length;
   openModal(`${mhead('Fechar caixa')}${resumoCaixaHtml(r)}
   ${pend ? `<div class="msg warn">Há ${pend} cupom(ns) em contingência neste caixa. Transmita na aba Notas.</div>` : ''}
-  ${fld('cxCont','Dinheiro contado na gaveta (R$)', '', 'inputmode="decimal" placeholder="0,00"')}<div id="cxDif" class="small"></div>
+  ${fld('cxCont','Dinheiro contado na gaveta (R$)', '', 'data-rs inputmode="decimal"')}<div id="cxDif" class="small"></div>
   <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="confFechar">Fechar caixa</button></div>`);
 }
 async function confFechar(){
@@ -2375,7 +2376,7 @@ function renderCompraImport(){
     <select data-ci="${i}"><option value="novo" ${it.produto_id === 'novo' ? 'selected' : ''}>➕ Cadastrar como produto novo</option>${prods.map(p => `<option value="${esc(p.id)}" ${p.id === it.produto_id ? 'selected' : ''}>${esc(p.descricao)}</option>`).join('')}</select>
     <div class="row" style="align-items:flex-end">
       <div><label>Conversão: 1 ${esc(it.uCom)} =</label><input data-cf="${i}" inputmode="decimal" value="${v2(it.fator)}"></div>
-      ${it.produto_id === 'novo' ? `<div><label>Preço de venda (R$)</label><input data-cp="${i}" inputmode="decimal" placeholder="obrigatório para vender" value="${esc(it.preco)}"></div>` : ''}
+      ${it.produto_id === 'novo' ? `<div><label>Preço de venda (R$)</label><input data-cp="${i}" data-rs inputmode="decimal" placeholder="obrigatório para vender" value="${esc(it.preco)}"></div>` : ''}
     </div>
     <div class="small" id="cix-${i}" style="margin-top:6px">${linhaEntrada(it)}</div></div>`).join('')}
   ${novos ? `${S.perfis.length ? sel('ciPerf', `Perfil de tributação para os ${novos} produto(s) novo(s)`, S.ciPerf || '', [['','— padrão do regime —'], ...S.perfis.map(f => [f.id, f.nome])]) : ''}
@@ -2477,19 +2478,19 @@ function renderCompraManual(){
   <button class="btn sm" data-act="cmNovoItem" style="margin-top:6px">+ Item com produto novo</button>
   ${c.itens.map((i, k) => `<div class="card" style="margin:8px 0 0;padding:10px">
     <div style="display:flex;gap:8px;align-items:center"><div class="grow" style="flex:1;font-weight:600">${i.produto_id === 'novo' ? 'Produto novo' : esc(nomeProd(i.produto_id))}</div><button class="x" data-act="cmRem" data-i="${k}" aria-label="Remover item">×</button></div>
-    ${i.produto_id === 'novo' ? `<div class="row">${fld('ci' + k + 'd', 'Descrição *', i.novoDesc, `data-it="${k}:novoDesc"`)}${fld('ci' + k + 'n', 'NCM *', i.ncm, `data-it="${k}:ncm" inputmode="numeric"`)}${fld('ci' + k + 'p', 'Preço de venda', i.preco, `data-it="${k}:preco" inputmode="decimal"`)}</div>` : ''}
+    ${i.produto_id === 'novo' ? `<div class="row">${fld('ci' + k + 'd', 'Descrição *', i.novoDesc, `data-it="${k}:novoDesc"`)}${fld('ci' + k + 'n', 'NCM *', i.ncm, `data-it="${k}:ncm" inputmode="numeric"`)}${fld('ci' + k + 'p', 'Preço de venda', i.preco, `data-it="${k}:preco" data-rs inputmode="decimal"`)}</div>` : ''}
     <div class="g3"><div><label>Quantidade</label><input data-it="${k}:qCom" inputmode="decimal" value="${esc(i.qCom)}"></div>
       <div><label>Unidade</label><input data-it="${k}:uCom" value="${esc(i.uCom)}"></div>
-      <div><label>Valor unitário</label><input data-it="${k}:vUnCom" inputmode="decimal" value="${esc(i.vUnCom)}"></div></div>
+      <div><label>Valor unitário</label><input data-it="${k}:vUnCom" data-rs inputmode="decimal" value="${esc(i.vUnCom)}"></div></div>
     <div class="g3" style="margin-top:4px"><div><label>1 ${esc(i.uCom || 'UN')} = (un. no estoque)</label><input data-it="${k}:fator" inputmode="decimal" value="${v2(i.fator)}"></div>
-      <div><label>Desconto (R$)</label><input data-it="${k}:vDesc" inputmode="decimal" value="${esc(i.vDesc)}"></div>
+      <div><label>Desconto (R$)</label><input data-it="${k}:vDesc" data-rs inputmode="decimal" value="${esc(i.vDesc)}"></div>
       <div><label>Total do item</label><div class="num" style="padding:10px 0" id="cmIt${k}">${brl(r2(numIn(i.qCom) * numIn(i.vUnCom)))}</div></div></div>
     <details style="margin-top:6px"><summary class="small" style="cursor:pointer">Impostos do item (CFOP, CST, ICMS, ST, IPI)</summary>
       <div class="g3">${['cfop:CFOP','cst:CST/CSOSN','vBC:BC ICMS','pICMS:Alíq. ICMS %','vICMS:Valor ICMS','vICMSST:ICMS-ST (R$)','vIPI:IPI (R$)'].map(s => { const [f, l] = s.split(':');
-        return `<div><label>${l}</label><input data-it="${k}:${f}" inputmode="decimal" value="${esc(i[f])}" ${f === 'cfop' ? `placeholder="${cfopCompra()}"` : ''}></div>`; }).join('')}</div>
+        return `<div><label>${l}</label><input data-it="${k}:${f}" ${['vBC','vICMS','vICMSST','vIPI'].includes(f) ? 'data-rs' : ''} inputmode="decimal" value="${esc(i[f])}" ${f === 'cfop' ? `placeholder="${cfopCompra()}"` : ''}></div>`; }).join('')}</div>
       <p class="small">ST e IPI entram no custo do produto. O ICMS é só informativo.</p></details></div>`).join('')}
   <h3>Valores da nota</h3>
-  <div class="row">${campo('frete', 'Frete (R$)', 'inputmode="decimal"')}${campo('seguro', 'Seguro (R$)', 'inputmode="decimal"')}${campo('outras', 'Outras despesas (R$)', 'inputmode="decimal"')}</div>
+  <div class="row">${campo('frete', 'Frete (R$)', 'data-rs inputmode="decimal"')}${campo('seguro', 'Seguro (R$)', 'data-rs inputmode="decimal"')}${campo('outras', 'Outras despesas (R$)', 'data-rs inputmode="decimal"')}</div>
   <p class="small">Frete, seguro e outras despesas são rateados entre os itens e entram no custo.</p>
   <div id="cmTotais" style="margin-top:6px">${totaisCompraHtml()}</div>
   <h3>Pagamento</h3>
@@ -2497,7 +2498,7 @@ function renderCompraManual(){
   ${c.pagamento === 'prazo' ? `<div class="row" style="align-items:flex-end"><div><label>Gerar parcelas</label><input id="cmNParc" inputmode="numeric" placeholder="Nº de parcelas" value=""></div>
       <div><label>Intervalo (dias)</label><input id="cmIntParc" inputmode="numeric" value="30"></div><div style="flex:0 0 auto"><button class="btn" data-act="cmGerarParc">Gerar</button></div></div>
     ${c.duplicatas.map((d, k) => `<div class="g3" style="margin-top:6px"><div><label>Parcela</label><input data-dp="${k}:n" value="${esc(d.n)}"></div><div><label>Vencimento</label><input type="date" data-dp="${k}:venc" value="${esc(d.venc)}"></div>
-      <div><label>Valor</label><div style="display:flex;gap:4px"><input data-dp="${k}:valor" inputmode="decimal" value="${esc(d.valor)}"><button class="x" data-act="cmRemParc" data-i="${k}" aria-label="Remover parcela">×</button></div></div></div>`).join('')}
+      <div><label>Valor</label><div style="display:flex;gap:4px"><input data-dp="${k}:valor" data-rs inputmode="decimal" value="${esc(d.valor)}"><button class="x" data-act="cmRemParc" data-i="${k}" aria-label="Remover parcela">×</button></div></div></div>`).join('')}
     <button class="btn sm" data-act="cmAddParc" style="margin-top:6px">+ Parcela</button>` : ''}
   <label for="cm_obs">Observações / informações complementares</label><textarea id="cm_obs" data-cm="obs" rows="2">${esc(c.obs)}</textarea>
   <div id="errM"></div>
@@ -2676,13 +2677,13 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}
 .g td{border:1px solid #000;padding:1px 3px 2px;vertical-align:top;overflow:hidden}
 .l{display:block;font-size:6.2px;text-transform:uppercase;line-height:1.15}
 .v{display:block;font-size:10px;font-weight:bold;line-height:1.2;min-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.r .v,.r{text-align:right}.c,.c .v{text-align:center}
+.r .v,.r{text-align:left}.c,.c .v{text-align:left}.ctr,.ctr .v{text-align:center}
 .sec{font-weight:bold;font-size:8.5px;margin:5px 0 1px;text-transform:uppercase}
 .corte{border-top:1px dashed #000;margin:5px 0}
-.dupx{display:inline-table;width:auto;margin:0 3px 0 0;border:1px solid #000}.dupx td{border:0;padding:0 3px;font-size:7px}
-.prod th{border:1px solid #000;font-size:6.2px;font-weight:normal;padding:1px;text-transform:uppercase;vertical-align:middle;text-align:center}
-.prod td{border-left:1px solid #000;border-right:1px solid #000;font-size:7px;padding:2px;vertical-align:top;text-align:right}
-.prod td.t{text-align:left;white-space:normal}.prod td.m{text-align:center}.prod tbody tr.it td{border-bottom:1px dashed #999}
+.dupx{display:inline-table;width:auto;margin:0 3px 0 0;border:1px solid #000}.dupx td{border:0;padding:0 3px;font-size:7px;text-align:left}
+.prod th{border:1px solid #000;font-size:6.2px;font-weight:normal;padding:1px 3px;text-transform:uppercase;vertical-align:middle;text-align:left}
+.prod td{border-left:1px solid #000;border-right:1px solid #000;font-size:7px;padding:2px 3px;vertical-align:top;text-align:left}
+.prod td.t{white-space:normal}.prod tbody tr.it td{border-bottom:1px dashed #999}
 .prod tbody{border-bottom:1px solid #000}thead{display:table-header-group}tr{page-break-inside:avoid}
 .aviso{text-align:center;font-weight:bold;font-size:11px;border:1px solid #000;padding:3px;margin:0 0 4px}
 .rod{display:flex;justify-content:space-between;font-style:italic;font-size:7px;margin-top:2px}`;
@@ -2696,13 +2697,13 @@ function danfeOficialHtml(D, extra){
   ${extra ? `<div class="aviso">${esc(extra)}</div>` : ''}
   <table class="g"><tr><td colspan="2" style="width:80%"><span style="font-size:7px">RECEBEMOS DE ${esc(e.nome || '')} OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ${D.chave ? 'ELETRÔNICA ' : ''}INDICADA ABAIXO.
     EMISSÃO: ${dataBR(D.dhEmi)} VALOR TOTAL: R$ ${nDanfe(t.vNF)} DESTINATÁRIO: ${esc(d.nome || '')} - ${esc(d.end || '')} ${esc(d.bairro || '')} ${esc(d.mun || '')}-${esc(d.uf || '')}</span></td>
-    <td rowspan="2" class="c" style="vertical-align:middle"><div style="font-size:14px;font-weight:bold">${D.modelo === '65' ? 'NFC-e' : D.chave ? 'NF-e' : 'NOTA'}</div><div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div></td></tr>
+    <td rowspan="2" class="ctr" style="vertical-align:middle"><div style="font-size:14px;font-weight:bold">${D.modelo === '65' ? 'NFC-e' : D.chave ? 'NF-e' : 'NOTA'}</div><div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div></td></tr>
     <tr>${F('Data de recebimento', '', { w:'20%' })}${F('Identificação e assinatura do recebedor', '')}</tr></table>
   <div class="corte"></div>
   <table class="g"><tr>
     <td rowspan="3" style="width:38%;text-align:center;vertical-align:middle"><span class="l" style="font-style:italic">Identificação do emitente</span>
       <div style="font-size:11px;font-weight:bold;margin:4px 0 3px">${esc(e.nome || '')}</div><div style="font-size:7.5px">${esc(e.l1 || '')}<br>${esc(e.l2 || '')}<br>${esc(e.l3 || '')}</div></td>
-    <td rowspan="3" class="c" style="width:17%;vertical-align:middle"><div style="font-size:15px;font-weight:bold">DANFE</div><div style="font-size:7.5px">${tituloDoc}</div>
+    <td rowspan="3" class="ctr" style="width:17%;vertical-align:middle"><div style="font-size:15px;font-weight:bold">DANFE</div><div style="font-size:7.5px">${tituloDoc}</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:4px 0;font-size:7.5px;text-align:left"><span>0 - ENTRADA<br>1 - SAÍDA</span><b style="border:1px solid #000;padding:1px 5px;font-size:11px">${esc(D.tpNF)}</b></div>
       <div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div><div style="font-style:italic;font-size:7.5px">Folha 1/1</div></td>
     <td style="height:15mm;padding:2px 6px">${D.chave ? barras128C(D.chave) : '<div class="c" style="padding-top:4mm;font-size:9px">Lançamento manual — sem código de barras</div>'}</td></tr>
@@ -3481,6 +3482,20 @@ document.addEventListener('click', async ev => {
       t.disabled = false; if (r) verNota(r.nota); break; }
   }
 });
+// ===== campos em reais: ao sair do campo, "9" vira "R$ 9,00" (marcados com data-rs) =====
+const numRS = v => { const s = semRS(v); if (!s) return NaN; if (s.includes(',')) return num(s); if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) return +s.replace(/\./g, ''); return parseFloat(s); };
+const fmtRS = v => 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const ehRS = t => !!t && t.tagName === 'INPUT' && t.dataset.rs !== undefined && !(t.dataset.rs && (document.getElementById(t.dataset.rs) || {}).value === '%');
+function formatarRS(t){ if (!ehRS(t) || t.value.trim() === '') return false; const n = numRS(t.value); if (isNaN(n)) return false; const f = fmtRS(n); if (t.value === f) return false; t.value = f; return true; }
+function prepararRS(raiz){ const l = [...(raiz.querySelectorAll ? raiz.querySelectorAll('input[data-rs]') : [])]; if (raiz.matches && raiz.matches('input[data-rs]')) l.push(raiz);
+  l.forEach(t => { if (!t.placeholder || /^0(,00)?$/.test(t.placeholder)) t.placeholder = 'R$ 0,00'; if (t !== document.activeElement) formatarRS(t); }); }
+document.addEventListener('change', ev => { const t = ev.target;
+  if (t.tagName === 'SELECT' && t.id){ document.querySelectorAll(`input[data-rs="${t.id}"]`).forEach(i => { if (t.value === '%') i.value = semRS(i.value); else formatarRS(i); }); return; }
+  if (formatarRS(t)) t.dispatchEvent(new Event('input', { bubbles:true })); }, true);
+document.addEventListener('focusin', ev => { const t = ev.target; if (ehRS(t) && /R\$/.test(t.value)){ t.value = semRS(t.value); try { t.select(); } catch {} } });
+document.addEventListener('focusout', ev => { formatarRS(ev.target); });
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) prepararRS(n); }).observe(document.body, { childList:true, subtree:true });
+prepararRS(document);
 document.addEventListener('input', ev => {
   const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return; if (inputEstoque(t)) return;
   if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(separarMult(S.busca).q, 'addCart'); }
