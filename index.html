@@ -444,7 +444,8 @@ function validarProduto(p, e){
   if (!simples && cst && !CST_OK.includes(cst)) E(`CST ICMS ${cst} não existe para regime normal.`);
   const st = simples ? ['201','202','203','500'].includes(cst) : ['10','30','60','70'].includes(cst);
   if (cest && cest.length !== 7) E('CEST deve ter 7 dígitos.');
-  if (st && !cest) E(`Produto com substituição tributária (${simples ? 'CSOSN' : 'CST'} ${cst}) precisa de CEST.`);
+  // ST sem CEST é aceito (decisão do Lucas): só avisa, porque a SEFAZ pode rejeitar (806) se o item estiver na tabela de CEST
+  if (st && !cest) A(`Produto com substituição tributária (${simples ? 'CSOSN' : 'CST'} ${cst}) sem CEST. Se a mercadoria estiver na tabela de CEST, a SEFAZ pode rejeitar a nota.`);
   if (cest && !st) A(`CEST informado, mas o ${simples ? 'CSOSN' : 'CST'} ${cst || '—'} não indica substituição tributária.`);
   if (st && cst !== '500'){
     if (!(num(p.st_mva) > 0) || !(num(p.st_aliq) > 0)) A('Para calcular o ICMS-ST como substituto, informe a MVA e a alíquota interna ST.');
