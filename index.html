@@ -893,13 +893,22 @@ function selCliente(id){
 function vNotas(){
   const f = S.filtroNotas, pend = S.notas.filter(n => n.status === 'contingencia'), gaps = buracos(), agora = new Date();
   // notas rejeitadas que já foram corrigidas com outro número não aparecem: ficam no histórico da nota final
-  const lista = S.notas.filter(n => !n.corrigida_por).filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
+  // para a lista não ficar enorme: só o ambiente atual (notas de teste à parte), mês escolhido, busca e 30 por vez
+  const mes = S.ntMes === undefined ? isoNow().slice(0, 7) : S.ntMes, q = (S.ntBusca || '').trim().toLowerCase(), qd = dig(q), lim = S.ntLim || 30;
+  const testes = ambAtual() === 'producao' ? S.notas.filter(n => !daAmb(n)).length : 0;
+  const urgente = ['pend','prob'].includes(f);
+  const lista = S.notas.filter(n => !n.corrigida_por && (S.ntTestes ? !daAmb(n) : daAmb(n)))
+    .filter(n => q ? (String(n.numero) === q || (n.destNome || '').toLowerCase().includes(q) || (qd.length >= 4 && (dig(n.destDoc || '').includes(qd) || dig(n.chave || '').includes(qd))))
+      : (urgente || !mes || (n.data || '').slice(0, 7) === mes))
+    .filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
     || (f === 'pend' && n.status === 'contingencia') || (f === 'prob' && notaProblema(n)) || (f === 'dev' && n.op && n.op !== 'venda')).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const tot = lista.filter(n => notaValida(n) && (n.op || 'venda') === 'venda').reduce((s, n) => s + (n.total || 0), 0);
   const nome = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '65' ? 'Cupom' : 'NF-e';
   const tag = n => n.corrigida_por ? `<span class="tag">corrigida → nº ${n.corrigida_por.numero}</span>` : n.status === 'cancelada' ? '<span class="tag b">cancelada</span>' : n.status === 'contingencia' ? '<span class="tag b">contingência</span>'
     : (n.devolucoes || []).length ? '<span class="tag w">devolvida</span>' : tagStatus(n);
-  return `<div class="row" style="align-items:center"><h2 style="flex:1">Notas emitidas</h2></div>
+  const meses = [...new Set([isoNow().slice(0, 7), ...S.notas.filter(n => S.ntTestes ? !daAmb(n) : daAmb(n)).map(n => (n.data || '').slice(0, 7)).filter(Boolean)])].sort().reverse();
+  const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Notas emitidas${S.ntTestes ? ' <span class="tag w">de teste</span>' : ''}</h2></div>
   ${pend.length ? `<div class="card" style="border-color:#efc5c2"><b>${pend.length} cupom(ns) em contingência</b><p class="small">Transmita assim que a internet voltar. Prazo: 24 horas após a emissão.${pend.some(n => prazoCont(n) < agora) ? ' <b style="color:var(--bad)">Há prazo vencido.</b>' : ''}</p>
     ${pode('emitir') ? '<button class="btn pri" data-act="transmitirTodas">Transmitir todos</button>' : ''}</div>` : ''}
   ${gaps.length && pode('inutilizar') ? `<div class="card"><b>Números pulados</b><p class="small">Notas não emitidas nesses números precisam ser inutilizadas. Se o número é de uma nota rejeitada que você ainda vai corrigir e reenviar, não inutilize.</p>
@@ -907,12 +916,17 @@ function vNotas(){
       <button class="btn sm" data-act="inutilizar" data-m="${g.modelo}" data-s="${esc(g.serie)}" data-i="${g.ini}" data-f="${g.fim}">Inutilizar</button></div>`).join('')}</div>` : ''}
   ${pode('inutilizar') || pode('backup') ? `<div class="actions" style="margin:0 0 12px">${pode('inutilizar') ? '<button class="btn" data-act="inutilizar">Inutilizar numeração</button>' : ''}${pode('backup') ? '<button class="btn" data-act="pacote">Pacote do mês p/ contador</button>' : ''}</div>` : ''}
   <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],...(S.notas.some(notaProblema) || f === 'prob' ? [['prob','Com problema']] : []),['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas</div><div class="list">${lista.map(n => `
+  <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="ntBusca">Buscar</label><input id="ntBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.ntBusca || '')}" autocomplete="off"></div>
+    <div style="flex:1 1 150px"><label for="ntMes">Mês</label><select id="ntMes" ${q || urgente ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
+  ${q ? '<p class="small" style="margin:-4px 0 8px">Buscando em todos os meses.</p>' : ''}
+  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="list">${lista.slice(0, lim).map(n => `
     <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${nome(n)} nº ${n.numero} <span class="small">série ${n.serie}</span></div>
       <div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}${n.corrige ? ` · substitui nº ${cadeiaCorrecao(n).map(x => x.numero).join(', ')}` : ''}</div></div>
       <div style="text-align:right"><div class="num"><b>${brl(n.total)}</b></div>${tag(n)}</div></div>`).join('')}</div>`
-    : '<div class="empty">Nenhuma nota por aqui.</div>'}</div>
-  ${S.inutilizacoes.length ? `<div class="card"><h3 style="margin-top:0">Inutilizações</h3><div class="list">${[...S.inutilizacoes].sort((a, b) => b.em.localeCompare(a.em)).map(i => `<div class="it"><div class="grow"><div class="t">${i.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(i.serie)}: nº ${i.ini}${i.fim > i.ini ? ' a ' + i.fim : ''}</div><div class="s">${fmtData(i.em)} · ${esc(i.justificativa)}</div></div></div>`).join('')}</div></div>` : ''}`;
+    : `<div class="empty">Nenhuma nota ${q ? 'encontrada' : mes && !urgente ? 'neste mês' : 'por aqui'}.</div>`}
+    ${lista.length > lim ? `<div class="actions"><button class="btn" data-act="ntMais">Mostrar mais ${Math.min(30, lista.length - lim)}</button></div>` : ''}</div>
+  ${testes || S.ntTestes ? `<p class="small" style="text-align:center"><u data-act="ntTestes" style="cursor:pointer">${S.ntTestes ? 'Voltar para as notas de produção' : `Ver as ${testes} nota(s) de teste (homologação)`}</u></p>` : ''}
+  ${S.inutilizacoes.length ? `<details class="card"><summary style="cursor:pointer"><b>Inutilizações (${S.inutilizacoes.length})</b></summary><div class="list">${[...S.inutilizacoes].sort((a, b) => b.em.localeCompare(a.em)).map(i => `<div class="it"><div class="grow"><div class="t">${i.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(i.serie)}: nº ${i.ini}${i.fim > i.ini ? ' a ' + i.fim : ''}</div><div class="s">${fmtData(i.em)} · ${esc(i.justificativa)}</div></div></div>`).join('')}</div></details>` : ''}`;
 }
 
 /* ---------- Produtos / Clientes / Empresa ---------- */
@@ -3615,7 +3629,9 @@ document.addEventListener('click', async ev => {
     case 'importarBackup': formBackup(); break;
     case 'salvarBackup': salvarBackup(); break;
     case 'emitirNfe': t.disabled = true; await emitirNfe(); t.disabled = false; break;
-    case 'filtro': S.filtroNotas = t.dataset.f; render(); break;
+    case 'filtro': S.filtroNotas = t.dataset.f; S.ntLim = 30; render(); break;
+    case 'ntMais': S.ntLim = (S.ntLim || 30) + 30; render(); break;
+    case 'ntTestes': S.ntTestes = !S.ntTestes; S.ntLim = 30; S.ntMes = undefined; render(); break;
     case 'verNota': verNota(S.notas.find(n => n.id === id)); break;
     case 'corrigirNota': corrigirNota(id); break;
     case 'cancelarNota': formCancelar(id); break;
@@ -3642,6 +3658,7 @@ prepararRS(document);
 document.addEventListener('input', ev => {
   const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return; if (inputEstoque(t)) return;
   if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(separarMult(S.busca).q, 'addCart'); }
+  else if (t.id === 'ntBusca'){ S.ntBusca = t.value; S.ntLim = 30; render(); }
   else if (t.id === 'buscaNfe'){ S.buscaNfe = t.value; $('#resN').innerHTML = resultadosHtml(S.buscaNfe, 'addNfe'); }
   else if (t.dataset.pv !== undefined){ S.pags[+t.dataset.pv].valor = t.value; }
   else if (t.id === 'descTot'){ S.descTotal.v = t.value; }
@@ -3675,6 +3692,7 @@ document.addEventListener('change', ev => {
   else if (t.dataset.np !== undefined){ S.nfe.itens[+t.dataset.np].preco = numIn(t.value); later(); }
   else if (t.dataset.pv !== undefined || ['descTot','nDescTot','nFrete','nSeguro','nOutras','dfAliq','dfFcp'].includes(t.id) || t.dataset.nd !== undefined){ later(); }
   else if (t.id === 'relIni' || t.id === 'relFim'){ if (t.value){ S[t.id] = t.value; S.relLim = 30; render(); } }
+  else if (t.id === 'ntMes'){ S.ntMes = t.value; S.ntLim = 30; render(); }
   else if (t.id === 'dfMet'){ S.nfe.difal.metodo = t.value; render(); }
   else if (t.id === 'nfeCli'){ selCliente(t.value); }
   else if (t.dataset.papel !== undefined){ if (!pode('usuarios')) return; safe(() => db.collection('usuarios').doc(t.dataset.papel).update({ papel:t.value }), 'Papel alterado.'); }
