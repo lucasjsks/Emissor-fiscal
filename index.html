@@ -698,9 +698,10 @@ const ICON = {
   empresa:'<path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/>',
   caixa:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h3M8 6V4h8v2"/>',
   estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
+  relatorios:'<path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/>',
   compras:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2h11.8L22 7H6.2"/>'
 };
-const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['empresa','Empresa']];
+const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['relatorios','Relatórios'],['empresa','Empresa']];
 const NAV_SEC = { venda:'Vendas', compras:'Gestão', empresa:'Configuração' };
 function renderNav(){
   $('#nav').innerHTML = `<div class="nav-brand"><img src="img/logo.png" alt=""><span>Nota<b>One</b></span></div>`
@@ -729,7 +730,7 @@ function render(){
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
-  } else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, empresa:vEmpresa })[S.tab]();
+  } else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -1538,7 +1539,6 @@ function vCaixa(){
     ${(cx.movs || []).length ? `<h3>Movimentos</h3><div class="list">${cx.movs.map(m => `<div class="it"><div class="grow"><div class="t">${m.tipo === 'sangria' ? 'Sangria' : 'Suprimento'}</div><div class="s">${fmtData(m.em)}${m.motivo ? ' · ' + esc(m.motivo) : ''}</div></div>
       <b class="num" style="color:${m.tipo === 'sangria' ? 'var(--bad)' : 'var(--ok)'}">${m.tipo === 'sangria' ? '−' : '+'}${brl(m.valor)}</b></div>`).join('')}</div>` : ''}
     <div class="actions"><button class="btn" data-act="movCaixa" data-t="sangria">Sangria</button><button class="btn" data-act="movCaixa" data-t="suprimento">Suprimento</button><button class="btn pri" data-act="fecharCaixa">Fechar caixa</button></div></div>`;
-  if (pode('relatorio')) h += vRelatorio();
   return h;
 }
 function formMov(tipo){
@@ -1586,45 +1586,77 @@ function periodo(k){
   return [f(new Date(Date.UTC(y, m - 2, 1))), f(new Date(Date.UTC(y, m - 1, 0)))];
 }
 function dadosRel(){
-  const [ini, fim] = periodo(S.relPer), ns = S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim; });
-  const vend = ns.filter(n => notaValida(n) && (n.op || 'venda') === 'venda'), canc = ns.filter(n => n.status === 'cancelada');
+  const [ini, fim] = S.relPer === 'periodo' ? [S.relIni || isoNow().slice(0, 8) + '01', S.relFim || isoNow().slice(0, 10)].sort() : periodo(S.relPer);
+  const mod = S.relMod || 'todos';
+  const ns = S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim && daAmb(n) && (mod === 'todos' || n.modelo === mod); });
+  const vend = ns.filter(n => notaValida(n) && (n.op || 'venda') === 'venda'), canc = ns.filter(n => n.status === 'cancelada' && (n.op || 'venda') === 'venda');
   const dev = ns.filter(n => n.op === 'dev_venda' && notaValida(n));
   const fat = r2(vend.reduce((a, n) => a + n.total, 0)), devV = r2(dev.reduce((a, n) => a + n.total, 0));
-  const dia = {}, forma = {}, prod = {};
+  const dia = {}, forma = {}, prod = {}, cli = {}; let desc = 0, itens = 0;
   vend.forEach(n => {
     const d = n.data.slice(0, 10); dia[d] = r2((dia[d] || 0) + n.total);
     if (n.pags){ n.pags.forEach(p => forma[p.forma] = r2((forma[p.forma] || 0) + p.valor)); if (n.troco) forma['01'] = r2((forma['01'] || 0) - n.troco); }
     else forma[n.pag || '99'] = r2((forma[n.pag || '99'] || 0) + n.total);
-    n.itens.forEach(i => { const k = i.d; prod[k] = prod[k] || { d:i.d, q:0, v:0 }; prod[k].q = r2(prod[k].q + i.q); prod[k].v = r2(prod[k].v + i.t - (i.desc || 0)); });
+    (n.itens || []).forEach(i => { const k = i.pid || i.d; prod[k] = prod[k] || { d:i.d, u:i.u || 'UN', q:0, v:0 }; prod[k].q = r2(prod[k].q + num(i.q)); prod[k].v = r2(prod[k].v + num(i.t) - num(i.desc)); desc += num(i.desc); itens += num(i.q); });
+    const c = n.destNome || 'Consumidor não identificado'; cli[c] = cli[c] || { nome:c, qtd:0, v:0 }; cli[c].qtd++; cli[c].v = r2(cli[c].v + n.total);
   });
-  return { ini, fim, vend, canc, dev, fat, devV, dia, forma, prod:Object.values(prod).sort((a, b) => b.v - a.v),
+  return { ini, fim, mod, vend:vend.sort((a, b) => (b.data || '').localeCompare(a.data || '')), canc, dev, fat, devV, dia, forma, desc:r2(desc), itens:r2(itens),
+    prod:Object.values(prod).sort((a, b) => b.v - a.v), cli:Object.values(cli).sort((a, b) => b.v - a.v),
     cupons:vend.filter(n => n.modelo === '65'), nfes:vend.filter(n => n.modelo === '55') };
 }
-function vRelatorio(){
+const dBR = d => d.split('-').reverse().join('/');
+const nomeForma = f => PAG_NOME[f] || (f === '90' ? 'Sem pagamento' : f);
+function vRelatorios(){
+  if (!pode('relatorio')) return '<h2>Relatórios</h2><div class="card empty">Seu acesso não inclui relatórios.</div>';
   const R = dadosRel(), maxDia = Math.max(1, ...Object.values(R.dia)), tk = R.vend.length ? r2(R.fat / R.vend.length) : 0;
-  const somaV = a => r2(a.reduce((s, n) => s + n.total, 0));
-  return `<h2 style="margin-top:22px">Relatório de vendas</h2>
-  <div class="seg" style="margin-bottom:10px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <div class="card"><div class="small">${R.ini.split('-').reverse().join('/')} a ${R.fim.split('-').reverse().join('/')}</div>
+  const somaV = a => r2(a.reduce((s, n) => s + n.total, 0)), totF = Object.values(R.forma).reduce((a, v) => a + v, 0) || 1;
+  const lim = S.relLim || 30, nProd = S.relTodos ? R.prod.length : 10;
+  return `<div class="row" style="align-items:center"><h2 style="flex:1;min-width:240px">Relatório de vendas</h2>
+    ${R.vend.length ? `<div class="actions" style="margin:0"><button class="btn" data-act="imprimirRel">Imprimir / PDF</button><button class="btn" data-act="exportRel">Exportar planilha</button></div>` : ''}</div>
+  <div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${R.ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${R.fim}"></div></div>` : ''}
+  <div class="seg" style="margin-bottom:12px">${[['todos','Cupom e NF-e'],['65','Só cupom'],['55','Só NF-e']].map(([k, l]) => `<button data-act="relMod" data-m="${k}" class="${R.mod === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="card"><div class="small">${dBR(R.ini)} a ${dBR(R.fim)}${ambAtual() !== 'producao' ? ' · notas de teste (homologação)' : ''}</div>
     <div class="stats"><div><b>${brl(R.fat)}</b>faturamento</div><div><b>${R.vend.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div></div>
-    ${linhaTot(`Cupons (${R.cupons.length})`, somaV(R.cupons), 'small')}${linhaTot(`NF-e (${R.nfes.length})`, somaV(R.nfes), 'small')}
+    ${R.mod === 'todos' ? linhaTot(`Cupons (${R.cupons.length})`, somaV(R.cupons), 'small') + linhaTot(`NF-e (${R.nfes.length})`, somaV(R.nfes), 'small') : ''}
+    ${R.desc ? linhaTot('Descontos concedidos', -R.desc, 'small') : ''}
     ${R.devV ? linhaTot(`Devoluções (${R.dev.length})`, -R.devV, 'small') + linhaTot('Faturamento líquido', r2(R.fat - R.devV)) : ''}
-    ${R.canc.length ? linhaTot(`Canceladas (${R.canc.length})`, somaV(R.canc), 'small') : ''}
-    ${pode('relatorio') && S.dl ? '<div class="actions"><button class="btn" data-act="exportRel">Exportar planilha</button></div>' : ''}</div>
-  ${Object.keys(R.dia).length > 1 ? `<div class="card"><h3 style="margin-top:0">Por dia</h3>${Object.entries(R.dia).sort().map(([d, v]) => `<div style="margin:6px 0"><div class="total small"><span>${d.split('-').reverse().slice(0, 2).join('/')}</span><span class="num">${brl(v)}</span></div><div class="bar" style="width:${Math.max(2, v / maxDia * 100)}%"></div></div>`).join('')}</div>` : ''}
-  ${Object.keys(R.forma).length ? `<div class="card"><h3 style="margin-top:0">Por forma de pagamento</h3>${Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => linhaTot(esc(PAG_NOME[f] || (f === '90' ? 'Sem pagamento' : f)), v)).join('')}</div>` : ''}
-  ${R.prod.length ? `<div class="card"><h3 style="margin-top:0">Produtos mais vendidos</h3><div class="list">${R.prod.slice(0, 10).map((p, i) => `<div class="it"><div class="grow"><div class="t">${i + 1}. ${esc(p.d)}</div><div class="s">${String(p.q).replace('.', ',')} un.</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div></div>` : ''}
-  ${!R.vend.length ? '<div class="card empty">Nenhuma venda no período.</div>' : ''}`;
+    ${R.canc.length ? linhaTot(`Canceladas (${R.canc.length}, fora do total)`, somaV(R.canc), 'small') : ''}</div>
+  ${!R.vend.length ? '<div class="card empty">Nenhuma venda no período.</div>' : `
+  ${Object.keys(R.dia).length > 1 ? `<div class="card"><h3 style="margin-top:0">Por dia</h3>${Object.entries(R.dia).sort().map(([d, v]) => `<div style="margin:6px 0"><div class="total small"><span>${dBR(d).slice(0, 5)}</span><span class="num">${brl(v)}</span></div><div class="bar" style="width:${Math.max(2, v / maxDia * 100)}%"></div></div>`).join('')}</div>` : ''}
+  <div class="card"><h3 style="margin-top:0">Por forma de pagamento</h3>${Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => linhaTot(`${esc(nomeForma(f))} <span class="small">${Math.round(v / totF * 100)}%</span>`, v)).join('')}</div>
+  <div class="card"><h3 style="margin-top:0">Produtos mais vendidos</h3><div class="list">${R.prod.slice(0, nProd).map((p, i) => `<div class="it"><div class="grow"><div class="t">${i + 1}. ${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u)}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>
+    ${R.prod.length > 10 ? `<div class="actions"><button class="btn sm" data-act="relTodos">${S.relTodos ? 'Mostrar só os 10 primeiros' : `Ver todos (${R.prod.length})`}</button></div>` : ''}</div>
+  ${R.cli.length > 1 || R.cli[0].nome !== 'Consumidor não identificado' ? `<div class="card"><h3 style="margin-top:0">Por cliente</h3><div class="list">${R.cli.slice(0, 10).map(c => `<div class="it"><div class="grow"><div class="t">${esc(c.nome)}</div><div class="s">${c.qtd} venda(s)</div></div><b class="num">${brl(c.v)}</b></div>`).join('')}</div></div>` : ''}
+  <div class="card"><h3 style="margin-top:0">Vendas do período (${R.vend.length})</h3><div class="list">${R.vend.slice(0, lim).map(n => `
+    <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${n.modelo === '65' ? 'Cupom' : 'NF-e'} nº ${n.numero}</div><div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}</div></div><b class="num">${brl(n.total)}</b></div>`).join('')}</div>
+    ${R.vend.length > lim ? `<div class="actions"><button class="btn sm" data-act="relMais">Mostrar mais</button></div>` : ''}</div>`}`;
 }
 async function exportRel(){
   const R = dadosRel();
   try {
     const X = await loadXlsx(), wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet([{ periodo:`${dBR(R.ini)} a ${dBR(R.fim)}`, faturamento:R.fat, vendas:R.vend.length, ticket_medio:R.vend.length ? r2(R.fat / R.vend.length) : 0, descontos:R.desc, devolucoes:R.devV, liquido:r2(R.fat - R.devV), canceladas:R.canc.length }]), 'Resumo');
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.vend.map(n => ({ data:fmtData(n.data), modelo:n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero, cliente:n.destNome || '', total:n.total }))), 'Vendas');
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.prod.map(p => ({ produto:p.d, quantidade:p.q, valor:p.v }))), 'Produtos');
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.entries(R.forma).map(([f, v]) => ({ forma:PAG_NOME[f] || f, valor:v }))), 'Pagamentos');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.prod.map(p => ({ produto:p.d, unidade:p.u, quantidade:p.q, valor:p.v }))), 'Produtos');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.entries(R.forma).map(([f, v]) => ({ forma:nomeForma(f), valor:v }))), 'Pagamentos');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.entries(R.dia).sort().map(([d, v]) => ({ dia:dBR(d), valor:v }))), 'Por dia');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.cli.map(c => ({ cliente:c.nome, vendas:c.qtd, valor:c.v }))), 'Clientes');
     await salvarArquivo(`vendas-${R.ini}-a-${R.fim}.xlsx`, new Blob([X.write(wb, { bookType:'xlsx', type:'array' })]));
   } catch(err){ toast(err.message || 'Não foi possível gerar a planilha.'); }
+}
+function imprimirRel(){
+  const R = dadosRel(), e = emp() || {}, tk = R.vend.length ? r2(R.fat / R.vend.length) : 0;
+  const lin = (a, b) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`;
+  const tab = (tit, cab, linhas, dir = [cab.length - 1]) => `<h2>${tit}</h2><table><tr>${cab.map((c, i) => `<th${dir.includes(i) ? ' class="r"' : ''}>${c}</th>`).join('')}</tr>${linhas.join('')}</table>`;
+  const css = 'body{font:12px Arial,sans-serif;color:#111;margin:14mm}h1{font-size:17px;margin:0}h2{font-size:13px;margin:16px 0 4px;border-bottom:1px solid #999;padding-bottom:2px}table{width:100%;border-collapse:collapse}td,th{padding:3px 4px;border-bottom:1px solid #ddd;text-align:left}th{background:#f0f0f0}.r{text-align:right}.s{color:#555}@page{size:A4;margin:0}';
+  const corpo = `<h1>Relatório de vendas</h1><div class="s">${esc(e.razao || '')}${e.cnpj ? ' · CNPJ ' + fmtDoc(e.cnpj) : ''}<br>Período: ${dBR(R.ini)} a ${dBR(R.fim)} · ${R.mod === '65' ? 'só cupom' : R.mod === '55' ? 'só NF-e' : 'cupom e NF-e'} · emitido em ${fmtData(isoNow())}</div>
+  ${tab('Resumo', ['', 'Valor'], [lin('Faturamento', brl(R.fat)), lin('Vendas', R.vend.length), lin('Ticket médio', brl(tk)), lin('Descontos concedidos', brl(R.desc)), lin('Devoluções', brl(R.devV)), lin('Faturamento líquido', brl(r2(R.fat - R.devV))), lin('Canceladas (fora do total)', R.canc.length)])}
+  ${tab('Por forma de pagamento', ['Forma', 'Valor'], Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => lin(esc(nomeForma(f)), brl(v))))}
+  ${Object.keys(R.dia).length > 1 ? tab('Por dia', ['Dia', 'Valor'], Object.entries(R.dia).sort().map(([d, v]) => lin(dBR(d), brl(v)))) : ''}
+  ${tab('Produtos vendidos', ['Produto', 'Quantidade', 'Valor'], R.prod.map(p => `<tr><td>${esc(p.d)}</td><td class="r">${qtdTxt(p.q)} ${esc(p.u)}</td><td class="r">${brl(p.v)}</td></tr>`), [1, 2])}
+  ${tab('Vendas', ['Nota', 'Data', 'Cliente', 'Total'], R.vend.map(n => `<tr><td>${n.modelo === '65' ? 'Cupom' : 'NF-e'} ${n.numero}</td><td>${fmtData(n.data)}</td><td>${esc(n.destNome || 'Consumidor')}</td><td class="r">${brl(n.total)}</td></tr>`))}`;
+  imprimirDoc('Relatório de vendas', css, corpo);
 }
 
 /* ---------- pacote mensal para a contabilidade ---------- */
@@ -1809,7 +1841,11 @@ async function acoesV4(a, t, id){
     case 'fecharCaixa': formFechar(); return true;
     case 'confFechar': confFechar(); return true;
     case 'verCaixa': verCaixa(id); return true;
-    case 'relPer': S.relPer = t.dataset.p; render(); return true;
+    case 'relPer': S.relPer = t.dataset.p; S.relLim = 30; render(); return true;
+    case 'relMod': S.relMod = t.dataset.m; S.relLim = 30; render(); return true;
+    case 'relTodos': S.relTodos = !S.relTodos; render(); return true;
+    case 'relMais': S.relLim = (S.relLim || 30) + 50; render(); return true;
+    case 'imprimirRel': imprimirRel(); return true;
     case 'exportRel': exportRel(); return true;
     case 'prodView': S.prodView = t.dataset.v; render(); return true;
     case 'novoPerfil': formPerfil(); return true;
@@ -3534,6 +3570,7 @@ document.addEventListener('change', ev => {
   else if (t.dataset.nq !== undefined){ S.nfe.itens[+t.dataset.nq].qtd = numIn(t.value); later(); }
   else if (t.dataset.np !== undefined){ S.nfe.itens[+t.dataset.np].preco = numIn(t.value); later(); }
   else if (t.dataset.pv !== undefined || ['descTot','nDescTot','nFrete','nSeguro','nOutras','dfAliq','dfFcp'].includes(t.id) || t.dataset.nd !== undefined){ later(); }
+  else if (t.id === 'relIni' || t.id === 'relFim'){ if (t.value){ S[t.id] = t.value; S.relLim = 30; render(); } }
   else if (t.id === 'dfMet'){ S.nfe.difal.metodo = t.value; render(); }
   else if (t.id === 'nfeCli'){ selCliente(t.value); }
   else if (t.dataset.papel !== undefined){ if (!pode('usuarios')) return; safe(() => db.collection('usuarios').doc(t.dataset.papel).update({ papel:t.value }), 'Papel alterado.'); }
