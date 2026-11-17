@@ -1865,7 +1865,10 @@ function criarShim(sb){
       set:async d => { try { localStorage.setItem('emissor-cfg-' + (S.meuId || ''), JSON.stringify(d)); } catch(_){} } };
     return { id:path.split('/').pop(), path,
       get:async () => { const { data, error } = await sb.from('docs').select('data').eq('path', path).maybeSingle(); if (error) throw erro(error); return snap(path, data ? data.data : undefined); },
-      set:async d => { const { error } = await sb.from('docs').upsert({ path, col:colDe(path), empresa_id:empOf(path), data:d }); if (error) throw erro(error); avisar(colDe(path)); },
+      set:async d => { const col = colDe(path);
+        // empresa já existe (criada por criar_empresa): o RLS só permite ALTERAR, então usa update em vez de upsert
+        if (col === 'empresas'){ const { data:r, error } = await sb.from('docs').update({ data:d }).eq('path', path).select('path'); if (error) throw erro(error); if (!r || !r.length) throw erro({ message:'permission denied' }); avisar(col); return; }
+        const { error } = await sb.from('docs').upsert({ path, col, empresa_id:empOf(path), data:d }); if (error) throw erro(error); avisar(col); },
       update:async d => { const s = await docRef(path).get(); if (!s.exists) throw erro({ message:'Documento não existe' }); await docRef(path).set({ ...s.data(), ...d }); },
       delete:async () => { const { error } = await sb.from('docs').delete().eq('path', path); if (error) throw erro(error); avisar(colDe(path)); },
       collection:sub => colRef(path + '/' + sub) };
