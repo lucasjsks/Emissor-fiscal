@@ -248,3 +248,13 @@ test('reenvio não manda de novo se a nota já estava autorizada na Focus', asyn
   docs['empresas/E1/notas/R4'] = { id:'R4', ref:'R4', modelo:'65', numero:6, status:'autorizada', ambiente:'homologacao' };
   assert.equal((await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{}, reenviar:'R4' })).code, 400);
 });
+
+test('carta de correção guarda os caminhos da Focus e o protocolo lido do XML', async () => {
+  docs['empresas/E1/notas/R5'] = { ref:'R5', modelo:'55', status:'autorizada' };
+  focusResp = m => m === 'GET' ? { status:200, body:'<retEvento><infEvento><nProt>222260000123456</nProt><dhRegEvento>2026-11-17T16:20:00-03:00</dhRegEvento></infEvento></retEvento>' }
+    : { status:200, body:{ status:'autorizado', caminho_xml_carta_correcao:'/arquivos/cce.xml', caminho_pdf_carta_correcao:'/arquivos/cce.pdf' } };
+  const c = await chamar(evento, 't2', { empresa_id:'E1', tipo:'cce', ref:'R5', texto:'Endereço de entrega correto: Rua C, 200' });
+  const ev = docs['empresas/E1/notas/R5'].eventos[0];
+  assert.equal(c.body.ok, true); assert.equal(ev.protocolo, '222260000123456'); assert.equal(ev.registro, '2026-11-17T16:20:00-03:00');
+  assert.equal(ev.focus.caminho_pdf_carta_correcao, '/arquivos/cce.pdf');
+});

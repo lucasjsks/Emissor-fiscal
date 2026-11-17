@@ -1447,7 +1447,7 @@ function formCce(id){
   const n = S.notas.find(x => x.id === id), ev = (n.eventos || []).filter(e => e.tipo === 'cce');
   openModal(`${mhead('Carta de correção')}
   <p class="small">Corrige informações da NF-e nº ${n.numero}. <b>Não pode</b> alterar valores, impostos, quantidades, dados que mudem o remetente ou o destinatário, nem a data de emissão. Cada nova carta substitui a anterior: escreva a correção completa. Limite de 20 cartas por nota.</p>
-  ${ev.length ? `<h3>Cartas registradas</h3>${ev.map(e => `<div class="v info"><b>${e.seq}ª</b> · ${fmtData(e.em)} — ${esc(e.texto)}</div>`).join('')}` : ''}
+  ${ev.length ? `<h3>Cartas registradas</h3>${ev.map(e => `<div class="v info"><b>${e.seq}ª</b> · ${fmtData(e.em)} — ${esc(e.texto)}${botoesCce(n, e)}</div>`).join('')}` : ''}
   <label for="cceTxt">Texto da correção (15 a 1.000 caracteres)</label><textarea id="cceTxt" rows="4" maxlength="1000"></textarea><div class="small" id="cceCnt">0 / 1000</div>
   <div id="errM"></div>
   <div class="actions"><button class="btn" data-act="verNota" data-id="${esc(id)}">Voltar</button><button class="btn pri" data-act="salvarCce" data-id="${esc(id)}">Registrar carta</button></div>`);
@@ -1458,6 +1458,46 @@ async function salvarCce(id){
   $('#errM').innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
   const r = await eventoServidor({ tipo:'cce', ref:n.ref, texto:t }, 'Carta de correção autorizada.');
   if (r) verNota(r.nota);
+}
+
+// ---------- PDF da carta de correção (DACCE), montado pelo sistema ----------
+const CCE_CONDICOES = 'A Carta de Correção é disciplinada pelo § 1º-A do art. 7º do Convênio S/N, de 15 de dezembro de 1970 e pode ser utilizada para regularização de erro ocorrido na emissão de documento fiscal, desde que o erro não esteja relacionado com: I - as variáveis que determinam o valor do imposto tais como: base de cálculo, alíquota, diferença de preço, quantidade, valor da operação ou da prestação; II - a correção de dados cadastrais que implique mudança do remetente ou do destinatário; III - a data de emissão ou de saída.';
+const CCE_CSS = `*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;font-size:10px}
+.pag{width:190mm;margin:10mm auto}table{width:100%;border-collapse:collapse;margin-bottom:2mm}td{border:1px solid #000;padding:2px 4px;vertical-align:top}
+.r{font-size:7px;text-transform:uppercase;display:block}.v{font-size:10px;font-weight:bold;min-height:12px;word-break:break-word}
+h1{font-size:13px;margin:0}.t{font-size:9px;font-weight:bold;margin:3mm 0 1mm;text-transform:uppercase}.txt{white-space:pre-wrap;font-size:11px;min-height:40mm;line-height:1.4}
+.homolog{border:2px solid #b00;color:#b00;text-align:center;font-weight:bold;padding:2mm;margin-bottom:2mm}.ctr{text-align:center}@page{size:A4;margin:0}`;
+function dacceHtml(n, ev){
+  const e = emp() || {}, p = n.payload || {}, f = ev.focus || {}, c = (r, v, w = '') => `<td${w ? ` style="width:${w}"` : ''}><span class="r">${r}</span><div class="v">${v || '&nbsp;'}</div></td>`;
+  const endE = [e.logradouro && (e.logradouro + (e.numero ? ', ' + e.numero : '')), e.bairro, e.municipio && e.municipio + '/' + (e.uf || 'PI'), e.cep && 'CEP ' + e.cep.replace(/(\d{5})(\d{3})/, '$1-$2')].filter(Boolean).join(' - ');
+  const endD = [p.logradouro_destinatario && (p.logradouro_destinatario + (p.numero_destinatario ? ', ' + p.numero_destinatario : '')), p.bairro_destinatario, p.municipio_destinatario && p.municipio_destinatario + '/' + (p.uf_destinatario || '')].filter(Boolean).join(' - ');
+  const chave = dig(n.chave || '');
+  return `<div class="pag">${n.ambiente !== 'producao' ? '<div class="homolog">EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO — SEM VALOR FISCAL</div>' : ''}
+  <table><tr><td style="width:62%"><h1>${esc(e.razao || '')}</h1><div>${esc(endE)}</div><div>CNPJ ${fmtDoc(e.cnpj || '')} · IE ${esc(e.ie || '')}${e.telefone ? ' · Fone ' + esc(e.telefone) : ''}</div></td>
+    <td class="ctr" style="vertical-align:middle"><h1>DACCE</h1><div>Documento Auxiliar da<br>Carta de Correção Eletrônica</div></td></tr></table>
+  <div class="t">Nota fiscal corrigida</div>
+  <table><tr>${c('Modelo', '55', '12%')}${c('Série', esc(n.serie), '12%')}${c('Número', esc(String(n.numero)), '16%')}${c('Data de emissão', fmtData(n.data))}${c('Protocolo de autorização da NF-e', esc((n.focus || {}).protocolo || ''))}</tr>
+    <tr><td colspan="5"><span class="r">Chave de acesso</span><div class="v" style="font-size:11px;letter-spacing:.5px">${fmtChave(chave)}</div>${chave.length === 44 ? `<div style="margin-top:2px">${barras128C(chave)}</div>` : ''}</td></tr></table>
+  <div class="t">Destinatário</div>
+  <table><tr>${c('Nome / razão social', esc(n.destNome || p.nome_destinatario || ''), '60%')}${c('CNPJ / CPF', fmtDoc(n.destDoc || p.cnpj_destinatario || p.cpf_destinatario || ''))}</tr>
+    <tr><td colspan="2"><span class="r">Endereço</span><div class="v">${esc(endD) || '&nbsp;'}</div></td></tr></table>
+  <div class="t">Carta de correção</div>
+  <table><tr>${c('Sequência do evento', ev.seq + 'ª', '18%')}${c('Data e hora do registro', ev.registro ? dataHoraBR(ev.registro) : fmtData(ev.em), '26%')}${c('Protocolo do evento', esc(ev.protocolo || ''))}${c('Situação', f.status_sefaz || f.mensagem_sefaz ? esc([f.status_sefaz, f.mensagem_sefaz].filter(Boolean).join(' - ')) : 'Evento registrado e vinculado à NF-e', '30%')}</tr>
+    <tr><td colspan="4"><span class="r">Correção</span><div class="txt">${esc(ev.texto)}</div></td></tr></table>
+  <div class="t">Condições de uso</div>
+  <table><tr><td style="font-size:9px;line-height:1.35">${CCE_CONDICOES}</td></tr></table>
+  <div style="font-size:8px;margin-top:2mm">Impresso em ${fmtData(isoNow())} · NotaOne</div></div>`;
+}
+function imprimirCce(id, seq){
+  const n = S.notas.find(x => x.id === id) || S.notaAberta, ev = n && (n.eventos || []).find(x => x.tipo === 'cce' && String(x.seq) === String(seq));
+  if (!ev) return toast('Carta de correção não encontrada.');
+  imprimirDoc(`Carta de correção ${ev.seq} - NF-e ${n.numero}`, CCE_CSS, dacceHtml(n, ev));
+}
+function botoesCce(n, x){
+  const f = x.focus || {}, base = n.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br', url = c => /^https?:/.test(c) ? c : base + c;
+  return `<div class="actions" style="margin:4px 0 0"><button class="btn sm" data-act="imprimirCce" data-id="${esc(n.id)}" data-seq="${x.seq}">📄 Ver / salvar PDF</button>
+    ${f.caminho_pdf_carta_correcao ? `<a class="btn sm" href="${esc(url(f.caminho_pdf_carta_correcao))}" target="_blank" rel="noopener">PDF da Focus</a>` : ''}
+    ${f.caminho_xml_carta_correcao ? `<a class="btn sm" href="${esc(url(f.caminho_xml_carta_correcao))}" target="_blank" rel="noopener">XML</a>` : ''}</div>`;
 }
 
 /* ---------- inutilização ---------- */
@@ -2152,7 +2192,7 @@ function verNota(n){
     ${aut && pode('cancelar') ? btn('cancelarNota', 'Cancelar nota', 'bad') : ''}
   </div>
   ${n.modelo === '65' ? cupomHtml(n, e) : danfePreview(n)}
-  ${ev.length ? `<h3>Eventos</h3>${ev.map(x => `<div class="v ${x.tipo === 'cce' ? 'info' : 'erro'}"><b>${x.tipo === 'cce' ? `Carta de correção ${x.seq}ª` : 'Cancelamento'}</b> · ${fmtData(x.em)} — ${esc(x.texto)}</div>`).join('')}` : ''}
+  ${ev.length ? `<h3>Eventos</h3>${ev.map(x => `<div class="v ${x.tipo === 'cce' ? 'info' : 'erro'}"><b>${x.tipo === 'cce' ? `Carta de correção ${x.seq}ª` : 'Cancelamento'}</b> · ${fmtData(x.em)} — ${esc(x.texto)}${x.tipo === 'cce' ? botoesCce(n, x) : ''}</div>`).join('')}` : ''}
   ${n.modelo === '65' && S.dl && !(n.focus || {}).caminho_danfe ? `<div class="actions">${btn('imprimir', 'Baixar prévia (80 mm)')}</div>` : ''}`);
 }
 async function eventoServidor(body, ok){
@@ -3518,6 +3558,7 @@ document.addEventListener('click', async ev => {
     case 'enviarCertificado': await enviarCertificado(t); break;
     case 'formAmbiente': formAmbiente(t.dataset.v); break;
     case 'trocarAmbiente': await trocarAmbiente(t.dataset.v, t); break;
+    case 'imprimirCce': imprimirCce(id, t.dataset.seq); break;
     case 'imprimirDanfe': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirDanfeNota(n); break; }
     case 'imprimirCupom': { const n = S.notas.find(x => x.id === id) || S.notaAberta; if (n) imprimirCupom(n); break; }
     case 'enviarNota': formEnviar(id); break;

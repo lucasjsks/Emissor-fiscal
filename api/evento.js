@@ -1,5 +1,5 @@
 // POST /api/evento — consultar, cancelar, carta de correção e inutilização.
-import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, focus as focusAmb, statusDe, resumoFocus, mensagemFocus, isoBR, ambienteEmp } from './_lib.js';
+import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, focus as focusAmb, statusDe, resumoFocus, mensagemFocus, isoBR, ambienteEmp, focusBase } from './_lib.js';
 
 const SO_GERENTE = ['cancelar','cce','inutilizar'];
 
@@ -79,7 +79,18 @@ export default rota(async (req, b) => {
     if (seq > 20) throw new Falha('Esta nota já tem 20 cartas de correção.');
     const r = await focus('POST', base + '/carta_correcao', { correcao:texto });
     if (r.body.status !== 'autorizado') return { ok:false, nota:n, mensagem:mensagemFocus(r.body) || `A SEFAZ não confirmou a carta (HTTP ${r.status}).` };
-    n.eventos = [...(n.eventos || []), { tipo:'cce', seq, texto, em:isoBR(), focus:resumoFocus(r.body) }];
+    // protocolo e data de registro do evento (vão impressos no PDF da carta): lidos do XML da carta, se a Focus já tiver
+    const ev = { tipo:'cce', seq, texto, em:isoBR(), focus:resumoFocus(r.body) };
+    try {
+      if (r.body.caminho_xml_carta_correcao){
+        const c = r.body.caminho_xml_carta_correcao, x = await fetch(/^https?:/.test(c) ? c : focusBase(n.ambiente === 'producao' ? 'producao' : 'homologacao') + c);
+        const xml = x.ok ? await x.text() : '';
+        const tag = t => (xml.match(new RegExp('<' + t + '>([^<]+)</' + t + '>')) || [])[1] || '';
+        if (tag('nProt')) ev.protocolo = tag('nProt');
+        if (tag('dhRegEvento')) ev.registro = tag('dhRegEvento');
+      }
+    } catch(_){}
+    n.eventos = [...(n.eventos || []), ev];
     await putDoc(path, n, u.id);
     return { ok:true, nota:n };
   }
