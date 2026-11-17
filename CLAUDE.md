@@ -41,6 +41,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
 - Ainda **não validados** em envio real: campos de ICMS-ST, DIFAL, devolução (de venda e de compra), carta de correção, inutilização e IBS/CBS. Ao receber rejeições, ajustar e registrar aqui.
 - **ST sem CEST:** produto com CST/CSOSN de substituição tributária pode ser salvo e vendido sem CEST (decisão do Lucas); `validarProduto` só dá aviso. Se vier rejeição 806, o `REJ` já orienta a informar o CEST.
 - **Campos em reais:** todo input de dinheiro leva `data-rs` (ou `data-rs="idDoSelect"` quando há opção R$/%); ao sair do campo vira `R$ 9,00` (`formatarRS`, `numRS` entende `9`, `9,5`, `9.5`, `1.250`), ao entrar mostra só `9,00` selecionado. `num`/`numIn` ignoram o `R$`. Campos de %, quantidade e peso não levam `data-rs`.
+- **Olhinho da senha:** todo `input[type=password]` (login, nova senha, senha do certificado) ganha o botão de mostrar/esconder automaticamente (`prepararSenha`, chamado pelo MutationObserver junto com `prepararRS`).
 - **Gravar a empresa:** o RLS não deixa o cliente inserir em `empresas` (só `criar_empresa`), e `upsert` passa pela regra de inserção; por isso o `set` do shim usa `update` para o caminho `empresas/<id>`. Nunca voltar a usar upsert ali.
 - Datas no formato `YYYY-MM-DDTHH:MM:SS-03:00` (`isoNow()`/`isoBR()`).
 
