@@ -26,6 +26,7 @@ export default rota(async (req, b) => {
   // a referência leva o ambiente para não colidir quando a numeração recomeça em produção
   const ref = `${empresa_id.slice(0, 8)}-${modelo}-${serie}-${numero}${ambienteEmp(emp) === 'producao' ? '-p' : ''}`;
   const envio = limparPayload({ ...payload, cnpj_emitente:emp.cnpj, serie, numero });
+  if (Array.isArray(envio.duplicatas) && envio.duplicatas.length && !envio.numero_fatura) envio.numero_fatura = String(numero); // fatura com o número real da nota
 
   const amb = ambienteEmp(emp);
   const resp = await focus('POST', `/v2/${modelo === '65' ? 'nfce' : 'nfe'}?ref=${encodeURIComponent(ref)}`, envio, { amb });
