@@ -2062,7 +2062,7 @@ function criarShim(sb){
   const empOf = p => p.startsWith('empresas/') ? p.split('/')[1] : null;
   const colDe = p => p.replace(/\/[^/]+$/, '');
   const snap = (path, d) => ({ id:path.split('/').pop(), exists:d !== undefined, data:() => d, metadata:{ fromCache:false, hasPendingWrites:false } });
-  const erro = e => { const x = new Error(e.message || 'Erro'); x.code = /row-level security|permission|violates/i.test(e.message || '') ? 'invalid_argument' : 'unavailable'; return x; };
+  const erro = e => { const x = new Error(e.message || 'Erro'); x.code = e.code === 'P0001' ? 'mensagem' : /row-level security|permission|violates/i.test(e.message || '') ? 'invalid_argument' : 'unavailable'; return x; }; // P0001 = aviso escrito pelo banco (ex.: CNPJ repetido)
   const ouvintes = {}; let canal = null;
   const avisar = col => (ouvintes[col] || new Set()).forEach(f => f());
   function ligarCanal(){
@@ -2213,7 +2213,10 @@ async function acaoLogin(a, t){
   if (a === 'criarConta'){
     if (senha.length < 8) return msgL('A senha precisa ter pelo menos 8 caracteres.');
     const { data, error } = await SB.auth.signUp({ email, password:senha, options:{ emailRedirectTo:location.origin } });
-    if (error) return msgL(error.message);
+    // e-mail já cadastrado: o Supabase responde "ok" sem criar nada (lista de identidades vazia) ou com "already registered"
+    const jaExiste = (error && /already|registered|exists/i.test(error.message)) || (data && data.user && Array.isArray(data.user.identities) && !data.user.identities.length);
+    if (jaExiste){ S.loginModo = 'entrar'; render(); return msgL('Já existe uma conta com este e-mail. Entre com a sua senha ou use "Esqueci a senha".'); }
+    if (error) return msgL(/password/i.test(error.message) ? 'Senha fraca: use pelo menos 8 caracteres, misturando letras e números.' : /email/i.test(error.message) ? 'E-mail inválido. Confira o endereço.' : error.message);
     if (!data.session) msgL('Conta criada. Enviamos um link de confirmação para ' + email + '.', 'info');
   }
   if (a === 'esqueci'){
