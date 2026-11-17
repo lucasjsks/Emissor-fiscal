@@ -891,7 +891,8 @@ function selCliente(id){
 /* ---------- Notas ---------- */
 function vNotas(){
   const f = S.filtroNotas, pend = S.notas.filter(n => n.status === 'contingencia'), gaps = buracos(), agora = new Date();
-  const lista = S.notas.filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
+  // notas rejeitadas que já foram corrigidas com outro número não aparecem: ficam no histórico da nota final
+  const lista = S.notas.filter(n => !n.corrigida_por).filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
     || (f === 'pend' && n.status === 'contingencia') || (f === 'prob' && notaProblema(n)) || (f === 'dev' && n.op && n.op !== 'venda')).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const tot = lista.filter(n => notaValida(n) && (n.op || 'venda') === 'venda').reduce((s, n) => s + (n.total || 0), 0);
   const nome = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '65' ? 'Cupom' : 'NF-e';
@@ -907,7 +908,7 @@ function vNotas(){
   <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],...(S.notas.some(notaProblema) || f === 'prob' ? [['prob','Com problema']] : []),['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas</div><div class="list">${lista.map(n => `
     <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${nome(n)} nº ${n.numero} <span class="small">série ${n.serie}</span></div>
-      <div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</div></div>
+      <div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}${n.corrige ? ` · substitui nº ${cadeiaCorrecao(n).map(x => x.numero).join(', ')}` : ''}</div></div>
       <div style="text-align:right"><div class="num"><b>${brl(n.total)}</b></div>${tag(n)}</div></div>`).join('')}</div>`
     : '<div class="empty">Nenhuma nota por aqui.</div>'}</div>
   ${S.inutilizacoes.length ? `<div class="card"><h3 style="margin-top:0">Inutilizações</h3><div class="list">${[...S.inutilizacoes].sort((a, b) => b.em.localeCompare(a.em)).map(i => `<div class="it"><div class="grow"><div class="t">${i.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(i.serie)}: nº ${i.ini}${i.fim > i.ini ? ' a ' + i.fim : ''}</div><div class="s">${fmtData(i.em)} · ${esc(i.justificativa)}</div></div></div>`).join('')}</div></div>` : ''}`;
@@ -2124,6 +2125,12 @@ function linksFocus(n){
   return L.join('');
 }
 // ---------- corrigir nota rejeitada e reenviar ----------
+// tentativas rejeitadas (com outros números) que levaram a esta nota, da mais antiga para a mais nova
+function cadeiaCorrecao(n){
+  const r = []; let x = n, guarda = 0;
+  while (x && x.corrige && guarda++ < 50){ const ant = S.notas.find(y => y.id === x.corrige.ref); r.unshift(ant || { numero:x.corrige.numero }); x = ant; }
+  return r;
+}
 const numeroPerdidoCli = n => ['204','205','206','539','301','302','303'].includes(String((n.focus || {}).status_sefaz || '')) || /duplicidade|inutilizad|denega/i.test(String((n.focus || {}).mensagem_sefaz || ''));
 const podeCorrigir = n => ['rejeitada','erro_envio'].includes(n.status) && !n.corrigida_por && pode('emitir') && (n.ambiente || 'homologacao') === ambAtual()
   && (numeroPerdidoCli(n) || !S.inutilizacoes.some(i => i.modelo === n.modelo && String(i.serie) === String(n.serie) && +n.numero >= +i.ini && +n.numero <= +i.fim && daAmb(i)))
@@ -2180,7 +2187,7 @@ function verNota(n){
   ${['rejeitada','denegada','erro_envio'].includes(n.status) ? explicarRejeicao(n) : erros.length ? erros.map(x => `<div class="v erro">${esc(x.mensagem || JSON.stringify(x))}</div>`).join('') : ''}
   ${(n.devolucoes || []).length ? `<div class="msg warn">Devolvida: ${n.devolucoes.map(d => `NF-e nº ${d.numero} (${brl(d.total)})`).join(', ')}</div>` : ''}
   ${notaProblema(n) ? `<a class="btn whats" href="${esc(linkSuporte(resumoNotaSuporte(n)))}" target="_blank" rel="noopener" style="width:100%;margin-top:8px">${WHATS_SVG} Pedir ajuda ao suporte sobre esta nota</a>` : ''}
-  ${n.corrigida_por ? `<div class="msg ok">Esta nota foi corrigida e reenviada como nº <b>${n.corrigida_por.numero}</b>.</div>` : n.corrige ? `<div class="msg info">Correção da nota nº ${n.corrige.numero}, que tinha sido rejeitada.</div>` : ''}
+  ${n.corrigida_por ? `<div class="msg ok">Esta nota foi corrigida e reenviada como <u data-act="verNota" data-id="${esc(n.corrigida_por.ref)}" style="cursor:pointer"><b>nº ${n.corrigida_por.numero}</b></u>. Ela não aparece mais na lista de notas.</div>` : n.corrige ? `<div class="msg info">Esta nota substitui ${cadeiaCorrecao(n).length > 1 ? 'as tentativas rejeitadas' : 'a tentativa rejeitada'}: ${cadeiaCorrecao(n).map(x => x.id ? `<u data-act="verNota" data-id="${esc(x.id)}" style="cursor:pointer">nº ${x.numero}</u>` : 'nº ' + x.numero).join(', ')}.</div>` : ''}
   ${podeCorrigir(n) ? `<button class="btn pri" data-act="corrigirNota" data-id="${esc(n.id)}" style="width:100%;margin-top:8px">✎ Corrigir e reenviar ${n.modelo === '65' ? 'este cupom' : 'esta nota'}</button>
     <p class="small" style="margin:4px 0 0">${numeroPerdidoCli(n) ? 'A SEFAZ já considera este número usado: a correção sai com o próximo número.' : `Abre a nota preenchida para você ajustar e enviar de novo com o mesmo número (${n.numero}).`}</p>` : ''}
   ${(n.tentativas || []).length ? `<details style="margin-top:8px"><summary class="small" style="cursor:pointer">Tentativas anteriores (${n.tentativas.length})</summary>${n.tentativas.map(x => `<div class="v erro">${fmtData(x.em)} · ${esc([x.cod, x.motivo].filter(Boolean).join(' — ') || x.status)}</div>`).join('')}</details>` : ''}
