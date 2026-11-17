@@ -242,6 +242,10 @@ nav .nav-brand,nav .nav-sec{display:none}
 .btn.whats{background:#25d366;border-color:#1fb457;color:#fff;text-decoration:none}.btn.whats:hover{background:#1fb457;text-decoration:none}.btn.whats svg{width:20px;height:20px}
 @media print{#suporte{display:none}}
 /* ===== PDV (frente de caixa em tela cheia) ===== */
+/* olho para ver a senha */
+.senha-wrap{position:relative}.senha-wrap input{padding-right:46px}
+.olho{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7686;border-radius:8px;padding:0}
+.olho:hover{background:rgba(0,0,0,.05);color:#1f2937}.olho svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 body.pdv header,body.pdv #nav,body.pdv #ambBar,body.pdv #suporte{display:none!important}
 body.pdv main,body.pdv #main,body.pdv main>*{margin:0!important;padding:0!important;max-width:none!important}
 body.pdv .pdv-wrap{padding:0!important}
@@ -3780,8 +3784,21 @@ document.addEventListener('change', ev => { const t = ev.target;
   if (formatarRS(t)) t.dispatchEvent(new Event('input', { bubbles:true })); }, true);
 document.addEventListener('focusin', ev => { const t = ev.target; if (ehRS(t) && /R\$/.test(t.value)){ t.value = semRS(t.value); try { t.select(); } catch {} } });
 document.addEventListener('focusout', ev => { formatarRS(ev.target); });
-new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) prepararRS(n); }).observe(document.body, { childList:true, subtree:true });
-prepararRS(document);
+// todo campo de senha ganha o "olhinho" para mostrar/esconder o que foi digitado
+const OLHO_ABERTO = '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OLHO_FECHADO = '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.1 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function prepararSenha(raiz){
+  const l = [...(raiz.querySelectorAll ? raiz.querySelectorAll('input[type=password]') : [])]; if (raiz.matches && raiz.matches('input[type=password]')) l.push(raiz);
+  l.forEach(i => { if (i.parentNode.classList.contains('senha-wrap')) return;
+    const w = document.createElement('div'); w.className = 'senha-wrap'; i.parentNode.insertBefore(w, i); w.appendChild(i);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'olho'; b.tabIndex = -1; b.setAttribute('aria-label', 'Mostrar senha'); b.title = 'Mostrar senha'; b.innerHTML = OLHO_ABERTO;
+    b.addEventListener('mousedown', ev => ev.preventDefault()); // não tira o foco do campo
+    b.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); const ver = i.type === 'password'; i.type = ver ? 'text' : 'password';
+      b.innerHTML = ver ? OLHO_FECHADO : OLHO_ABERTO; b.title = ver ? 'Esconder senha' : 'Mostrar senha'; b.setAttribute('aria-label', b.title); });
+    w.appendChild(b); });
+}
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1){ prepararRS(n); prepararSenha(n); } }).observe(document.body, { childList:true, subtree:true });
+prepararRS(document); prepararSenha(document);
 document.addEventListener('input', ev => {
   const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return; if (inputEstoque(t)) return;
   if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(separarMult(S.busca).q, 'addCart'); }
