@@ -354,7 +354,8 @@ async function init(){ S.carregando = true; await iniciarProducao(); }
 function renderBadge(){
   const b = $('#badge');
   if (!S.logado){ b.textContent = ''; b.style.display = 'none'; return; }
-  b.style.display = ''; b.textContent = (S.ambiente === 'producao' ? '' : 'teste · ') + ({ dono:'dono', gerente:'gerente', operador:'operador' }[S.papelEmp] || 'conta');
+  // sem o papel (cada empresa tem um usuário só): mostra apenas "teste" quando estiver em homologação
+  const txt = S.ambiente === 'producao' ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
   b.title = S.meuEmail || '';
 }
 async function safe(fn, okMsg){
@@ -2049,8 +2050,7 @@ async function carregarMembros(){
 }
 function cardUsuarios(){
   if (!SB) return '';
-  const nomePapel = { dono:'dono', gerente:'gerente', operador:'operador' };
-  const conta = `<div class="card"><h3 style="margin-top:0">Sua conta</h3><p>${esc(S.meuEmail)}${S.papelEmp ? ' · <b>' + nomePapel[S.papelEmp] + '</b> nesta empresa' : ''}</p></div>`;
+  const conta = `<div class="card"><h3 style="margin-top:0">Sua conta</h3><p>${esc(S.meuEmail)}</p></div>`;
   return conta; // cada empresa tem um único usuário (o dono): não há convites
 }
 
