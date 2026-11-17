@@ -2676,13 +2676,13 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}
 .g td{border:1px solid #000;padding:1px 3px 2px;vertical-align:top;overflow:hidden}
 .l{display:block;font-size:6.2px;text-transform:uppercase;line-height:1.15}
 .v{display:block;font-size:10px;font-weight:bold;line-height:1.2;min-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.r .v,.r{text-align:right}.c,.c .v{text-align:center}
+.r .v,.r{text-align:left}.c,.c .v{text-align:left}.ctr,.ctr .v{text-align:center}
 .sec{font-weight:bold;font-size:8.5px;margin:5px 0 1px;text-transform:uppercase}
 .corte{border-top:1px dashed #000;margin:5px 0}
-.dupx{display:inline-table;width:auto;margin:0 3px 0 0;border:1px solid #000}.dupx td{border:0;padding:0 3px;font-size:7px}
-.prod th{border:1px solid #000;font-size:6.2px;font-weight:normal;padding:1px;text-transform:uppercase;vertical-align:middle;text-align:center}
-.prod td{border-left:1px solid #000;border-right:1px solid #000;font-size:7px;padding:2px;vertical-align:top;text-align:right}
-.prod td.t{text-align:left;white-space:normal}.prod td.m{text-align:center}.prod tbody tr.it td{border-bottom:1px dashed #999}
+.dupx{display:inline-table;width:auto;margin:0 3px 0 0;border:1px solid #000}.dupx td{border:0;padding:0 3px;font-size:7px;text-align:left}
+.prod th{border:1px solid #000;font-size:6.2px;font-weight:normal;padding:1px 3px;text-transform:uppercase;vertical-align:middle;text-align:left}
+.prod td{border-left:1px solid #000;border-right:1px solid #000;font-size:7px;padding:2px 3px;vertical-align:top;text-align:left}
+.prod td.t{white-space:normal}.prod tbody tr.it td{border-bottom:1px dashed #999}
 .prod tbody{border-bottom:1px solid #000}thead{display:table-header-group}tr{page-break-inside:avoid}
 .aviso{text-align:center;font-weight:bold;font-size:11px;border:1px solid #000;padding:3px;margin:0 0 4px}
 .rod{display:flex;justify-content:space-between;font-style:italic;font-size:7px;margin-top:2px}`;
@@ -2696,13 +2696,13 @@ function danfeOficialHtml(D, extra){
   ${extra ? `<div class="aviso">${esc(extra)}</div>` : ''}
   <table class="g"><tr><td colspan="2" style="width:80%"><span style="font-size:7px">RECEBEMOS DE ${esc(e.nome || '')} OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ${D.chave ? 'ELETRÔNICA ' : ''}INDICADA ABAIXO.
     EMISSÃO: ${dataBR(D.dhEmi)} VALOR TOTAL: R$ ${nDanfe(t.vNF)} DESTINATÁRIO: ${esc(d.nome || '')} - ${esc(d.end || '')} ${esc(d.bairro || '')} ${esc(d.mun || '')}-${esc(d.uf || '')}</span></td>
-    <td rowspan="2" class="c" style="vertical-align:middle"><div style="font-size:14px;font-weight:bold">${D.modelo === '65' ? 'NFC-e' : D.chave ? 'NF-e' : 'NOTA'}</div><div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div></td></tr>
+    <td rowspan="2" class="ctr" style="vertical-align:middle"><div style="font-size:14px;font-weight:bold">${D.modelo === '65' ? 'NFC-e' : D.chave ? 'NF-e' : 'NOTA'}</div><div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div></td></tr>
     <tr>${F('Data de recebimento', '', { w:'20%' })}${F('Identificação e assinatura do recebedor', '')}</tr></table>
   <div class="corte"></div>
   <table class="g"><tr>
     <td rowspan="3" style="width:38%;text-align:center;vertical-align:middle"><span class="l" style="font-style:italic">Identificação do emitente</span>
       <div style="font-size:11px;font-weight:bold;margin:4px 0 3px">${esc(e.nome || '')}</div><div style="font-size:7.5px">${esc(e.l1 || '')}<br>${esc(e.l2 || '')}<br>${esc(e.l3 || '')}</div></td>
-    <td rowspan="3" class="c" style="width:17%;vertical-align:middle"><div style="font-size:15px;font-weight:bold">DANFE</div><div style="font-size:7.5px">${tituloDoc}</div>
+    <td rowspan="3" class="ctr" style="width:17%;vertical-align:middle"><div style="font-size:15px;font-weight:bold">DANFE</div><div style="font-size:7.5px">${tituloDoc}</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin:4px 0;font-size:7.5px;text-align:left"><span>0 - ENTRADA<br>1 - SAÍDA</span><b style="border:1px solid #000;padding:1px 5px;font-size:11px">${esc(D.tpNF)}</b></div>
       <div style="font-size:10px;font-weight:bold">Nº. ${nf}<br>Série ${sr}</div><div style="font-style:italic;font-size:7.5px">Folha 1/1</div></td>
     <td style="height:15mm;padding:2px 6px">${D.chave ? barras128C(D.chave) : '<div class="c" style="padding-top:4mm;font-size:9px">Lançamento manual — sem código de barras</div>'}</td></tr>
