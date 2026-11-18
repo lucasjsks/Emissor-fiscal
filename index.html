@@ -254,6 +254,12 @@ nav .nav-brand,nav .nav-sec{display:none}
 .nt-l{cursor:pointer}.nt-l:hover{background:#f7f9fc}.nt-l .fin-r .tag{min-width:78px;text-align:center}
 .pdv-esc{display:flex;flex-direction:column;gap:8px;margin:10px 0}.pdv-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:14px 16px;border:1px solid #dfe5ee;border-radius:12px;background:#fff;cursor:pointer;font:inherit}
 .pdv-op b{font-size:17px}.pdv-op span{font-size:13px;color:#6b7686}.pdv-op:hover{border-color:var(--brand)}.pdv-op.on{border-color:var(--brand);background:var(--brand-soft)}
+.cert-ban{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;margin:0 0 14px;border:1px solid}
+.cert-ban.ok{background:#eef8f2;border-color:#cfe9da;color:#17603a}.cert-ban.warn{background:#fff7e6;border-color:#f5d998;color:#7a4d00}
+.cert-ban.bad{background:#fdecec;border-color:#f3b9b9;color:#9b1c1c}.cert-ban.bad .cert-ico{background:#d93636;color:#fff}
+.cert-ico{flex:0 0 28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;background:rgba(0,0,0,.06)}
+.cert-txt{flex:1;font-size:14px;line-height:1.4}.cert-zap{flex:0 0 auto;background:#25d366!important;color:#fff!important;border:0!important;text-decoration:none;white-space:nowrap}
+@media(max-width:600px){.cert-ban{flex-wrap:wrap}.cert-zap{width:100%;text-align:center}}
 /* olho para ver a senha */
 .senha-wrap{position:relative}.senha-wrap input{padding-right:46px}
 .olho{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7686;border-radius:8px;padding:0}
@@ -3818,8 +3824,7 @@ function alertasInicio(){
   const ctS = (e || {}).contador_envio || {};
   if (ctS.mes && !ctS.ok && ((e || {}).contador || {}).ativo) add('warn', `O envio dos XMLs de ${mesNome(ctS.mes)} ao contador falhou. Veja na aba Empresa.`, 'irPara', 'data-tab="empresa"');
   const ce = (e || {}).certificado || {}, dc = diasAte(ce.valido_ate);
-  if (dc !== null && dc < 0) add('bad', 'O certificado digital está vencido: as notas não saem. Envie o novo certificado.', 'irPara', 'data-tab="empresa"');
-  else if (dc !== null && dc <= 30) add('warn', `O certificado digital vence em ${dc} dia(s). Renove e envie o novo.`, 'irPara', 'data-tab="empresa"');
+  void dc; // o aviso do certificado fica no topo do Início (bannerCertificado)
   const cx = caixaAberto();
   if (pode('caixa') && !cx) add('info', 'Seu caixa está fechado. Abra o caixa para vender no cupom.', 'irPara', 'data-tab="caixa"');
   else if (cx && String(cx.aberto_em || '').slice(0, 10) < hoje) add('warn', `Seu caixa está aberto desde ${dataBR(cx.aberto_em)}. Feche o caixa do dia anterior.`, 'irPara', 'data-tab="caixa"');
@@ -3843,6 +3848,19 @@ function alertasInicio(){
   }
   return A;
 }
+// lembrete do certificado digital no topo do Início
+function bannerCertificado(){
+  const ce = (emp() || {}).certificado || {}; if (!ce.valido_ate) return '';
+  const venc = String(ce.valido_ate).slice(0, 10), hoje = isoNow().slice(0, 10);
+  const d = Math.round((Date.parse(venc + 'T12:00:00Z') - Date.parse(hoje + 'T12:00:00Z')) / 864e5);
+  const zap = `<a class="btn cert-zap" href="${esc(linkSuporte('Quero adquirir/renovar o certificado digital (vence em ' + dataBR(venc) + ').'))}" target="_blank" rel="noopener">Falar com o suporte</a>`;
+  let cls, txt, extra = '';
+  if (d < 0){ cls = 'bad'; txt = `<b>Seu certificado digital venceu em ${dataBR(venc)}.</b> As notas não saem sem ele. Entre em contato com o suporte e adquira seu certificado.`; extra = zap; }
+  else if (d <= 5){ cls = 'bad'; txt = `<b>${d === 0 ? 'Seu certificado digital vence HOJE!' : `${d > 1 ? `Faltam ${d} dias` : 'Falta 1 dia'} para o certificado digital vencer!`}</b> Entre em contato com o suporte e adquira seu certificado.`; extra = zap; }
+  else if (d <= 30){ cls = 'warn'; txt = `<b>Faltam ${d} dias para o certificado digital vencer</b> (vence em ${dataBR(venc)}). Já pode providenciar a renovação.`; extra = zap; }
+  else { cls = 'ok'; txt = `Certificado digital: faltam <b>${d} dias</b> para vencer (${dataBR(venc)}).`; }
+  return `<div class="cert-ban ${cls}"><span class="cert-ico">${cls === 'ok' ? '✓' : '!'}</span><div class="cert-txt">${txt}</div>${extra}</div>`;
+}
 function vInicio(){
   const hoje = isoNow().slice(0, 10), ontem = diaMais(hoje, -1), mesIni = hoje.slice(0, 8) + '01';
   const H = vendasDe(hoje, hoje), O = vendasDe(ontem, ontem), M = vendasDe(mesIni, hoje);
@@ -3856,7 +3874,7 @@ function vInicio(){
   const A = alertasInicio(), hora = +isoNow().slice(11, 13), saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
   const tk = H.v.length ? r2(H.total / H.v.length) : 0;
-  return `<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
+  return `${bannerCertificado()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
   <div class="ini-acoes">${pode('emitir') ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe"><b>＋</b>Nova NF-e</button>' : ''}
     ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
   <div class="grid2"><div>
