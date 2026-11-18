@@ -1019,7 +1019,7 @@ function selCliente(id){
 
 /* ---------- Notas ---------- */
 function vNotas(){
-  const f = S.filtroNotas, pend = S.notas.filter(n => n.status === 'contingencia'), gaps = buracos(), agora = new Date();
+  const f = S.filtroNotas, pend = S.notas.filter(n => n.status === 'contingencia'), agora = new Date();
   // notas rejeitadas que já foram corrigidas com outro número não aparecem: ficam no histórico da nota final
   // para a lista não ficar enorme: só o ambiente atual (notas de teste à parte), mês escolhido, busca e 30 por vez
   const mes = S.ntMes === undefined ? isoNow().slice(0, 7) : S.ntMes, q = (S.ntBusca || '').trim().toLowerCase(), qd = dig(q), lim = S.ntLim || 30;
@@ -1039,9 +1039,6 @@ function vNotas(){
   return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1">Notas emitidas${S.ntTestes ? ' <span class="tag w">de teste</span>' : ''}</h2></div>
   ${pend.length ? `<div class="card" style="border-color:#efc5c2"><b>${pend.length} cupom(ns) em contingência</b><p class="small">Transmita assim que a internet voltar. Prazo: 24 horas após a emissão.${pend.some(n => prazoCont(n) < agora) ? ' <b style="color:var(--bad)">Há prazo vencido.</b>' : ''}</p>
     ${pode('emitir') ? '<button class="btn pri" data-act="transmitirTodas">Transmitir todos</button>' : ''}</div>` : ''}
-  ${gaps.length && pode('inutilizar') ? `<div class="card"><b>Números pulados</b><p class="small">Notas não emitidas nesses números precisam ser inutilizadas. Se o número é de uma nota rejeitada que você ainda vai corrigir e reenviar, não inutilize.</p>
-    ${gaps.map(g => `<div class="it"><div class="grow">${g.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(g.serie)}: nº ${g.ini}${g.fim > g.ini ? ' a ' + g.fim : ''}</div>
-      <button class="btn sm" data-act="inutilizar" data-m="${g.modelo}" data-s="${esc(g.serie)}" data-i="${g.ini}" data-f="${g.fim}">Inutilizar</button></div>`).join('')}</div>` : ''}
   ${pode('inutilizar') || pode('backup') ? `<div class="actions" style="margin:0 0 12px">${pode('inutilizar') ? '<button class="btn" data-act="inutilizar">Inutilizar numeração</button>' : ''}${pode('backup') ? '<button class="btn" data-act="pacote">Pacote do mês p/ contador</button>' : ''}</div>` : ''}
   <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],...(S.notas.some(notaProblema) || f === 'prob' ? [['prob','Com problema']] : []),['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="ntBusca">Buscar</label><input id="ntBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.ntBusca || '')}" autocomplete="off"></div>
@@ -3621,8 +3618,7 @@ function alertasInicio(){
   if (fila.length) add('bad', `${fila.length} venda(s) feitas sem internet aguardando virar cupom`, 'filaVer');
   const cont = S.notas.filter(n => n.status === 'contingencia');
   if (cont.length) add('bad', `${cont.length} cupom(ns) em contingência para transmitir (prazo de 24 h)`, 'irPara', 'data-tab="notas" data-fn="pend"');
-  const gaps = buracos();
-  if (gaps.length && pode('inutilizar')) add('warn', `${gaps.reduce((a, g) => a + g.fim - g.ini + 1, 0)} número(s) de nota pulado(s) para inutilizar`, 'irPara', 'data-tab="notas"');
+  // "números pulados" não aparece mais (pedido do Lucas): a inutilização continua no botão "Inutilizar numeração" da aba Notas
   const ce = (e || {}).certificado || {}, dc = diasAte(ce.valido_ate);
   if (dc !== null && dc < 0) add('bad', 'O certificado digital está vencido: as notas não saem. Envie o novo certificado.', 'irPara', 'data-tab="empresa"');
   else if (dc !== null && dc <= 30) add('warn', `O certificado digital vence em ${dc} dia(s). Renove e envie o novo.`, 'irPara', 'data-tab="empresa"');
