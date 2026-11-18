@@ -2537,7 +2537,9 @@ function cadeiaCorrecao(n){
   while (x && x.corrige && guarda++ < 50){ const ant = S.notas.find(y => y.id === x.corrige.ref); r.unshift(ant || { numero:x.corrige.numero }); x = ant; }
   return r;
 }
-const numeroPerdidoCli = n => ['204','205','206','539','301','302','303'].includes(String((n.focus || {}).status_sefaz || '')) || /duplicidade|inutilizad|denega/i.test(String((n.focus || {}).mensagem_sefaz || ''));
+// igual ao numeroPerdido do servidor: só duplicidade de numeração (e denegada/inutilizada) troca o número da correção
+const numeroPerdidoCli = n => { const f = n.focus || {}, cod = String(f.status_sefaz || '').trim();
+  return cod ? ['204','205','206','539','301','302','303'].includes(cod) : /duplicidade de (nf|nota)|uso denegado|est[aá] denegada|j[aá] (est[aá] )?inutilizad/i.test(String(f.mensagem_sefaz || '')); };
 const podeCorrigir = n => ['rejeitada','erro_envio'].includes(n.status) && !n.corrigida_por && pode('emitir') && (n.ambiente || 'homologacao') === ambAtual()
   && (numeroPerdidoCli(n) || !S.inutilizacoes.some(i => i.modelo === n.modelo && String(i.serie) === String(n.serie) && +n.numero >= +i.ini && +n.numero <= +i.fim && daAmb(i)))
   && (n.op !== 'dev_venda' && n.op !== 'dev_compra' || pode('devolucao'));

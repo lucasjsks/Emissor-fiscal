@@ -9,9 +9,15 @@ export function limparPayload(p){
   return o;
 }
 
-// rejeições em que o número já ficou usado na SEFAZ: a correção sai com número novo
+// A correção de uma nota rejeitada sai SEMPRE com o mesmo número (decisão do Lucas), exceto quando a SEFAZ
+// diz que o número já está usado: duplicidade de numeração (204, 539) — e também denegada (205, 301–303) ou
+// inutilizada (206), em que o número ficou queimado e a SEFAZ recusaria de novo para sempre.
 const NUMERO_PERDIDO = ['204','205','206','539','301','302','303'];
-export const numeroPerdido = n => NUMERO_PERDIDO.includes(String((n.focus || {}).status_sefaz || '')) || /duplicidade|inutilizad|denega/i.test(String((n.focus || {}).mensagem_sefaz || ''));
+export const numeroPerdido = n => {
+  const f = n.focus || {}, cod = String(f.status_sefaz || '').trim();
+  if (cod) return NUMERO_PERDIDO.includes(cod);   // com código da SEFAZ, vale só o código (outras rejeições mantêm o número)
+  return /duplicidade de (nf|nota)|uso denegado|est[aá] denegada|j[aá] (est[aá] )?inutilizad/i.test(String(f.mensagem_sefaz || ''));
+};
 
 export default rota(async (req, b) => {
   const u = await usuario(req);
