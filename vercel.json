@@ -1,0 +1,4 @@
+{
+  "crons": [{ "path": "/api/contador", "schedule": "0 10 * * *" }],
+  "functions": { "api/contador.js": { "maxDuration": 60 } }
+}

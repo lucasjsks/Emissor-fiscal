@@ -1105,6 +1105,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardContador()}
   ${cardImpressao()}
   ${cardBalanca()}
   ${cardUsuarios()}
@@ -1505,7 +1506,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -1583,7 +1584,7 @@ async function salvarBackup(){
 
 /* ================== v4: chave, eventos, caixa, relatórios, perfis, XML, impressão ================== */
 Object.assign(ACT_PERM, { abrirCaixa:'caixa', movCaixa:'caixa', salvarMov:'caixa', fecharCaixa:'caixa', confFechar:'caixa',
-  cce:'cce', salvarCce:'cce', devolver:'devolucao', inutilizar:'inutilizar', salvarInut:'inutilizar', pacote:'backup', gerarPacote:'backup',
+  cce:'cce', salvarCce:'cce', devolver:'devolucao', inutilizar:'inutilizar', salvarInut:'inutilizar', pacote:'backup', gerarPacote:'backup', enviarPacote:'backup',
   transmitir:'emitir', transmitirTodas:'emitir', novoPerfil:'produto', editPerfil:'produto', salvarPerfil:'produto', delPerfil:'produto', confDelPerfil:'produto',
   importarXml:'produto', salvarXml:'produto', exportRel:'relatorio' });
 PERM_OPERADOR.push('caixa');
@@ -1901,42 +1902,77 @@ function imprimirRel(){
   imprimirDoc('Relatório de vendas', css, corpo);
 }
 
-/* ---------- pacote mensal para a contabilidade ---------- */
+/* ---------- pacote mensal para a contabilidade (montado no servidor, com os XMLs) ---------- */
+const mesNome = m => ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
+const mesAntCont = () => { const [y, m] = isoNow().slice(0, 7).split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; };
+const emailsCont = s => [...new Set(String(s || '').split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)))];
 function formPacote(){
-  const h = isoNow().slice(0, 7), [y, m] = h.split('-').map(Number), ant = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  const c = (emp() || {}).contador || {};
   openModal(`${mhead('Pacote do mês para a contabilidade')}
-  <p class="small">Gera um ZIP com uma planilha de resumo (notas, totais por CFOP/CST, cancelamentos, cartas de correção e inutilizações) e os arquivos de cada nota, separados em autorizadas, canceladas e pendentes.</p>
-  <div class="msg warn">Enquanto a emissão é simulada, os arquivos das notas são os JSON de envio. Com a Focus ligada, entram os XMLs autorizados.</div>
-  <label for="pkMes">Mês</label><input id="pkMes" type="month" value="${ant}">
-  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="gerarPacote">Gerar pacote</button></div>`);
+  <p class="small">Um arquivo ZIP com os <b>XMLs</b> das notas do mês (autorizadas, canceladas, cartas de correção e inutilizações), os XMLs das <b>notas de compra</b> e planilhas de resumo (notas, CFOP/CST e compras).</p>
+  <label for="pkMes">Mês</label><input id="pkMes" type="month" value="${mesAntCont()}">
+  ${c.ativo && c.email ? `<p class="small">Envio automático ligado: todo dia <b>${c.dia || 1}</b> vai para <b>${esc(c.email)}</b>.</p>` : `<p class="small">Quer que vá sozinho todo mês para o e-mail do contador? <u data-act="irPara" data-tab="empresa" style="cursor:pointer">Configure na aba Empresa</u>.</p>`}
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="gerarPacote">Baixar ZIP</button>${c.email ? '<button class="btn pri" data-act="enviarPacote">Enviar ao contador</button>' : ''}</div>`);
 }
 async function gerarPacote(){
-  const e = emp(), mes = val('pkMes'), ns = S.notas.filter(n => (n.data || '').slice(0, 7) === mes).sort((a, b) => a.data.localeCompare(b.data));
-  const inut = S.inutilizacoes.filter(i => (i.em || '').slice(0, 7) === mes);
-  if (!ns.length && !inut.length) return $('#errM').innerHTML = '<div class="msg err">Nenhuma nota ou inutilização nesse mês.</div>';
-  $('#errM').innerHTML = '<p class="small">Gerando…</p>';
+  const mes = val('pkMes'); if (!mes) return;
+  $('#errM').innerHTML = '<p class="small">Juntando os XMLs… pode levar alguns segundos.</p>';
   try {
-    const [X, Z] = await Promise.all([loadXlsx(), loadZip()]), zip = new Z(), wb = X.utils.book_new();
-    ns.forEach(n => { const pasta = n.status === 'cancelada' ? 'canceladas' : n.status === 'contingencia' ? 'pendentes' : 'autorizadas';
-      zip.file(`${pasta}/${n.modelo === '65' ? 'nfce' : 'nfe'}-s${n.serie}-${String(n.numero).padStart(9, '0')}.json`, JSON.stringify({ chave:n.chave || null, ref:n.ref, status:n.status, eventos:n.eventos || [], payload:n.payload }, null, 2)); });
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(ns.map(n => ({ data:fmtData(n.data), modelo:n.modelo, serie:n.serie, numero:n.numero, chave:n.chave || '', operacao:n.op || 'venda',
-      destinatario:n.destNome || '', documento:n.destDoc || '', total:n.total, situacao:n.status }))), 'Notas');
-    const cf = {};
-    ns.filter(n => notaValida(n)).forEach(n => (n.payload.items || []).forEach(it => {
-      const k = `${n.modelo}|${it.cfop}|${it.icms_situacao_tributaria}`;
-      const o = cf[k] = cf[k] || { modelo:n.modelo, cfop:it.cfop, cst_csosn:it.icms_situacao_tributaria, valor_contabil:0, bc_icms:0, icms:0, bc_st:0, icms_st:0 };
-      o.valor_contabil = r2(o.valor_contabil + it.valor_bruto - (it.valor_desconto || 0) + (it.valor_frete || 0) + (it.valor_seguro || 0) + (it.valor_outras_despesas || 0) + (it.icms_valor_st || 0) + (it.fcp_valor_st || 0));
-      o.bc_icms = r2(o.bc_icms + (it.icms_base_calculo || 0)); o.icms = r2(o.icms + (it.icms_valor || 0));
-      o.bc_st = r2(o.bc_st + (it.icms_base_calculo_st || 0)); o.icms_st = r2(o.icms_st + (it.icms_valor_st || 0)); }));
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.values(cf).sort((a, b) => (a.modelo + a.cfop).localeCompare(b.modelo + b.cfop))), 'Por CFOP e CST');
-    const evs = []; ns.forEach(n => (n.eventos || []).forEach(ev => evs.push({ nota:`${n.modelo}-${n.serie}-${n.numero}`, tipo:ev.tipo === 'cce' ? 'Carta de correção' : 'Cancelamento', sequencia:ev.seq || '', data:fmtData(ev.em), texto:ev.texto })));
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(evs.length ? evs : [{ nota:'', tipo:'nenhum evento' }]), 'Eventos');
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(inut.length ? inut.map(i => ({ modelo:i.modelo, serie:i.serie, inicial:i.ini, final:i.fim, data:fmtData(i.em), justificativa:i.justificativa })) : [{ modelo:'', serie:'nenhuma inutilização' }]), 'Inutilizações');
-    zip.file(`resumo-${mes}.xlsx`, X.write(wb, { bookType:'xlsx', type:'array' }));
-    zip.file('LEIA-ME.txt', `Pacote fiscal de ${mes.split('-').reverse().join('/')} — ${e.razao} (CNPJ ${fmtDoc(e.cnpj)})\r\nGerado em ${fmtData(isoNow())}.\r\n\r\nATENÇÃO: emissão em ambiente de homologação (simulada). Os arquivos .json são os dados de envio e as chaves de acesso são simuladas.\r\nQuando a emissão real estiver ligada, este pacote trará os XMLs autorizados pela SEFAZ.\r\n`);
-    const blob = await zip.generateAsync({ type:'blob' });
-    if (await salvarArquivo(`contabilidade-${dig(e.cnpj)}-${mes}.zip`, blob)) closeModal(); else $('#errM').innerHTML = '';
-  } catch(err){ $('#errM').innerHTML = `<div class="msg err">${esc(err.message || 'Não foi possível gerar o pacote.')}</div>`; }
+    const r = await api('contador', { empresa_id:S.empId, acao:'baixar', mes });
+    const bin = atob(r.arquivo), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    if (await salvarArquivo(r.nome, new Blob([u8], { type:'application/zip' }))) closeModal(); else $('#errM').innerHTML = '';
+  } catch(err){ $('#errM').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+}
+async function enviarPacote(mes, email, alvo){
+  const box = alvo || $('#errM');
+  if (box) box.innerHTML = '<p class="small">Montando o pacote e enviando o e-mail…</p>';
+  try {
+    const r = await api('contador', { empresa_id:S.empId, acao:'enviar', mes, ...(email ? { email } : {}) });
+    if (box) box.innerHTML = `<div class="msg ok">Enviado para ${esc(r.para.join(', '))}: ${r.notas} nota(s), ${r.canceladas} cancelada(s) e ${r.compras} compra(s) de ${mesNome(mes)}.${r.faltando ? ` ${r.faltando} XML(s) não puderam ser baixados (veja o LEIA-ME no ZIP).` : ''}</div>`;
+    toast('Pacote enviado ao contador.');
+  } catch(err){ if (box) box.innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+}
+
+/* ---------- envio automático para o contador (configuração na aba Empresa) ---------- */
+function proxEnvioCont(c, st){
+  if (!c.ativo || !emailsCont(c.email).length) return null;
+  const dia = Math.min(Math.max(+c.dia || 1, 1), 28), hoje = isoNow().slice(0, 10), [y, m] = hoje.split('-').map(Number);
+  const feito = (st.mes === mesAntCont() && st.ok) || (c.pular && c.pular >= mesAntCont());
+  const esteMes = +hoje.slice(8, 10) <= dia && !feito;
+  const [py, pm] = esteMes ? [y, m] : m === 12 ? [y + 1, 1] : [y, m + 1];
+  const xm = pm === 1 ? `${py - 1}-12` : `${py}-${String(pm - 1).padStart(2, '0')}`;
+  return { data:`${String(dia).padStart(2, '0')}/${String(pm).padStart(2, '0')}/${py}`, mes:xm };
+}
+function cardContador(){
+  const e = emp() || {}, c = e.contador || {}, st = e.contador_envio || {}, prox = proxEnvioCont(c, st);
+  const ult = st.mes ? `<div class="msg ${st.ok ? 'ok' : 'err'}" style="margin-top:8px">${st.ok
+    ? `Último envio: XMLs de <b>${mesNome(st.mes)}</b> em ${fmtData(st.em)} para ${esc((st.para || []).join(', '))} (${st.notas || 0} nota(s), ${st.compras || 0} compra(s)).`
+    : `O envio dos XMLs de <b>${mesNome(st.mes)}</b> falhou em ${fmtData(st.em)}: ${esc(String(st.erro || '').replace(/\.?\s*$/, '.'))}${(st.tentativas || 0) < 3 && st.auto ? ' O sistema tenta de novo amanhã.' : ' Use "Enviar agora".'}`}</div>` : '';
+  if (!pode('empresa')) return `<div class="card"><h3 style="margin-top:0">Envio automático para o contador</h3><p>${c.ativo && c.email ? `Todo dia ${c.dia || 1} para ${esc(c.email)}` : 'Desligado'}</p>${ult}</div>`;
+  return `<div class="card"><h3 style="margin-top:0">Envio automático para o contador</h3>
+    <p class="small">Todo mês, no dia escolhido, o sistema manda sozinho para o e-mail do contador um ZIP com os XMLs das notas e das compras do <b>mês anterior</b>, com planilhas de resumo.</p>
+    <label class="chk"><input type="checkbox" id="ctAtivo" ${c.ativo ? 'checked' : ''}> Enviar automaticamente todo mês</label>
+    <div class="row">${fld('ctEmail', 'E-mail do contador (pode pôr mais de um, separados por vírgula)', c.email || '', 'type="email" inputmode="email" autocomplete="off" multiple placeholder="contador@escritorio.com.br"')}
+      ${sel('ctDia', 'Dia do envio', String(c.dia || 1), Array.from({ length:28 }, (_, i) => [String(i + 1), `Dia ${i + 1}`]))}</div>
+    ${prox ? `<p class="small">Próximo envio: <b>${prox.data}</b> pela manhã, com os XMLs de ${mesNome(prox.mes)}.</p>` : ''}
+    <div class="actions"><button class="btn pri" data-act="salvarContador">Salvar</button><button class="btn" data-act="ctEnviarAgora">Enviar agora</button></div>
+    <div id="ctMsg"></div>${ult}</div>`;
+}
+async function salvarContador(){
+  const ativo = $('#ctAtivo').checked, lista = emailsCont(val('ctEmail')), dia = +val('ctDia') || 1;
+  if (ativo && !lista.length) return $('#ctMsg').innerHTML = '<div class="msg err">Informe um e-mail válido do contador.</div>';
+  const e = clone(emp()), hoje = +isoNow().slice(8, 10);
+  // salvou depois do dia de envio deste mês: o automático começa no mês que vem (o mês passado pode ir em "Enviar agora")
+  e.contador = { ativo, email:lista.join(', '), dia, pular:hoje >= dia ? mesAntCont() : '', salvo_em:isoNow() };
+  await safe(() => put('empresas', e), ativo ? 'Envio automático ligado.' : 'Configuração salva.');
+}
+function formContadorAgora(){
+  const c = (emp() || {}).contador || {};
+  openModal(`${mhead('Enviar XMLs ao contador agora')}
+  <div class="row"><div><label for="caMes">Mês dos XMLs</label><input id="caMes" type="month" value="${mesAntCont()}"></div>
+    ${fld('caEmail', 'Para', c.email || '', 'type="email" inputmode="email" multiple')}</div>
+  <p class="small">Para testar, coloque o seu próprio e-mail: o envio de teste não conta como o envio do mês ao contador.</p>
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="ctConfEnviar">Enviar</button></div>`);
 }
 
 /* ---------- impressão (arquivo pronto para 80 mm ou A4) ---------- */
@@ -2074,6 +2110,13 @@ async function acoesV4(a, t, id){
     case 'salvarInut': salvarInut(); return true;
     case 'pacote': formPacote(); return true;
     case 'gerarPacote': t.disabled = true; await gerarPacote(); t.disabled = false; return true;
+    case 'enviarPacote': t.disabled = true; await enviarPacote(val('pkMes')); t.disabled = false; return true;
+    case 'salvarContador': salvarContador(); return true;
+    case 'ctEnviarAgora': formContadorAgora(); return true;
+    case 'ctConfEnviar': { const ls = emailsCont(val('caEmail')), c = (emp() || {}).contador || {};
+      if (!ls.length) { $('#errM').innerHTML = '<div class="msg err">Informe um e-mail válido.</div>'; return true; }
+      const igual = ls.join(', ') === emailsCont(c.email).join(', ');
+      t.disabled = true; await enviarPacote(val('caMes'), igual ? '' : ls.join(', ')); t.disabled = false; return true; }
     case 'transmitir': await transmitir([id]); verNota(S.notas.find(n => n.id === id)); return true;
     case 'transmitirTodas': await transmitir(S.notas.filter(n => n.status === 'contingencia').map(n => n.id)); return true;
     case 'imprimir': imprimir(S.notas.find(n => n.id === id)); return true;
@@ -3617,6 +3660,8 @@ function alertasInicio(){
   const cont = S.notas.filter(n => n.status === 'contingencia');
   if (cont.length) add('bad', `${cont.length} cupom(ns) em contingência para transmitir (prazo de 24 h)`, 'irPara', 'data-tab="notas" data-fn="pend"');
   // "números pulados" não aparece mais (pedido do Lucas): a inutilização continua no botão "Inutilizar numeração" da aba Notas
+  const ctS = (e || {}).contador_envio || {};
+  if (ctS.mes && !ctS.ok && ((e || {}).contador || {}).ativo) add('warn', `O envio dos XMLs de ${mesNome(ctS.mes)} ao contador falhou. Veja na aba Empresa.`, 'irPara', 'data-tab="empresa"');
   const ce = (e || {}).certificado || {}, dc = diasAte(ce.valido_ate);
   if (dc !== null && dc < 0) add('bad', 'O certificado digital está vencido: as notas não saem. Envie o novo certificado.', 'irPara', 'data-tab="empresa"');
   else if (dc !== null && dc <= 30) add('warn', `O certificado digital vence em ${dc} dia(s). Renove e envie o novo.`, 'irPara', 'data-tab="empresa"');
@@ -3942,7 +3987,7 @@ let cliqueNoFundo = false;
 document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
-  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
