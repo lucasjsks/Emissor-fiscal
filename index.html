@@ -1024,7 +1024,6 @@ function vNotas(){
   // notas rejeitadas que já foram corrigidas com outro número não aparecem: ficam no histórico da nota final
   // para a lista não ficar enorme: só o ambiente atual (notas de teste à parte), mês escolhido, busca e 30 por vez
   const mes = S.ntMes === undefined ? isoNow().slice(0, 7) : S.ntMes, q = (S.ntBusca || '').trim().toLowerCase(), qd = dig(q), lim = S.ntLim || 30;
-  const testes = ambAtual() === 'producao' ? S.notas.filter(n => !daAmb(n)).length : 0;
   const urgente = ['pend','prob'].includes(f);
   const lista = S.notas.filter(n => !n.corrigida_por && (S.ntTestes ? !daAmb(n) : daAmb(n)))
     .filter(n => q ? (String(n.numero) === q || (n.destNome || '').toLowerCase().includes(q) || (qd.length >= 4 && (dig(n.destDoc || '').includes(qd) || dig(n.chave || '').includes(qd))))
@@ -1051,7 +1050,6 @@ function vNotas(){
       <div class="fin-r"><b class="num">${brl(n.total)}</b>${tag(n)}</div></div>`).join('')}</div>`
     : `<div class="empty">Nenhuma nota ${q ? 'encontrada' : mes && !urgente ? 'neste mês' : 'por aqui'}.</div>`}
     ${lista.length > lim ? `<div class="actions"><button class="btn" data-act="ntMais">Mostrar mais ${Math.min(30, lista.length - lim)}</button></div>` : ''}</div>
-  ${testes || S.ntTestes ? `<p class="small" style="text-align:center"><u data-act="ntTestes" style="cursor:pointer">${S.ntTestes ? 'Voltar para as notas de produção' : `Ver as ${testes} nota(s) de teste (homologação)`}</u></p>` : ''}
   ${S.inutilizacoes.length ? `<details class="card"><summary style="cursor:pointer"><b>Inutilizações (${S.inutilizacoes.length})</b></summary><div class="list">${[...S.inutilizacoes].sort((a, b) => b.em.localeCompare(a.em)).map(i => `<div class="it"><div class="grow"><div class="t">${i.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(i.serie)}: nº ${i.ini}${i.fim > i.ini ? ' a ' + i.fim : ''}</div><div class="s">${fmtData(i.em)} · ${esc(i.justificativa)}</div></div></div>`).join('')}</div></details>` : ''}`;
 }
 
