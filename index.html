@@ -242,6 +242,15 @@ nav .nav-brand,nav .nav-sec{display:none}
 .btn.whats{background:#25d366;border-color:#1fb457;color:#fff;text-decoration:none}.btn.whats:hover{background:#1fb457;text-decoration:none}.btn.whats svg{width:20px;height:20px}
 @media print{#suporte{display:none}}
 /* ===== PDV (frente de caixa em tela cheia) ===== */
+/* financeiro: lista compacta (uma linha por conta) */
+.fin-lista{display:flex;flex-direction:column}
+.fin-l{display:flex;align-items:center;gap:12px;padding:7px 4px;border-bottom:1px solid #eef1f5}.fin-l:last-child{border-bottom:0}
+.fin-v{flex:0 0 52px;text-align:center;font-weight:700;font-size:14px;line-height:1.1;font-variant-numeric:tabular-nums}.fin-v small{display:block;font-size:10px;font-weight:600;color:#7a8597;text-transform:uppercase}
+.fin-l.vencido .fin-v,.fin-l.vencido .fin-v small{color:var(--bad)}.fin-l.hoje .fin-v,.fin-l.hoje .fin-v small{color:#b45309}.fin-l.pago .fin-v,.fin-l.pago .fin-v small{color:var(--ok)}
+.fin-d{flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column}.fin-d b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fin-d span{font-size:12px;color:#6b7686;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fin-r{display:flex;align-items:center;gap:8px;flex:0 0 auto}.fin-r .btn.sm{padding:5px 10px;font-size:12px;min-height:0}.fin-r b{font-size:14px}
+@media(max-width:600px){.fin-r{flex-direction:column;align-items:flex-end;gap:3px}}
 /* olho para ver a senha */
 .senha-wrap{position:relative}.senha-wrap input{padding-right:46px}
 .olho{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7686;border-radius:8px;padding:0}
@@ -3263,7 +3272,7 @@ function titulosFin(){
 function vFinanceiro(){
   if (!pode('financeiro')) return '<h2>Financeiro</h2><div class="card empty">Seu acesso não inclui o financeiro.</div>';
   const tipo = S.finTipo || 'pagar', sit = S.finSit || 'abertos', hoje = isoNow().slice(0, 10), em7 = diaMais(hoje, 7), em30 = diaMais(hoje, 30);
-  const mes = S.finMes === undefined || S.finMes === null ? '' : S.finMes, q = norm(S.finBusca || ''), lim = S.finLim || 30;
+  const mes = S.finMes === undefined || S.finMes === null ? '' : S.finMes, q = norm(S.finBusca || ''), lim = S.finLim || 20;
   const TODOS = titulosFin(), aberto = t => !t.pago_em, soma = a => r2(a.reduce((s, t) => s + num(t.valor), 0));
   const P = TODOS.filter(t => t.tipo === 'pagar' && aberto(t)), R = TODOS.filter(t => t.tipo === 'receber' && aberto(t));
   const venc = a => a.filter(t => t.venc < hoje), prox = (a, ate) => a.filter(t => t.venc >= hoje && t.venc <= ate);
@@ -3276,7 +3285,6 @@ function vFinanceiro(){
   const meses = [...new Set(TODOS.map(t => String(sit === 'pagos' ? (t.pago_em || '') : t.venc).slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m)))].sort().reverse();
   const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
   const pg = tipo === 'pagar', nome = pg ? 'pagar' : 'receber';
-  const tagSit = t => t.situacao === 'pago' ? `<span class="tag ok">${pg ? 'pago' : 'recebido'} ${dBR(t.pago_em)}</span>` : t.situacao === 'vencido' ? `<span class="tag b">vencido</span>` : t.situacao === 'hoje' ? '<span class="tag w">vence hoje</span>' : '<span class="tag">em aberto</span>';
   return `<div class="row" style="align-items:center"><h2 style="flex:1;min-width:200px">Financeiro</h2>
     <div class="actions" style="margin:0"><button class="btn" data-act="finExport">Exportar planilha</button><button class="btn pri" data-act="finNovo" data-t="${tipo}">+ Conta a ${nome}</button></div></div>
   <div class="grid2" style="gap:12px;margin-bottom:12px">
@@ -3290,11 +3298,11 @@ function vFinanceiro(){
   <div class="card"><div class="row" style="align-items:end"><div style="flex:2 1 220px"><label for="finBusca">Buscar</label><input id="finBusca" placeholder="Descrição, ${pg ? 'fornecedor' : 'cliente'} ou categoria" value="${esc(S.finBusca || '')}" autocomplete="off"></div>
     <div style="flex:1 1 150px"><label for="finMes">${sit === 'pagos' ? 'Mês do pagamento' : 'Mês do vencimento'}</label><select id="finMes"><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
     <div class="seg" style="margin-top:8px">${[['abertos','Em aberto'],['vencidos',pg ? 'Vencidas' : 'Atrasadas'],['pagos',pg ? 'Pagas' : 'Recebidas'],['todos','Todas']].map(([k, l]) => `<button data-act="finSit" data-s="${k}" class="${sit === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
-  <div class="card">${L.length ? `<div class="small" style="margin-bottom:4px">${L.length} conta(s) · ${brl(totL)}</div><div class="list">${L.slice(0, lim).map(t => `
-    <div class="it"><div class="grow" data-act="finVer" data-id="${esc(t.id)}" style="cursor:pointer"><div class="t">${esc(t.descricao)}</div>
-      <div class="s">${esc(t.pessoa || '—')} · vence ${dBR(t.venc)}${t.categoria ? ' · ' + esc(t.categoria) : ''}${t.auto ? ' · automático' : ''}${t.cancelada ? ' · <b style="color:var(--bad)">nota cancelada</b>' : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(t.valor)}</b><br>${tagSit(t)}${!t.pago_em ? `<br><button class="btn sm pri" data-act="finBaixar" data-id="${esc(t.id)}" style="margin-top:4px">${pg ? 'Pagar' : 'Receber'}</button>` : ''}</div></div>`).join('')}</div>
-    ${mais > 0 ? `<div class="actions"><button class="btn" data-act="finMais">Mostrar mais ${Math.min(mais, 30)} (faltam ${mais})</button></div>` : ''}`
+  <div class="card">${L.length ? `<div class="small" style="margin-bottom:4px">${L.length} conta(s) · ${brl(totL)}${L.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="fin-lista">${L.slice(0, lim).map(t => `
+    <div class="fin-l ${t.situacao}"><div class="fin-v">${t.pago_em ? dBR(t.pago_em).slice(0, 5) : dBR(t.venc).slice(0, 5)}<small>${t.pago_em ? (pg ? 'pago' : 'receb.') : t.situacao === 'vencido' ? 'vencido' : t.situacao === 'hoje' ? 'hoje' : 'vence'}</small></div>
+      <div class="fin-d" data-act="finVer" data-id="${esc(t.id)}"><b>${esc(t.descricao)}</b><span>${esc(t.pessoa || '—')}${t.categoria ? ' · ' + esc(t.categoria) : ''}${t.cancelada ? ' · <b style="color:var(--bad)">nota cancelada</b>' : ''}</span></div>
+      <div class="fin-r"><b class="num">${brl(t.valor)}</b>${!t.pago_em ? `<button class="btn sm pri" data-act="finBaixar" data-id="${esc(t.id)}">${pg ? 'Pagar' : 'Receber'}</button>` : '<span class="tag ok">✓</span>'}</div></div>`).join('')}</div>
+    ${mais > 0 ? `<div class="actions"><button class="btn" data-act="finMais">Mostrar mais ${Math.min(mais, 20)} (faltam ${mais})</button></div>` : ''}`
     : `<div class="empty">${TODOS.some(t => t.tipo === tipo) ? 'Nenhuma conta neste filtro.' : pg ? 'Nenhuma conta a pagar. As parcelas das compras a prazo entram aqui sozinhas; despesas como aluguel e energia você lança em "+ Conta a pagar".' : 'Nenhuma conta a receber. As duplicatas das NF-e a prazo e as vendas em "Crédito loja" entram aqui sozinhas.'}</div>`}</div>`;
 }
 function tituloFin(id){ return titulosFin().find(t => t.id === id); }
@@ -3375,9 +3383,9 @@ async function finExport(){
 }
 async function acoesFin(a, t, id){
   switch (a){
-    case 'finTipo': S.finTipo = t.dataset.t; S.finLim = 30; render(); return true;
-    case 'finSit': S.finSit = t.dataset.s; S.finLim = 30; render(); return true;
-    case 'finMais': S.finLim = (S.finLim || 30) + 30; render(); return true;
+    case 'finTipo': S.finTipo = t.dataset.t; S.finLim = 20; render(); return true;
+    case 'finSit': S.finSit = t.dataset.s; S.finLim = 20; render(); return true;
+    case 'finMais': S.finLim = (S.finLim || 20) + 20; render(); return true;
     case 'finNovo': formFinNovo(t.dataset.t || S.finTipo || 'pagar'); return true;
     case 'finSalvar': t.disabled = true; try { await finSalvar(id); } finally { t.disabled = false; } return true;
     case 'finEditar': formFinNovo(null, S.financeiro.find(x => x.id === id)); return true;
@@ -3391,8 +3399,8 @@ async function acoesFin(a, t, id){
   return false;
 }
 function inputFin(t){
-  if (t.id === 'finBusca'){ S.finBusca = t.value; S.finLim = 30; later(); return true; }
-  if (t.id === 'finMes'){ S.finMes = t.value; S.finLim = 30; render(); return true; }
+  if (t.id === 'finBusca'){ S.finBusca = t.value; S.finLim = 20; later(); return true; }
+  if (t.id === 'finMes'){ S.finMes = t.value; S.finLim = 20; render(); return true; }
   return false;
 }
 
