@@ -252,6 +252,8 @@ nav .nav-brand,nav .nav-sec{display:none}
 .fin-r{display:flex;align-items:center;gap:8px;flex:0 0 auto}.fin-r .btn.sm{padding:5px 10px;font-size:12px;min-height:0}.fin-r b{font-size:14px}
 @media(max-width:600px){.fin-r{flex-direction:column;align-items:flex-end;gap:3px}}
 .nt-l{cursor:pointer}.nt-l:hover{background:#f7f9fc}.nt-l .fin-r .tag{min-width:78px;text-align:center}
+.pdv-esc{display:flex;flex-direction:column;gap:8px;margin:10px 0}.pdv-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:14px 16px;border:1px solid #dfe5ee;border-radius:12px;background:#fff;cursor:pointer;font:inherit}
+.pdv-op b{font-size:17px}.pdv-op span{font-size:13px;color:#6b7686}.pdv-op:hover{border-color:var(--brand)}.pdv-op.on{border-color:var(--brand);background:var(--brand-soft)}
 /* olho para ver a senha */
 .senha-wrap{position:relative}.senha-wrap input{padding-right:46px}
 .olho{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7686;border-radius:8px;padding:0}
@@ -812,7 +814,7 @@ function pagResumo(total){
 function vVenda(){
   if (!S.produtos.length) return `<h2>Cupom fiscal (NFC-e)</h2><div class="card empty">Cadastre pelo menos um produto para começar a vender.${pode('produto') ? '<br><br><button class="btn pri" data-act="novoProd">Cadastrar produto</button>' : ''}</div>`;
   const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), lim = num(e.limite_cpf_nfce || 10000);
-  return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1;min-width:220px">Cupom fiscal (NFC-e)</h2><button class="btn pri" data-act="pdvAbrir" title="Frente de caixa em tela cheia">🖥 Abrir PDV (tela cheia)</button></div>${bannerCorrecao(S.reenviar65, 'limpar')}
+  return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1;min-width:220px">Cupom fiscal (NFC-e)</h2>${modoPdv() ? `<button class="btn" data-act="trocarPdv" title="Trocar de caixa" style="flex:0 0 auto">${meuPdv() ? `<b>${esc(meuPdv().nome)}</b>${caixaAberto() ? '' : ' (fechado)'} · trocar` : 'Escolher caixa'}</button>` : ''}<button class="btn pri" data-act="pdvAbrir" title="Frente de caixa em tela cheia">🖥 Abrir PDV (tela cheia)</button></div>${bannerCorrecao(S.reenviar65, 'limpar')}
   <div class="grid2"><div>
     <div class="card"><label for="busca">Buscar produto (nome, código ou código de barras)</label>
       <input id="busca" autocomplete="off" placeholder="Digite ou passe o leitor…" value="${esc(S.busca)}">
@@ -841,7 +843,7 @@ function vVenda(){
       ${CONTINGENCIA_DISPONIVEL ? `<label class="chk"><input type="checkbox" data-act="contOn" ${S.conting ? 'checked' : ''}> Contingência offline (sem internet)</label>` : ''}
       ${!navigator.onLine ? '<div class="msg warn">Sem internet: o cupom não consegue ser enviado agora.</div>' : ''}
       ${S.conting ? '<div class="msg warn">Em contingência: o cupom sai marcado e precisa ser transmitido em até 24 horas (aba Notas).</div>' : ''}
-      ${!caixaAberto() ? '<div class="msg info">Caixa fechado. Abra o caixa na aba <b>Caixa</b> para vender.</div>' : ''}
+      ${!caixaAberto() ? (modoPdv() ? `<div class="msg info">${meuPdv() ? esc(meuPdv().nome) + ' fechado.' : 'Escolha o caixa deste computador.'} <u data-act="trocarPdv" style="cursor:pointer"><b>${meuPdv() ? 'Abrir caixa' : 'Escolher caixa'}</b></u></div>` : '<div class="msg info">Caixa fechado. Abra o caixa na aba <b>Caixa</b> para vender.</div>') : ''}
       <div id="errV"></div>
       <div class="actions"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Limpar</button><button class="btn pri" data-act="emitirNfce" ${L.length ? '' : 'disabled'}>${S.conting ? 'Emitir em contingência' : 'Emitir cupom'}</button></div>
       <p class="small">Venda para CNPJ não sai em NFC-e: use a aba NF-e. CPF obrigatório a partir de ${brl(lim)}.</p>
@@ -856,14 +858,14 @@ function vPdv(){
   const agora = new Date(), hora = agora.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), data = agora.toLocaleDateString('pt-BR');
   return `<div class="pdv-wrap">
   <div class="pdv-top"><div class="marca"><img src="img/logo.png" alt="">NotaOne <small>PDV</small></div>
-    <div class="info"><span>Empresa <b>${esc(e.fantasia || e.razao || '')}</b></span><span>Caixa <b>${cx ? 'aberto' : 'fechado'}</b></span>${ambAtual() !== 'producao' ? '<span style="color:#fbbf24"><b style="color:#fbbf24">HOMOLOGAÇÃO</b> · sem valor fiscal</span>' : ''}${!navigator.onLine ? '<span style="color:#fca5a5"><b style="color:#fca5a5">SEM INTERNET</b></span>' : ''}</div>
+    <div class="info"><span>Empresa <b>${esc(e.fantasia || e.razao || '')}</b></span><span ${modoPdv() ? 'data-act="trocarPdv" style="cursor:pointer" title="Trocar de caixa"' : ''}>${modoPdv() ? `<b>${esc(nomeCaixa() || 'Escolher caixa')}</b> ${cx ? 'aberto' : 'fechado'}` : `Caixa <b>${cx ? 'aberto' : 'fechado'}</b>`}</span>${ambAtual() !== 'producao' ? '<span style="color:#fbbf24"><b style="color:#fbbf24">HOMOLOGAÇÃO</b> · sem valor fiscal</span>' : ''}${!navigator.onLine ? '<span style="color:#fca5a5"><b style="color:#fca5a5">SEM INTERNET</b></span>' : ''}</div>
     <div class="relogio" id="pdvRelogio" title="${data}">${hora}</div>
     <button data-act="pdvTela">${document.fullscreenElement ? '⤡ Sair da tela cheia' : '⤢ Tela cheia'}</button><button class="sair" data-act="pdvSair">Fechar PDV</button></div>
   ${bannerCorrecao(S.reenviar65, 'limpar') ? `<div style="padding:12px 12px 0">${bannerCorrecao(S.reenviar65, 'limpar')}</div>` : ''}
   ${bannerFila() ? `<div style="padding:12px 12px 0">${bannerFila()}</div>` : ''}
   <div class="pdv-body"><div class="pdv-esq">
     <div class="pdv-box pdv-ult">${ult ? `<div style="flex:1;min-width:0"><div class="d">${esc(ult.p.descricao)}</div><div class="q">${qtdTxt(ult.qtd)} ${esc(ult.p.unidade || 'UN')} × ${brl(ult.preco)}</div></div><div class="v">${brl(r2(ult.c.bruto - ult.descItem))}</div>`
-      : `<div class="d" style="color:#9fb3cf">${cx ? 'Caixa livre — passe o primeiro produto' : 'Caixa fechado'}</div>`}</div>
+      : `<div class="d" style="color:#9fb3cf">${cx ? 'Caixa livre — passe o primeiro produto' : modoPdv() ? 'Caixa fechado — toque no nome do caixa lá em cima para abrir' : 'Caixa fechado'}</div>`}</div>
     <div class="pdv-box pdv-itens">${L.length ? `<table><tr><th class="hm">#</th><th class="hm">Código</th><th>Descrição</th><th class="n">Qtd</th><th class="n hm">Unitário</th><th class="n">Total</th><th></th></tr>
       ${L.map((l, i) => `<tr><td class="hm">${i + 1}</td><td class="hm">${esc(l.p.codigo || l.p.gtin || '')}</td><td><span data-act="descItem" data-i="${i}" style="cursor:pointer" title="Dar desconto">${esc(l.p.descricao)}</span>${l.descItem ? ` <span class="small" style="color:#b42318">desc. −${brl(l.descItem)}</span>` : ''}${temSaldo(l.p) && l.p.estoque - l.qtd < 0 ? ' <span class="small" style="color:#b42318">sem estoque</span>' : ''}</td>
         <td class="n"><button class="qbtn" data-act="qtd" data-i="${i}" data-d="-1">−</button> ${qtdTxt(l.qtd)} ${esc(l.p.unidade || 'UN')} <button class="qbtn" data-act="qtd" data-i="${i}" data-d="1">+</button></td>
@@ -896,7 +898,8 @@ function vPdv(){
   <div class="pdv-rod"><span><b>F2</b> produto</span><span><b>F3</b> CPF</span><span><b>F4</b> dinheiro</span><span><b>F6</b> PIX</span><span><b>F7</b> débito</span><span><b>F8</b> crédito</span><span><b>F9</b> finalizar</span><span><b>F10</b> desconto</span><span><b>3*código</b> quantidade</span><span><b>Del</b> remove o último item</span><span><b>Esc</b> limpa a busca</span></div>
   </div>`;
 }
-async function pdvAbrir(){
+async function pdvAbrir(escolhido){
+  if (!escolhido && pdvsEmp().length > 1){ formEscolherPdv('pdv'); return; }
   S.pdv = true; S.tab = 'venda'; render();
   try { if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(_){}
   render(); const b = $('#busca'); if (b) b.focus();
@@ -1105,6 +1108,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardCaixas()}
   ${cardContador()}
   ${cardImpressao()}
   ${cardBalanca()}
@@ -1325,7 +1329,7 @@ async function emitirNfce(){
   if (pg.troco > 0) payload.valor_troco = pg.troco;
   const nota = { id:ref, ref, modelo:'65', serie, numero, data:payload.data_emissao, total:T.nota, destNome:S.nomeCons.toUpperCase() || (docC ? 'CPF ' + fmtDoc(docC) : ''), destDoc:docC,
     pags:S.pags.map(p => ({ forma:p.forma, valor:numIn(p.valor) })), troco:pg.troco, status:S.conting ? 'contingencia' : 'simulada', ambiente:'homologacao', tot:T, emitida_por:S.meuId || null,
-    chave:gerarChave(e, '65', serie, numero, payload.data_emissao, S.conting ? '9' : '1'), caixa:caixaAberto().id, op:'venda',
+    chave:gerarChave(e, '65', serie, numero, payload.data_emissao, S.conting ? '9' : '1'), caixa:caixaAberto().id, caixa_nome:caixaAberto().pdv_nome || '', op:'venda',
     itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, cfop:l.c.cfop, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc })), payload,
     form:{ cart:clone(S.cart), pags:clone(S.pags), descTotal:clone(S.descTotal), cpf:S.cpf, nomeCons:S.nomeCons }, venda_id:uid() };
   // sem internet: a venda fica guardada neste computador e vira cupom sozinha quando a conexão voltar
@@ -1583,7 +1587,7 @@ async function salvarBackup(){
 }
 
 /* ================== v4: chave, eventos, caixa, relatórios, perfis, XML, impressão ================== */
-Object.assign(ACT_PERM, { abrirCaixa:'caixa', movCaixa:'caixa', salvarMov:'caixa', fecharCaixa:'caixa', confFechar:'caixa',
+Object.assign(ACT_PERM, { novoPdv:'empresa', renPdv:'empresa', salvarPdv:'empresa', delPdv:'empresa', abrirCaixa:'caixa', movCaixa:'caixa', salvarMov:'caixa', fecharCaixa:'caixa', confFechar:'caixa',
   cce:'cce', salvarCce:'cce', devolver:'devolucao', inutilizar:'inutilizar', salvarInut:'inutilizar', pacote:'backup', gerarPacote:'backup', enviarPacote:'backup',
   transmitir:'emitir', transmitirTodas:'emitir', novoPerfil:'produto', editPerfil:'produto', salvarPerfil:'produto', delPerfil:'produto', confDelPerfil:'produto',
   importarXml:'produto', salvarXml:'produto', exportRel:'relatorio' });
@@ -1754,7 +1758,113 @@ async function transmitir(ids){
 
 /* ---------- caixa ---------- */
 const meuCaixaKey = () => S.meuId || 'local';
-const caixaAberto = () => S.caixas.find(c => !c.fechado_em && c.aberto_por === meuCaixaKey());
+/* caixas cadastrados (pontos de venda): empresa.pdvs [{id, nome}]; cada computador escolhe o seu (guardado no navegador) */
+const pdvsEmp = () => ((emp() || {}).pdvs || []);
+const modoPdv = () => pdvsEmp().length > 0;
+const limiteCaixas = () => +((emp() || {}).limite_caixas) || 2;
+const lsGet = (k, st = localStorage) => { try { return st.getItem(k) || ''; } catch(_){ return ''; } };
+const lsSet = (k, v, st = localStorage) => { try { st.setItem(k, v); } catch(_){} };
+function aparelhoId(){ let a = lsGet('notaone.aparelho'); if (!a){ a = Math.random().toString(36).slice(2, 10); lsSet('notaone.aparelho', a); } return a; }
+function meuPdv(){ const L = pdvsEmp(); if (!L.length) return null; if (L.length === 1) return L[0]; const id = lsGet('notaone.pdv.' + S.empId); return L.find(p => p.id === id) || null; }
+// já escolheu o caixa nesta abertura do navegador? (com um caixa só, não pergunta)
+const pdvConfirmado = () => pdvsEmp().length <= 1 ? !!meuPdv() : !!meuPdv() && lsGet('notaone.pdvok.' + S.empId, sessionStorage) === meuPdv().id;
+const sessaoPdv = id => S.caixas.find(c => !c.fechado_em && c.pdv === id);
+const caixaAberto = () => { if (!modoPdv()) return S.caixas.find(c => !c.fechado_em && !c.pdv && c.aberto_por === meuCaixaKey()); const p = meuPdv(); return p ? sessaoPdv(p.id) : null; };
+const nomeCaixa = () => { const p = modoPdv() && meuPdv(); return p ? p.nome : ''; };
+function statusPdvTxt(p){
+  const c = sessaoPdv(p.id); if (!c) return 'Fechado';
+  const r = resumoCaixa(c); return `Aberto desde ${fmtData(c.aberto_em).slice(-5)}${String(c.aberto_em).slice(0, 10) !== isoNow().slice(0, 10) ? ' de ' + dataBR(c.aberto_em) : ''} · ${r.qtd} venda(s) · ${brl(r.total)}${c.aparelho && c.aparelho !== aparelhoId() ? ' · <b>em uso em outro computador</b>' : ''}`;
+}
+// pergunta qual caixa este computador vai usar; depois = 'pdv' entra no PDV em seguida
+function formEscolherPdv(depois = ''){
+  S.pdvDepois = depois; S.pdvEscolha = null;
+  const atual = meuPdv();
+  openModal(`${mhead('Qual caixa você vai usar?')}
+  <p class="small">Escolha o caixa deste computador. As vendas e o fechamento ficam separados por caixa.</p>
+  <div class="pdv-esc">${pdvsEmp().map(p => `<button class="pdv-op ${atual && atual.id === p.id ? 'on' : ''}" data-act="escolherPdv" data-id="${esc(p.id)}"><b>${esc(p.nome)}</b><span>${statusPdvTxt(p)}</span></button>`).join('')}</div>
+  <div id="pdvPasso"></div><div id="errM"></div>`);
+}
+async function escolherPdv(id, forcar){
+  const p = pdvsEmp().find(x => x.id === id); if (!p) return;
+  const c = sessaoPdv(id);
+  if (c && c.aparelho && c.aparelho !== aparelhoId() && !forcar){
+    S.pdvEscolha = id;
+    $('#pdvPasso').innerHTML = `<div class="msg warn">O <b>${esc(p.nome)}</b> está aberto em outro computador. Se os dois usarem o mesmo caixa, as vendas se misturam no fechamento.</div>
+      <div class="actions"><button class="btn" data-act="pdvOutro">Escolher outro</button><button class="btn pri" data-act="escolherPdv" data-id="${esc(id)}" data-forcar="1">Usar mesmo assim</button></div>`;
+    return;
+  }
+  lsSet('notaone.pdv.' + S.empId, id); lsSet('notaone.pdvok.' + S.empId, id, sessionStorage);
+  // caixa aberto antes de existirem caixas cadastrados: passa a ser deste caixa
+  const velho = S.caixas.find(x => !x.fechado_em && !x.pdv && x.aberto_por === meuCaixaKey());
+  if (!c && velho) await safe(() => put('caixas', { ...clone(velho), pdv:id, pdv_nome:p.nome, aparelho:aparelhoId() }));
+  else if (c && c.aparelho !== aparelhoId()) await safe(() => put('caixas', { ...clone(c), aparelho:aparelhoId() }));
+  if (!caixaAberto() && pode('caixa')){
+    $('#pdvPasso').innerHTML = `<div class="card" style="margin:10px 0 0"><b>${esc(p.nome)}</b> está fechado. Abra para vender.
+      <label for="cxIniM">Troco inicial na gaveta (R$)</label><input id="cxIniM" data-rs inputmode="decimal">
+      <div class="actions"><button class="btn" data-act="pdvSemAbrir">Agora não</button><button class="btn pri" data-act="abrirCaixa">Abrir caixa</button></div></div>`;
+    document.querySelectorAll('.pdv-op').forEach(b => b.classList.toggle('on', b.dataset.id === id));
+    setTimeout(() => { const el = $('#cxIniM'); if (el) el.focus(); }, 50);
+    return;
+  }
+  concluirEscolhaPdv();
+}
+function concluirEscolhaPdv(){
+  closeModal(); const d = S.pdvDepois; S.pdvDepois = '';
+  if (d === 'pdv') pdvAbrir(true); else { render(); const b = $('#busca'); if (b) b.focus(); }
+  if (nomeCaixa()) toast('Usando o ' + nomeCaixa() + '.');
+}
+async function abrirCaixaAgora(){
+  if (caixaAberto()) return true;
+  if (modoPdv() && !meuPdv()){ formEscolherPdv(); return false; }
+  const p = modoPdv() ? meuPdv() : null;
+  return safe(() => put('caixas', { aberto_em:isoNow(), aberto_por:meuCaixaKey(), inicial:numIn(val($('#cxIniM') ? 'cxIniM' : 'cxIni')), movs:[],
+    ...(p ? { pdv:p.id, pdv_nome:p.nome, aparelho:aparelhoId() } : {}) }), p ? p.nome + ' aberto.' : 'Caixa aberto.');
+}
+// pergunta o caixa ao entrar no Cupom (uma vez por abertura do navegador)
+function perguntarPdvSePreciso(){
+  if (S.tab !== 'venda' || !modoPdv() || pdvConfirmado() || $('#modal').classList.contains('on')) return;
+  if (pdvsEmp().length === 1){ lsSet('notaone.pdvok.' + S.empId, pdvsEmp()[0].id, sessionStorage); return; }
+  formEscolherPdv();
+}
+
+/* ---------- configuração dos caixas (aba Empresa) ---------- */
+function cardCaixas(){
+  const L = pdvsEmp(), lim = limiteCaixas(), cheio = L.length >= lim;
+  if (!pode('empresa')) return L.length ? `<div class="card"><h3 style="margin-top:0">Caixas</h3><p>${L.map(p => esc(p.nome)).join(', ')}</p></div>` : '';
+  return `<div class="card"><h3 style="margin-top:0">Caixas da empresa</h3>
+    <p class="small">Cadastre um caixa para cada computador que vende cupom (ex.: Caixa 01, Caixa 02). Ao abrir o Cupom ou o PDV, o sistema pergunta qual caixa aquele computador vai usar, e cada um tem sua abertura e fechamento.</p>
+    ${L.length ? `<div class="list">${L.map(p => `<div class="it"><div class="grow"><div class="t">${esc(p.nome)}</div><div class="s">${statusPdvTxt(p)}${meuPdv() && meuPdv().id === p.id ? ' · <b>este computador</b>' : ''}</div></div>
+      <button class="btn sm" data-act="renPdv" data-id="${esc(p.id)}">Renomear</button><button class="btn sm bad" data-act="delPdv" data-id="${esc(p.id)}">Excluir</button></div>`).join('')}</div>`
+      : '<p class="small"><b>Nenhum caixa cadastrado:</b> todos os computadores usam um caixa só.</p>'}
+    <p class="small">Seu plano inclui <b>${lim} caixa(s)</b>${L.length ? ` · ${L.length} em uso` : ''}.</p>
+    ${cheio ? `<div class="msg info">Precisa de mais caixas? <a href="${esc(linkSuporte(`Quero mais caixas para a empresa (hoje tenho ${L.length}).`))}" target="_blank" rel="noopener"><b>Fale com o suporte</b></a> e liberamos para você.</div>`
+      : `<div class="actions"><button class="btn pri" data-act="novoPdv">+ Novo caixa</button></div>`}</div>`;
+}
+function formPdv(id){
+  const p = id ? pdvsEmp().find(x => x.id === id) : null, n = pdvsEmp().length + 1;
+  openModal(`${mhead(p ? 'Renomear caixa' : 'Novo caixa')}
+  ${fld('pdvNome', 'Nome do caixa', p ? p.nome : `Caixa ${String(n).padStart(2, '0')}`, 'maxlength="30"')}
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="salvarPdv" data-id="${esc(id || '')}">Salvar</button></div>`);
+  setTimeout(() => { const el = $('#pdvNome'); if (el){ el.focus(); el.select(); } }, 50);
+}
+async function salvarPdv(id){
+  const nome = val('pdvNome').replace(/\s+/g, ' ').trim();
+  if (!nome) return $('#errM').innerHTML = '<div class="msg err">Dê um nome ao caixa.</div>';
+  const e = clone(emp()), L = e.pdvs || [];
+  if (L.some(p => p.id !== id && p.nome.toLowerCase() === nome.toLowerCase())) return $('#errM').innerHTML = '<div class="msg err">Já existe um caixa com esse nome.</div>';
+  if (id) L.forEach(p => { if (p.id === id) p.nome = nome; });
+  else { if (L.length >= limiteCaixas()) return $('#errM').innerHTML = `<div class="msg err">Seu plano permite ${limiteCaixas()} caixa(s). Fale com o suporte para liberar mais.</div>`;
+    L.push({ id:'cx' + Date.now().toString(36), nome, criado_em:isoNow() }); }
+  e.pdvs = L;
+  if (await safe(() => put('empresas', e), id ? 'Caixa renomeado.' : 'Caixa criado.')) closeModal();
+}
+async function delPdv(id){
+  const p = pdvsEmp().find(x => x.id === id); if (!p) return;
+  if (sessaoPdv(id)) return toast(`Feche o ${p.nome} antes de excluir.`);
+  if (!confirm(`Excluir o ${p.nome}? O histórico dos fechamentos continua guardado.`)) return;
+  const e = clone(emp()); e.pdvs = (e.pdvs || []).filter(x => x.id !== id);
+  await safe(() => put('empresas', e), 'Caixa excluído.');
+}
 function resumoCaixa(cx){
   const ns = S.notas.filter(n => n.caixa === cx.id && n.modelo === '65' && notaValida(n));
   const porForma = {}; let total = 0, troco = 0;
@@ -1773,15 +1883,24 @@ function resumoCaixaHtml(r){
     ${linhaTot('Troco inicial', r.inicial, 'small')}${r.sup ? linhaTot('Suprimentos', r.sup, 'small') : ''}${r.sang ? linhaTot('Sangrias', -r.sang, 'small') : ''}${r.canc ? linhaTot(`Canceladas (${r.canc})`, r.cancValor, 'small') : ''}`;
 }
 function vCaixa(){
-  const cx = caixaAberto(); let h = '<h2>Caixa</h2>';
-  if (!cx) h += `<div class="card"><p>Nenhum caixa aberto${S.meuId ? ' no seu usuário' : ''}. Abra o caixa para começar a vender.</p>
+  const cx = caixaAberto(), p = modoPdv() ? meuPdv() : null;
+  let h = `<div class="row" style="align-items:center"><h2 style="flex:1">${p ? esc(p.nome) : 'Caixa'}</h2>${modoPdv() ? `<button class="btn" data-act="trocarPdv" style="flex:0 0 auto">${p ? 'Trocar de caixa' : 'Escolher caixa'}</button>` : ''}</div>`;
+  if (modoPdv() && !p) return h + `<div class="card"><p>Escolha qual caixa este computador vai usar.</p><div class="actions"><button class="btn pri" data-act="trocarPdv">Escolher caixa</button></div></div>` + cardTodosCaixas();
+  if (!cx) h += `<div class="card"><p>${p ? esc(p.nome) + ' está fechado' : 'Nenhum caixa aberto' + (S.meuId ? ' no seu usuário' : '')}. Abra o caixa para começar a vender.</p>
     <label for="cxIni">Troco inicial na gaveta (R$)</label><input id="cxIni" data-rs inputmode="decimal">
     <div class="actions"><button class="btn pri" data-act="abrirCaixa">Abrir caixa</button></div></div>`;
   else h += `<div class="card"><b>Caixa aberto</b><div class="small">desde ${fmtData(cx.aberto_em)}</div>${resumoCaixaHtml(resumoCaixa(cx))}
     ${(cx.movs || []).length ? `<h3>Movimentos</h3><div class="list">${cx.movs.map(m => `<div class="it"><div class="grow"><div class="t">${m.tipo === 'sangria' ? 'Sangria' : 'Suprimento'}</div><div class="s">${fmtData(m.em)}${m.motivo ? ' · ' + esc(m.motivo) : ''}</div></div>
       <b class="num" style="color:${m.tipo === 'sangria' ? 'var(--bad)' : 'var(--ok)'}">${m.tipo === 'sangria' ? '−' : '+'}${brl(m.valor)}</b></div>`).join('')}</div>` : ''}
     <div class="actions"><button class="btn" data-act="movCaixa" data-t="sangria">Sangria</button><button class="btn" data-act="movCaixa" data-t="suprimento">Suprimento</button><button class="btn pri" data-act="fecharCaixa">Fechar caixa</button></div></div>`;
-  return h;
+  return h + cardTodosCaixas();
+}
+// situação de todos os caixas (para o dono acompanhar)
+function cardTodosCaixas(){
+  if (pdvsEmp().length < 2) return '';
+  const fech = S.caixas.filter(c => c.fechado_em && c.pdv).sort((a, b) => String(b.fechado_em).localeCompare(String(a.fechado_em))).slice(0, 8);
+  return `<div class="card"><h3 style="margin-top:0">Todos os caixas</h3><div class="list">${pdvsEmp().map(p => `<div class="it"><div class="grow"><div class="t">${esc(p.nome)}</div><div class="s">${statusPdvTxt(p)}</div></div></div>`).join('')}</div>
+    ${fech.length ? `<h3>Últimos fechamentos</h3><div class="list">${fech.map(c => `<div class="it" data-act="verCaixa" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(c.pdv_nome || 'Caixa')}</div><div class="s">fechado ${fmtData(c.fechado_em)}</div></div>${difTag(c.diferenca)}</div>`).join('')}</div>` : ''}</div>`;
 }
 function formMov(tipo){
   openModal(`${mhead(tipo === 'sangria' ? 'Sangria (retirada)' : 'Suprimento (reforço)')}
@@ -1816,7 +1935,7 @@ async function confFechar(){
 function verCaixa(id){
   const c = S.caixas.find(x => x.id === id); if (!c) return;
   const r = c.resumo || resumoCaixa(c);
-  openModal(`${mhead('Caixa ' + fmtData(c.aberto_em).slice(0, 10))}<p class="small">Aberto ${fmtData(c.aberto_em)}${c.fechado_em ? ' · fechado ' + fmtData(c.fechado_em) : ''}</p>${resumoCaixaHtml(r)}
+  openModal(`${mhead((c.pdv_nome || 'Caixa') + ' · ' + fmtData(c.aberto_em).slice(0, 10))}<p class="small">Aberto ${fmtData(c.aberto_em)}${c.fechado_em ? ' · fechado ' + fmtData(c.fechado_em) : ''}</p>${resumoCaixaHtml(r)}
   ${c.fechado_em ? `${linhaTot('Dinheiro contado', c.contado)}<div class="total"><span>Diferença</span>${difTag(c.diferenca)}</div>` : ''}`);
 }
 
@@ -2120,7 +2239,15 @@ async function acoesV4(a, t, id){
     case 'transmitir': await transmitir([id]); verNota(S.notas.find(n => n.id === id)); return true;
     case 'transmitirTodas': await transmitir(S.notas.filter(n => n.status === 'contingencia').map(n => n.id)); return true;
     case 'imprimir': imprimir(S.notas.find(n => n.id === id)); return true;
-    case 'abrirCaixa': if (caixaAberto()) return true; await safe(() => put('caixas', { aberto_em:isoNow(), aberto_por:meuCaixaKey(), inicial:numIn(val('cxIni')), movs:[] }), 'Caixa aberto.'); return true;
+    case 'abrirCaixa': { const naEscolha = !!$('#pdvPasso'); if (await abrirCaixaAgora() && naEscolha) concluirEscolhaPdv(); return true; }
+    case 'escolherPdv': await escolherPdv(id, !!t.dataset.forcar); return true;
+    case 'pdvOutro': $('#pdvPasso').innerHTML = ''; return true;
+    case 'pdvSemAbrir': concluirEscolhaPdv(); return true;
+    case 'trocarPdv': formEscolherPdv(S.pdv ? 'pdv' : ''); return true;
+    case 'novoPdv': formPdv(); return true;
+    case 'renPdv': formPdv(id); return true;
+    case 'salvarPdv': salvarPdv(t.dataset.id); return true;
+    case 'delPdv': delPdv(id); return true;
     case 'movCaixa': formMov(t.dataset.t); return true;
     case 'salvarMov': salvarMov(t.dataset.t); return true;
     case 'fecharCaixa': formFechar(); return true;
@@ -3987,7 +4114,7 @@ let cliqueNoFundo = false;
 document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
-  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); perguntarPdvSePreciso(); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
   const P = () => S.produtos.find(x => x.id === id);

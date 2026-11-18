@@ -51,3 +51,14 @@ update docs set data = data || '{"razao":"OUTRA LOJA LTDA"}' where path='empresa
 reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/financeiro/f1','empresas/'||:'e'||'/financeiro',:'e','{"tipo":"pagar","valor":100}') returning data->>'valor' as fin_gravou;
 delete from docs where path='empresas/'||:'e'||'/financeiro/f1' returning 'fin_apagou';
+-- caixas: limite do plano (2), a tela não muda o limite; o suporte libera mais
+reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"pdvs":[{"id":"a","nome":"Caixa 01"},{"id":"b","nome":"Caixa 02"}]}' where path='empresas/'||:'e' returning jsonb_array_length(data->'pdvs') as dois_caixas_ok;
+update docs set data = data || '{"pdvs":[{"id":"a"},{"id":"b"},{"id":"c"}]}' where path='empresas/'||:'e'; -- deve falhar: limite 2
+update docs set data = data || '{"limite_caixas":10}' where path='empresas/'||:'e' returning data->>'limite_caixas' as limite_ignorado_nulo;
+select public.definir_limite_caixas('11222333000181', 3); -- dono comum: falha
+reset role;
+select public.definir_limite_caixas('11.222.333/0001-81', 3);
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"pdvs":[{"id":"a"},{"id":"b"},{"id":"c"}]}' where path='empresas/'||:'e' returning jsonb_array_length(data->'pdvs') as tres_caixas_ok, data->>'limite_caixas' as limite_3;
+reset role;
