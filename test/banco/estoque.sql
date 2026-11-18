@@ -47,3 +47,7 @@ select public.criar_empresa('{"razao":"COPIA","cnpj":"11.222.333/0001-81"}');  -
 select public.criar_empresa('{"razao":"OUTRA LOJA","cnpj":"11444777000161"}') as e2 \gset
 update docs set data = data || '{"cnpj":"11222333000181"}' where path='empresas/'||:'e2';  -- deve falhar
 update docs set data = data || '{"razao":"OUTRA LOJA LTDA"}' where path='empresas/'||:'e2' returning data->>'razao' as salvou_sem_trocar_cnpj;
+-- financeiro: dono grava e apaga contas
+reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/financeiro/f1','empresas/'||:'e'||'/financeiro',:'e','{"tipo":"pagar","valor":100}') returning data->>'valor' as fin_gravou;
+delete from docs where path='empresas/'||:'e'||'/financeiro/f1' returning 'fin_apagou';
