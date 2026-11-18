@@ -258,3 +258,14 @@ test('carta de correção guarda os caminhos da Focus e o protocolo lido do XML'
   assert.equal(c.body.ok, true); assert.equal(ev.protocolo, '222260000123456'); assert.equal(ev.registro, '2026-11-17T16:20:00-03:00');
   assert.equal(ev.focus.caminho_pdf_carta_correcao, '/arquivos/cce.pdf');
 });
+
+test('a mesma venda (venda_id) não vira duas notas quando a tela tenta de novo', async () => {
+  focusResp = { status:201, body:{ status:'autorizado', chave_nfe:'NFe55' } };
+  const r1 = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{ venda_id:'vendaABC123', total:10 } });
+  const posts = () => chamadas.filter(c => c.method === 'POST' && c.url.startsWith('/v2/nfce')).length;
+  const antes = posts();
+  const r2 = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{ venda_id:'vendaABC123', total:10 } });
+  assert.equal(r2.body.repetida, true); assert.equal(r2.body.nota.ref, r1.body.nota.ref); assert.equal(posts(), antes, 'não manda de novo para a Focus');
+  const r3 = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{ venda_id:'outraVenda99', total:10 } });
+  assert.notEqual(r3.body.nota.ref, r1.body.nota.ref);
+});
