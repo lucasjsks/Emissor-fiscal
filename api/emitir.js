@@ -29,6 +29,14 @@ export default rota(async (req, b) => {
 
   // correção de nota rejeitada: reenvia com o MESMO número e a mesma referência (a Focus aceita reenviar
   // uma referência rejeitada). Se a rejeição deixou o número usado (duplicidade/denegação), vai com número novo.
+  // a mesma venda nunca vira duas notas: se a resposta se perdeu (internet caiu) e a tela tentar de novo,
+  // devolve a nota que já foi feita para essa venda (venda_id gerado pela tela)
+  const vid = typeof nota.venda_id === 'string' && /^[A-Za-z0-9_-]{6,60}$/.test(nota.venda_id) ? nota.venda_id : null;
+  if (vid && !b.reenviar){
+    const ja = await getDoc(`empresas/${empresa_id}/vendas_id/${vid}`);
+    const feita = ja && ja.ref && await getDoc(`empresas/${empresa_id}/notas/${ja.ref}`);
+    if (feita) return { nota:feita, mensagem:'Esta venda já tinha virado nota. Nada foi enviado de novo.', repetida:true };
+  }
   let antiga = null;
   if (b.reenviar){
     antiga = await getDoc(`empresas/${empresa_id}/notas/${b.reenviar}`);
@@ -54,6 +62,7 @@ export default rota(async (req, b) => {
   const envio = limparPayload({ ...payload, cnpj_emitente:emp.cnpj, serie, numero });
   if (Array.isArray(envio.duplicatas) && envio.duplicatas.length && !envio.numero_fatura) envio.numero_fatura = String(numero); // fatura com o número real da nota
 
+  if (vid) await putDoc(`empresas/${empresa_id}/vendas_id/${vid}`, { ref, em:isoBR() }, u.id);
   const resp = await focus('POST', `/v2/${tipo}?ref=${encodeURIComponent(ref)}`, envio, { amb });
   const r = resp.body || {};
   const status = (resp.status === 0 || resp.status >= 500) ? 'erro_envio' : statusDe(r);
