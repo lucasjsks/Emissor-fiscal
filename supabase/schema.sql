@@ -173,6 +173,46 @@ drop trigger if exists cnpj_unico on public.docs;
 create trigger cnpj_unico before insert or update on public.docs
   for each row execute function public.cnpj_unico();
 
+-- CAIXAS (pontos de venda) da empresa: lista em empresas/<id>.pdvs. O plano permite limite_caixas (padrão 2).
+-- A tela não consegue mudar limite_caixas nem passar do limite; só o suporte (SQL abaixo / admin) aumenta.
+create or replace function public.limite_caixas() returns trigger
+language plpgsql as $$
+declare lim int; qtd int; antes int := 0;
+begin
+  -- ao criar (inclusive por criar_empresa) nunca vem limite; ao alterar, só a tela (authenticated) é conferida
+  if new.col <> 'empresas' or (tg_op = 'UPDATE' and current_user not in ('authenticated', 'anon')) then return new; end if;
+  if tg_op = 'UPDATE' then
+    new.data := (new.data - 'limite_caixas') || jsonb_strip_nulls(jsonb_build_object('limite_caixas', old.data->'limite_caixas'));
+    antes := coalesce(jsonb_array_length(case when jsonb_typeof(old.data->'pdvs') = 'array' then old.data->'pdvs' end), 0);
+  else
+    new.data := new.data - 'limite_caixas';
+  end if;
+  lim := coalesce((new.data->>'limite_caixas')::int, 2);
+  qtd := coalesce(jsonb_array_length(case when jsonb_typeof(new.data->'pdvs') = 'array' then new.data->'pdvs' end), 0);
+  if qtd > lim and qtd > antes then
+    raise exception 'Seu plano permite % caixa(s). Para usar mais caixas, fale com o suporte.', lim;
+  end if;
+  return new;
+end $$;
+drop trigger if exists limite_caixas on public.docs;
+create trigger limite_caixas before insert or update on public.docs
+  for each row execute function public.limite_caixas();
+
+-- suporte: libera mais caixas para uma empresa. No SQL Editor do Supabase: select public.definir_limite_caixas('CNPJ', 3);
+create or replace function public.definir_limite_caixas(p_cnpj text, p_limite int) returns text
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if current_user in ('authenticated', 'anon') and not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  if p_limite < 1 or p_limite > 50 then raise exception 'Limite inválido.'; end if;
+  update public.docs set data = jsonb_set(data, '{limite_caixas}', to_jsonb(p_limite), true)
+   where col = 'empresas' and regexp_replace(coalesce(data->>'cnpj', ''), '\D', '', 'g') = regexp_replace(p_cnpj, '\D', '', 'g');
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ.'; end if;
+  return 'Limite de caixas atualizado para ' || p_limite;
+end $$;
+revoke execute on function public.definir_limite_caixas(text, int) from public, anon;
+
 create or replace function public.listar_membros(e text)
 returns table (user_id uuid, email text, papel text, criado_em timestamptz, pendente boolean)
 language sql stable security definer set search_path = public, auth as $$
