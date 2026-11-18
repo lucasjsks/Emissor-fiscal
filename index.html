@@ -1587,7 +1587,7 @@ async function salvarBackup(){
 }
 
 /* ================== v4: chave, eventos, caixa, relatórios, perfis, XML, impressão ================== */
-Object.assign(ACT_PERM, { novoPdv:'empresa', renPdv:'empresa', salvarPdv:'empresa', delPdv:'empresa', abrirCaixa:'caixa', movCaixa:'caixa', salvarMov:'caixa', fecharCaixa:'caixa', confFechar:'caixa',
+Object.assign(ACT_PERM, { abrirTodos:'caixa', confAbrirTodos:'caixa', novoPdv:'empresa', renPdv:'empresa', salvarPdv:'empresa', delPdv:'empresa', abrirCaixa:'caixa', movCaixa:'caixa', salvarMov:'caixa', fecharCaixa:'caixa', confFechar:'caixa',
   cce:'cce', salvarCce:'cce', devolver:'devolucao', inutilizar:'inutilizar', salvarInut:'inutilizar', pacote:'backup', gerarPacote:'backup', enviarPacote:'backup',
   transmitir:'emitir', transmitirTodas:'emitir', novoPerfil:'produto', editPerfil:'produto', salvarPerfil:'produto', delPerfil:'produto', confDelPerfil:'produto',
   importarXml:'produto', salvarXml:'produto', exportRel:'relatorio' });
@@ -1885,7 +1885,8 @@ function resumoCaixaHtml(r){
 function vCaixa(){
   const cx = caixaAberto(), p = modoPdv() ? meuPdv() : null;
   let h = `<div class="row" style="align-items:center"><h2 style="flex:1">${p ? esc(p.nome) : 'Caixa'}</h2>${modoPdv() ? `<button class="btn" data-act="trocarPdv" style="flex:0 0 auto">${p ? 'Trocar de caixa' : 'Escolher caixa'}</button>` : ''}</div>`;
-  if (modoPdv() && !p) return h + `<div class="card"><p>Escolha qual caixa este computador vai usar.</p><div class="actions"><button class="btn pri" data-act="trocarPdv">Escolher caixa</button></div></div>` + cardTodosCaixas();
+  if (modoPdv() && !p) return h + cardTodosCaixas() + `<div class="card"><p>Escolha qual caixa este computador vai usar.</p><div class="actions"><button class="btn pri" data-act="trocarPdv">Escolher caixa</button></div></div>`;
+  h += cardTodosCaixas();
   if (!cx) h += `<div class="card"><p>${p ? esc(p.nome) + ' está fechado' : 'Nenhum caixa aberto' + (S.meuId ? ' no seu usuário' : '')}. Abra o caixa para começar a vender.</p>
     <label for="cxIni">Troco inicial na gaveta (R$)</label><input id="cxIni" data-rs inputmode="decimal">
     <div class="actions"><button class="btn pri" data-act="abrirCaixa">Abrir caixa</button></div></div>`;
@@ -1893,14 +1894,39 @@ function vCaixa(){
     ${(cx.movs || []).length ? `<h3>Movimentos</h3><div class="list">${cx.movs.map(m => `<div class="it"><div class="grow"><div class="t">${m.tipo === 'sangria' ? 'Sangria' : 'Suprimento'}</div><div class="s">${fmtData(m.em)}${m.motivo ? ' · ' + esc(m.motivo) : ''}</div></div>
       <b class="num" style="color:${m.tipo === 'sangria' ? 'var(--bad)' : 'var(--ok)'}">${m.tipo === 'sangria' ? '−' : '+'}${brl(m.valor)}</b></div>`).join('')}</div>` : ''}
     <div class="actions"><button class="btn" data-act="movCaixa" data-t="sangria">Sangria</button><button class="btn" data-act="movCaixa" data-t="suprimento">Suprimento</button><button class="btn pri" data-act="fecharCaixa">Fechar caixa</button></div></div>`;
-  return h + cardTodosCaixas();
+  return h;
 }
 // situação de todos os caixas (para o dono acompanhar)
 function cardTodosCaixas(){
   if (pdvsEmp().length < 2) return '';
   const fech = S.caixas.filter(c => c.fechado_em && c.pdv).sort((a, b) => String(b.fechado_em).localeCompare(String(a.fechado_em))).slice(0, 8);
-  return `<div class="card"><h3 style="margin-top:0">Todos os caixas</h3><div class="list">${pdvsEmp().map(p => `<div class="it"><div class="grow"><div class="t">${esc(p.nome)}</div><div class="s">${statusPdvTxt(p)}</div></div></div>`).join('')}</div>
+  const fechados = pdvsEmp().filter(p => !sessaoPdv(p.id)), pd = pode('caixa');
+  return `<div class="card"><div class="row" style="align-items:center"><h3 style="margin:0;flex:1">Todos os caixas</h3>${pd && fechados.length > 1 ? '<button class="btn pri" data-act="abrirTodos" style="flex:0 0 auto">Abrir todos os caixas</button>' : ''}</div>
+    <div class="list">${pdvsEmp().map(p => `<div class="it"><div class="grow"><div class="t">${esc(p.nome)}${meuPdv() && meuPdv().id === p.id ? ' <span class="small">· este computador</span>' : ''}</div><div class="s">${statusPdvTxt(p)}</div></div>
+      ${pd && !sessaoPdv(p.id) ? `<button class="btn sm" data-act="abrirTodos" data-id="${esc(p.id)}">Abrir</button>` : ''}</div>`).join('')}</div>
     ${fech.length ? `<h3>Últimos fechamentos</h3><div class="list">${fech.map(c => `<div class="it" data-act="verCaixa" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(c.pdv_nome || 'Caixa')}</div><div class="s">fechado ${fmtData(c.fechado_em)}</div></div>${difTag(c.diferenca)}</div>`).join('')}</div>` : ''}</div>`;
+}
+// abre vários caixas de uma vez (cada um com o seu troco inicial)
+function formAbrirTodos(so){
+  const L = pdvsEmp().filter(p => !sessaoPdv(p.id) && (!so || p.id === so));
+  if (!L.length) return toast('Todos os caixas já estão abertos.');
+  openModal(`${mhead(L.length > 1 ? 'Abrir todos os caixas' : 'Abrir ' + esc(L[0].nome))}
+  <p class="small">Informe o troco inicial da gaveta de cada caixa (pode deixar 0).</p>
+  ${L.map(p => `<label class="chk" style="margin-top:10px"><input type="checkbox" class="atSel" value="${esc(p.id)}" checked> <b>${esc(p.nome)}</b></label>
+    <input id="atIni_${esc(p.id)}" data-rs inputmode="decimal" placeholder="Troco inicial (R$)">`).join('')}
+  <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn pri" data-act="confAbrirTodos">${L.length > 1 ? 'Abrir caixas' : 'Abrir caixa'}</button></div>`);
+  setTimeout(() => { const el = document.querySelector('[id^=atIni_]'); if (el) el.focus(); }, 50);
+}
+async function confAbrirTodos(){
+  const ids = [...document.querySelectorAll('.atSel')].filter(x => x.checked).map(x => x.value);
+  if (!ids.length) return $('#errM').innerHTML = '<div class="msg err">Marque pelo menos um caixa.</div>';
+  let n = 0;
+  for (const id of ids){
+    const p = pdvsEmp().find(x => x.id === id); if (!p || sessaoPdv(id)) continue;
+    const ok = await safe(() => put('caixas', { aberto_em:isoNow(), aberto_por:meuCaixaKey(), inicial:numIn(val('atIni_' + id)), movs:[], pdv:p.id, pdv_nome:p.nome }));
+    if (!ok) break; n++;
+  }
+  closeModal(); toast(n > 1 ? `${n} caixas abertos.` : n ? 'Caixa aberto.' : 'Nenhum caixa aberto.');
 }
 function formMov(tipo){
   openModal(`${mhead(tipo === 'sangria' ? 'Sangria (retirada)' : 'Suprimento (reforço)')}
@@ -2244,6 +2270,8 @@ async function acoesV4(a, t, id){
     case 'pdvOutro': $('#pdvPasso').innerHTML = ''; return true;
     case 'pdvSemAbrir': concluirEscolhaPdv(); return true;
     case 'trocarPdv': formEscolherPdv(S.pdv ? 'pdv' : ''); return true;
+    case 'abrirTodos': formAbrirTodos(t.dataset.id || ''); return true;
+    case 'confAbrirTodos': t.disabled = true; await confAbrirTodos(); return true;
     case 'novoPdv': formPdv(); return true;
     case 'renPdv': formPdv(id); return true;
     case 'salvarPdv': salvarPdv(t.dataset.id); return true;
