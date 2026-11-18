@@ -2571,10 +2571,9 @@ function vNotasCompra(){
       ${q ? '<p class="small" style="margin:4px 0 0">Buscando em todos os meses.</p>' : ''}
       <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${nEst}</b>estornadas</div></div>
       <div class="seg" style="margin-top:8px">${[['ativas','Lançadas'],['devolvidas',`Com devolução (${nDev})`],['estornadas',`Estornadas (${nEst})`],['todas','Todas']].map(([k, l]) => `<button data-act="cpSit" data-s="${k}" class="${sit === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
-    <div class="card">${L.length ? `<div class="list">${L.map(c => `<div class="it" data-act="verCompra" data-id="${esc(c.id)}" style="cursor:pointer"><div class="grow">
-      <div class="t">${esc(c.fornecedor_nome || 'Sem fornecedor')} <span class="small">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></div>
-      <div class="s">${dataBR(c.data_emissao)} · ${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(c.total_nota || 0)}</b><br>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 30)} (faltam ${mais})</button></div>` : ''}${total > 30 ? `<p class="small" style="text-align:center">${total} nota(s) neste filtro</p>` : ''}`
+    <div class="card">${L.length ? `<div class="fin-lista">${L.map(c => `<div class="fin-l nt-l" data-act="verCompra" data-id="${esc(c.id)}"><div class="fin-v">${(c.data_emissao || '').slice(8, 10)}/${(c.data_emissao || '').slice(5, 7)}<small>${(c.data_emissao || '').slice(0, 4)}</small></div>
+      <div class="fin-d"><b>${esc(c.fornecedor_nome || 'Sem fornecedor')} <span style="font-weight:400;color:#7a8597;font-size:12px">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></b><span>${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</span></div>
+      <div class="fin-r"><b class="num">${brl(c.total_nota || 0)}</b>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 30)} (faltam ${mais})</button></div>` : ''}${total > 30 ? `<p class="small" style="text-align:center">${total} nota(s) neste filtro</p>` : ''}`
       : `<div class="empty">${S.compras.length ? (q ? 'Nenhuma nota encontrada.' : mes ? 'Nenhuma nota de compra neste mês. Escolha outro mês ou "Todos os meses".' : 'Nenhuma nota neste filtro.') : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
 }
 
