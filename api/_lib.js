@@ -90,6 +90,8 @@ export async function getDoc(path){
 }
 // grava vários documentos numa chamada só
 export async function putDocs(lista, userId){
+  // o mesmo caminho duas vezes no lote derruba o upsert ("ON CONFLICT ... cannot affect row a second time"): fica o último
+  lista = [...new Map(lista.map(d => [d.path, d])).values()];
   if (!lista.length) return;
   await sb('/rest/v1/docs?on_conflict=path', { method:'POST', prefer:'resolution=merge-duplicates,return=minimal',
     body:lista.map(({ path, data }) => ({ path, col:path.replace(/\/[^/]+$/, ''), empresa_id:path.split('/')[1], data, atualizado_por:userId || null })) });

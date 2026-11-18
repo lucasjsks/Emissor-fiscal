@@ -25,11 +25,13 @@ beforeEach(() => {
       if (u.pathname === '/rest/v1/rpc/proximo_numero'){ const d = docs['empresas/' + body.e]; const n = d[body.campo]; d[body.campo] = n + 1; return json(n); }
       if (u.pathname.startsWith('/rest/v1/rpc/')) return json(null);
       if (u.pathname === '/rest/v1/docs' && (opt.method || 'GET') === 'GET'){
-        const p = u.searchParams.get('path'); if (p) { const d = docs[p.slice(3)]; return json(d ? [{ data:d }] : []); }
+        const p = u.searchParams.get('path');
+        if (p && p.startsWith('in.(')){ const ps = p.slice(4, -1).split(',').map(x => x.replace(/^"|"$/g, '')); return json(ps.filter(x => docs[x]).map(x => ({ path:x, data:docs[x] }))); }
+        if (p) { const d = docs[p.slice(3)]; return json(d ? [{ data:d }] : []); }
         const ch = u.searchParams.get('data->>chave'); const hit = Object.entries(docs).find(([, v]) => v.chave === (ch || '').slice(3));
         return json(hit ? [{ path:hit[0], data:hit[1] }] : []);
       }
-      if (u.pathname === '/rest/v1/docs' && opt.method === 'POST'){ docs[body.path] = body.data; return json(null, 201); }
+      if (u.pathname === '/rest/v1/docs' && opt.method === 'POST'){ [].concat(body).forEach(b => { docs[b.path] = b.data; }); return json(null, 201); }
     }
     if (u.host === 'homologacao.focusnfe.com.br'){ const fr = typeof focusResp === 'function' ? focusResp(opt.method || 'GET') : focusResp; return json(fr.body, fr.status); }
     throw new Error('URL inesperada ' + url);
@@ -268,4 +270,18 @@ test('a mesma venda (venda_id) não vira duas notas quando a tela tenta de novo'
   assert.equal(r2.body.repetida, true); assert.equal(r2.body.nota.ref, r1.body.nota.ref); assert.equal(posts(), antes, 'não manda de novo para a Focus');
   const r3 = await chamar(emitir, 't1', { empresa_id:'E1', modelo:'65', payload, nota:{ venda_id:'outraVenda99', total:10 } });
   assert.notEqual(r3.body.nota.ref, r1.body.nota.ref);
+});
+
+test('notas recebidas: a mesma nota repetida na lista não derruba a gravação e a manifestação feita aqui é mantida', async () => {
+  docs['empresas/E1'].mde_versao = 0;
+  const c1 = rec(1, 1).chave_nfe;
+  docs['empresas/E1/recebidas/' + c1] = { chave:c1, manifestacao:'ciencia', manifestado_em:'2026-11-18T08:00:00-03:00', justificativa:'x', compra_id:'C9' };
+  focusResp = { status:200, body:[rec(1, 3), rec(1, 4, { manifestacao_destinatario:'nulo' }), rec(2, 5)] };
+  const lotes = []; const fetchOrig = globalThis.fetch;
+  globalThis.fetch = async (url, opt = {}) => { if (String(url).includes('/rest/v1/docs?on_conflict') && opt.body) lotes.push(JSON.parse(opt.body)); return fetchOrig(url, opt); };
+  const r = await chamar(recebidas, 't2', { empresa_id:'E1', acao:'buscar' });
+  globalThis.fetch = fetchOrig;
+  assert.equal(r.code, 200); assert.equal(lotes[0].length, 2, 'sem caminho repetido no lote');
+  const d = docs['empresas/E1/recebidas/' + c1];
+  assert.equal(d.versao, 4); assert.equal(d.manifestacao, 'ciencia'); assert.equal(d.compra_id, 'C9');
 });

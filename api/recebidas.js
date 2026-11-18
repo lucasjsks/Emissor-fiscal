@@ -2,7 +2,7 @@
 //   acao 'buscar'      → baixa da Focus as notas novas/alteradas e grava em empresas/<id>/recebidas/<chave>
 //   acao 'manifestar'  → ciência, confirmação, desconhecimento ou operação não realizada
 //   acao 'xml'         → XML completo (liberado pela SEFAZ depois da ciência), para dar entrada na aba Compras
-import { rota, Falha, usuario, papelDe, getDoc, putDoc, putDocs, rpc, focus, mensagemFocus, isoBR, ambienteMde } from './_lib.js';
+import { rota, Falha, usuario, papelDe, getDoc, putDoc, putDocs, rpc, sb, focus, mensagemFocus, isoBR, ambienteMde } from './_lib.js';
 
 const dig = s => String(s || '').replace(/\D/g, '');
 export const TIPOS = { ciencia:'ciencia', confirmacao:'confirmacao', desconhecimento:'desconhecimento', nao_realizada:'nao_realizada' };
@@ -38,7 +38,20 @@ export default rota(async (req, b) => {
         throw new Falha(m || `A Focus NFe não respondeu (HTTP ${r.status}).`, 502);
       }
       const lista = Array.isArray(r.body) ? r.body : [];
-      const docs = lista.map(resumoRecebida).filter(x => x.chave.length === 44).map(data => ({ path:base + data.chave, data }));
+      // a Focus pode mandar a mesma nota mais de uma vez na lista (resumo e completa, eventos): fica a versão mais nova
+      const porChave = new Map();
+      lista.map(resumoRecebida).filter(x => x.chave.length === 44).forEach(x => { const y = porChave.get(x.chave); if (!y || x.versao >= y.versao) porChave.set(x.chave, x); });
+      // preserva o que o sistema já anotou na nota (manifestação feita aqui, justificativa, XML baixado, compra lançada)
+      const chaves = [...porChave.keys()], atuais = {};
+      for (let i = 0; i < chaves.length; i += 40){ // em pedaços, para o endereço não ficar grande demais
+        const rows = await sb('/rest/v1/docs?select=path,data&path=in.(' + chaves.slice(i, i + 40).map(c => encodeURIComponent('"' + base + c + '"')).join(',') + ')');
+        (rows || []).forEach(r => { atuais[r.path] = r.data; });
+      }
+      const docs = chaves.map(c => { const novo = porChave.get(c), velho = atuais[base + c] || {};
+        const data = { ...velho, ...novo };
+        // manifestação feita pelo sistema vale até a Focus confirmar outra
+        if (velho.manifestado_em && (!novo.manifestacao || novo.manifestacao === 'nulo')) data.manifestacao = velho.manifestacao;
+        return { path:base + c, data }; });
       await putDocs(docs, u.id); gravadas += docs.length;
       const max = Math.max(versao, Number(r.headers.get('x-max-version')) || 0, ...lista.map(x => Number(x.versao) || 0));
       if (!lista.length || max <= versao){ versao = max; break; }
