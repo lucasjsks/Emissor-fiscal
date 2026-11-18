@@ -251,6 +251,7 @@ nav .nav-brand,nav .nav-sec{display:none}
 .fin-d span{font-size:12px;color:#6b7686;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fin-r{display:flex;align-items:center;gap:8px;flex:0 0 auto}.fin-r .btn.sm{padding:5px 10px;font-size:12px;min-height:0}.fin-r b{font-size:14px}
 @media(max-width:600px){.fin-r{flex-direction:column;align-items:flex-end;gap:3px}}
+.nt-l{cursor:pointer}.nt-l:hover{background:#f7f9fc}.nt-l .fin-r .tag{min-width:78px;text-align:center}
 /* olho para ver a senha */
 .senha-wrap{position:relative}.senha-wrap input{padding-right:46px}
 .olho{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7686;border-radius:8px;padding:0}
@@ -1044,10 +1045,10 @@ function vNotas(){
   <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="ntBusca">Buscar</label><input id="ntBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.ntBusca || '')}" autocomplete="off"></div>
     <div style="flex:1 1 150px"><label for="ntMes">Mês</label><select id="ntMes" ${q || urgente ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
   ${q ? '<p class="small" style="margin:-4px 0 8px">Buscando em todos os meses.</p>' : ''}
-  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="list">${lista.slice(0, lim).map(n => `
-    <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${nome(n)} nº ${n.numero} <span class="small">série ${n.serie}</span></div>
-      <div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}${n.corrige ? ` · substitui nº ${cadeiaCorrecao(n).map(x => x.numero).join(', ')}` : ''}</div></div>
-      <div style="text-align:right"><div class="num"><b>${brl(n.total)}</b></div>${tag(n)}</div></div>`).join('')}</div>`
+  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="fin-lista">${lista.slice(0, lim).map(n => `
+    <div class="fin-l nt-l" data-act="verNota" data-id="${esc(n.id)}"><div class="fin-v">${(n.data || '').slice(8, 10)}/${(n.data || '').slice(5, 7)}<small>${(n.data || '').slice(11, 16)}</small></div>
+      <div class="fin-d"><b>${nome(n)} nº ${n.numero} <span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span></b><span>${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}${n.corrige ? ` · substitui nº ${cadeiaCorrecao(n).map(x => x.numero).join(', ')}` : ''}</span></div>
+      <div class="fin-r"><b class="num">${brl(n.total)}</b>${tag(n)}</div></div>`).join('')}</div>`
     : `<div class="empty">Nenhuma nota ${q ? 'encontrada' : mes && !urgente ? 'neste mês' : 'por aqui'}.</div>`}
     ${lista.length > lim ? `<div class="actions"><button class="btn" data-act="ntMais">Mostrar mais ${Math.min(30, lista.length - lim)}</button></div>` : ''}</div>
   ${testes || S.ntTestes ? `<p class="small" style="text-align:center"><u data-act="ntTestes" style="cursor:pointer">${S.ntTestes ? 'Voltar para as notas de produção' : `Ver as ${testes} nota(s) de teste (homologação)`}</u></p>` : ''}
