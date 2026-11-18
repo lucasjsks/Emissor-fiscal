@@ -231,6 +231,16 @@ test('reenvio de nota rejeitada usa o mesmo número e a mesma referência', asyn
   assert.equal(docs['empresas/E1/notas/R1'].tentativas[0].cod, '225');
 });
 
+test('rejeição que só cita duplicidade de outra coisa mantém o número; só duplicidade de numeração troca', async () => {
+  const { numeroPerdido } = await import('../api/emitir.js');
+  assert.equal(numeroPerdido({ focus:{ status_sefaz:'780', mensagem_sefaz:'Rejeição: Duplicidade de item' } }), false);
+  assert.equal(numeroPerdido({ focus:{ status_sefaz:'225', mensagem_sefaz:'Falha no Schema XML (denegação)' } }), false);
+  assert.equal(numeroPerdido({ focus:{ status_sefaz:'204', mensagem_sefaz:'Duplicidade de NF-e' } }), true);
+  assert.equal(numeroPerdido({ focus:{ status_sefaz:'539' } }), true);
+  assert.equal(numeroPerdido({ focus:{ mensagem_sefaz:'Rejeicao: Duplicidade de NF-e [chave: 2226...]' } }), true);
+  assert.equal(numeroPerdido({ focus:{ mensagem:'Erro de validação' } }), false);
+});
+
 test('reenvio após duplicidade (539) sai com número novo e marca a antiga', async () => {
   docs['empresas/E1/notas/R2'] = { id:'R2', ref:'R2', modelo:'55', numero:1, serie:'2', status:'rejeitada', ambiente:'homologacao', focus:{ status_sefaz:'539', mensagem_sefaz:'Duplicidade de NF-e' } };
   focusResp = m => m === 'GET' ? { status:200, body:{ status:'erro_autorizacao' } } : { status:201, body:{ status:'autorizado' } };
