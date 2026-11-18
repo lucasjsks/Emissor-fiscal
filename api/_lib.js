@@ -65,7 +65,7 @@ export function resumoFocus(r = {}){
   const o = {};
   ['status','status_sefaz','mensagem_sefaz','chave_nfe','numero','serie','protocolo','caminho_xml_nota_fiscal','caminho_danfe',
    'qrcode_url','url_consulta_nf','data_autorizacao','mensagem','codigo','erros',
-   'caminho_xml_carta_correcao','caminho_pdf_carta_correcao','numero_carta_correcao'].forEach(k => { if (r[k] !== undefined) o[k] = r[k]; });
+   'caminho_xml_carta_correcao','caminho_pdf_carta_correcao','numero_carta_correcao','caminho_xml_cancelamento','caminho_xml'].forEach(k => { if (r[k] !== undefined) o[k] = r[k]; });
   return o;
 }
 
