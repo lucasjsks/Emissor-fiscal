@@ -1078,12 +1078,7 @@ function vProdutos(){
     <div class="s">${p.codigo ? 'cód. ' + esc(p.codigo) + ' · ' : ''}NCM ${fmtNcm(p.ncm)}${temSaldo(p) ? ` · custo médio ${brl(p.custo_medio || 0)}` : ''}${num(p.estoque_min) > 0 ? ' · mín. ' + qtdTxt(p.estoque_min) : ''} ${tag(v)}</div></div>
     <div style="text-align:right;min-width:92px"><b class="num">${brl(p.preco)}</b><br><span class="num" style="color:${cor(p)};font-weight:600">${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</span> <span class="small">${esc(p.unidade || 'UN')}</span></div></div>`).join('')}</div>`
     : `<div class="empty">${V.length ? 'Nenhum produto neste filtro.' : 'Nenhum produto cadastrado. Cadastre aqui ou importe uma nota de compra na aba Compras.'}</div>`}</div>
-  <p class="small">Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.</p>
-  <details class="card"><summary style="cursor:pointer;font-weight:600">Tabela NCM e conferência fiscal</summary>
-    <p class="small">${S.ncmMap ? `Tabela NCM carregada: ${(m.total || ncmFull().length).toLocaleString('pt-BR')} códigos${m.data ? ' · atualização ' + esc(m.data) : ''}.` : 'Tabela NCM ainda não importada. Por enquanto valem as regras de formato, capítulo, descrição, monofásico e IBS/CBS.'}</p>
-    ${pode('ncm') ? `<button class="btn" data-act="importarNcm">${S.ncmMap ? 'Atualizar tabela NCM' : 'Importar tabela NCM oficial'}</button>` : ''}
-    ${S.ncmMap ? `<label for="ncmBusca">Consultar NCM por código ou descrição</label><input id="ncmBusca" autocomplete="off" placeholder="Ex.: 1006 ou arroz parboilizado" value="${esc(S.ncmQ)}"><div class="results" id="ncmRes">${ncmBuscaHtml(S.ncmQ)}</div>` : ''}
-  </details>`;
+  <p class="small">Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.</p>`;
 }
 function vClientes(){
   const cs = [...S.clientes].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
