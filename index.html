@@ -325,6 +325,19 @@ body.pdv{background:#e9eef5}
 .nfe-grid .fin-l{padding:5px 4px}
 .nfe-grid .empty{padding:10px}
 .nfe-topo{margin:0 0 4px}.nfe-topo+h2{margin:0 0 8px;font-size:20px}
+/* Cadastro de produto compacto (pedido do Lucas) */
+#mbox.compacto{padding-top:14px;padding-bottom:14px}
+#mbox.compacto .mhead{margin-bottom:4px}
+#mbox.compacto h3{margin:12px 0 2px;font-size:15px}
+#mbox.compacto label{margin:5px 0 3px;font-size:12px}
+#mbox.compacto label.chk{margin:8px 0 2px;font-size:13px}
+#mbox.compacto input,#mbox.compacto select,#mbox.compacto textarea{padding:6px 10px;font-size:14px;border-radius:9px}
+#mbox.compacto select{padding-right:30px}
+#mbox.compacto .row{gap:8px}
+#mbox.compacto .row>div{flex:1 1 120px}
+#mbox.compacto .small,#mbox.compacto p.small{font-size:11.5px;margin:3px 0 0}
+#mbox.compacto .btn{padding:8px 12px;font-size:13.5px}
+#mbox.compacto .actions{margin-top:10px}
 </style>
 </head>
 <body>
@@ -1232,7 +1245,7 @@ function vEmpresa(){
 }
 
 /* ================== formulários (modal) ================== */
-function openModal(html){ $('#mbox').innerHTML = html; $('#modal').classList.add('on'); }
+function openModal(html){ $('#mbox').classList.remove('compacto'); $('#mbox').innerHTML = html; $('#modal').classList.add('on'); }
 function closeModal(){ $('#modal').classList.remove('on'); $('#mbox').innerHTML = ''; if (S.tab === 'venda' && typeof ponteiroFino === 'function' && ponteiroFino()) setTimeout(() => { const b = $('#busca'); if (b) b.focus(); }, 30); }
 const fld = (id, label, v, extra = '') => `<div><label for="${id}">${label}</label><input id="${id}" value="${esc(v ?? '')}" ${extra}></div>`;
 const sel = (id, label, v, opts) => `<div><label for="${id}">${label}</label><select id="${id}">${opts.map(([c, t]) => `<option value="${esc(c)}" ${String(v) === String(c) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
@@ -1284,8 +1297,7 @@ function formProduto(p){
   p = p || { unidade:'UN', origem:'0', cfop:'5102', cst_csosn:simples ? '102' : '00', pis_cst:simples ? '49' : '01', cofins_cst:simples ? '49' : '01', pis_aliq:'0', cofins_aliq:'0', icms_aliq:simples ? '0' : '20,5', cst_ibscbs:'000', cclasstrib:'000001', gtin:'SEM GTIN' };
   openModal(`${mhead(p.id ? 'Editar produto' : 'Novo produto')}
   ${fld('pDesc','Descrição *',p.descricao)}
-  <div class="row">${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
-  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}</div>
+  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
   <label class="chk"><input type="checkbox" id="pFav" ${p.favorito ? 'checked' : ''}> Mostrar como atalho no cupom (botão de toque rápido)</label>
   <p class="small">Produto vendido na balança: o <b>Código interno</b> deve ser o mesmo código cadastrado na balança.</p>
   <h3>Tributação</h3>
@@ -1302,6 +1314,7 @@ function formProduto(p){
   <h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>
   <div id="errM"></div>
   <div class="actions">${p.id ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
+  $('#mbox').classList.add('compacto'); // cadastro de produto mais junto (pedido do Lucas)
 }
 async function salvarProd(id, force){
   const o = { descricao:val('pDesc').toUpperCase(), codigo:val('pCod'), gtin:val('pGtin') || 'SEM GTIN', preco:numIn(val('pPreco')), unidade:(val('pUn') || 'UN').toUpperCase(),
