@@ -508,9 +508,7 @@ function validarProduto(p, e){
   if (!simples && cst && !CST_OK.includes(cst)) E(`CST ICMS ${cst} não existe para regime normal.`);
   const st = simples ? ['201','202','203','500'].includes(cst) : ['10','30','60','70'].includes(cst);
   if (cest && cest.length !== 7) E('CEST deve ter 7 dígitos.');
-  // ST sem CEST é aceito (decisão do Lucas): só avisa, porque a SEFAZ pode rejeitar (806) se o item estiver na tabela de CEST
-  if (st && !cest) A(`Produto com substituição tributária (${simples ? 'CSOSN' : 'CST'} ${cst}) sem CEST. Se a mercadoria estiver na tabela de CEST, a SEFAZ pode rejeitar a nota.`);
-  if (cest && !st) A(`CEST informado, mas o ${simples ? 'CSOSN' : 'CST'} ${cst || '—'} não indica substituição tributária.`);
+  // avisos de CEST (ST sem CEST, CEST sem ST) retirados a pedido do Lucas; se vier rejeição 806, o REJ orienta
   if (st && cst !== '500'){
     if (!(num(p.st_mva) > 0) || !(num(p.st_aliq) > 0)) A('Para calcular o ICMS-ST como substituto, informe a MVA e a alíquota interna ST.');
     else if (!(num(p.icms_aliq) > 0)) A('Informe a alíquota de ICMS própria para deduzir do ICMS-ST.');
@@ -521,8 +519,7 @@ function validarProduto(p, e){
     if (simples) I('NCM pode ter PIS/COFINS monofásico: segregue essa receita no PGDAS-D.');
     else if (p.pis_cst !== '04' || p.cofins_cst !== '04') A('NCM pode ter PIS/COFINS monofásico (na revenda, normalmente CST 04). Confira.');
   }
-  if (ncm.length === 8 && CESTA.some(x => ncm.startsWith(x)) && (p.cst_ibscbs || '000') === '000')
-    A('NCM pode estar na Cesta Básica Nacional (alíquota zero de IBS/CBS, Anexo I da LC 214/2025), mas o CST IBS/CBS está como tributação integral (000). Confira o CST e o cClassTrib.');
+  // aviso de NCM da Cesta Básica Nacional retirado a pedido do Lucas
   if (p.gtin && p.gtin !== 'SEM GTIN' && !gtinOk(p.gtin)) E('Código de barras (GTIN) com dígito verificador inválido.');
   if (!(num(p.preco) > 0)) E('Informe o preço de venda.');
   return out;
@@ -1097,7 +1094,7 @@ function vProdutos(){
     : `<div class="empty">${V.length ? 'Nenhum produto neste filtro.' : 'Nenhum produto cadastrado. Cadastre aqui ou importe uma nota de compra na aba Compras.'}</div>`}</div>
   <p class="small">Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.</p>
   <details class="card"><summary style="cursor:pointer;font-weight:600">Tabela NCM e conferência fiscal</summary>
-    <p class="small">${S.ncmMap ? `Tabela NCM carregada: ${(m.total || ncmFull().length).toLocaleString('pt-BR')} códigos${m.data ? ' · atualização ' + esc(m.data) : ''}.` : 'Tabela NCM ainda não importada. Por enquanto valem as regras de formato, capítulo, descrição, ST × CEST, monofásico e IBS/CBS.'}</p>
+    <p class="small">${S.ncmMap ? `Tabela NCM carregada: ${(m.total || ncmFull().length).toLocaleString('pt-BR')} códigos${m.data ? ' · atualização ' + esc(m.data) : ''}.` : 'Tabela NCM ainda não importada. Por enquanto valem as regras de formato, capítulo, descrição, monofásico e IBS/CBS.'}</p>
     ${pode('ncm') ? `<button class="btn" data-act="importarNcm">${S.ncmMap ? 'Atualizar tabela NCM' : 'Importar tabela NCM oficial'}</button>` : ''}
     ${S.ncmMap ? `<label for="ncmBusca">Consultar NCM por código ou descrição</label><input id="ncmBusca" autocomplete="off" placeholder="Ex.: 1006 ou arroz parboilizado" value="${esc(S.ncmQ)}"><div class="results" id="ncmRes">${ncmBuscaHtml(S.ncmQ)}</div>` : ''}
   </details>`;
