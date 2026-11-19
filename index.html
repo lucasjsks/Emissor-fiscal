@@ -804,7 +804,7 @@ function render(){
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
   } else if (S.pdv && S.tab === 'venda') m.innerHTML = vPdv();
-  else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfe, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, financeiro:vFinanceiro, empresa:vEmpresa })[S.tab]();
+  else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfeTab, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, financeiro:vFinanceiro, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -1005,6 +1005,32 @@ function nfiOk(){
 }
 
 /* ---------- NF-e ---------- */
+// aba NF-e: abre na lista das NF-e emitidas; o formulário só aparece em "Nova NF-e" (ou ao continuar/corrigir/devolver)
+function vNfeTab(){ return S.nfeForm ? vNfe() : vNfeLista(); }
+function vNfeLista(){
+  const mes = S.nfMes === undefined ? isoNow().slice(0, 7) : S.nfMes, q = (S.nfBusca || '').trim().toLowerCase(), qd = dig(q), lim = S.nfLim || 30;
+  const todas = S.notas.filter(n => n.modelo === '55' && !n.corrigida_por && daAmb(n));
+  const lista = todas.filter(n => q ? (String(n.numero) === q || (n.destNome || '').toLowerCase().includes(q) || (qd.length >= 4 && (dig(n.destDoc || '').includes(qd) || dig(n.chave || '').includes(qd))))
+      : (!mes || (n.data || '').slice(0, 7) === mes)).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  const tot = lista.filter(n => notaValida(n) && (n.op || 'venda') === 'venda').reduce((s, n) => s + (n.total || 0), 0);
+  const nome = n => n.op === 'dev_venda' ? 'Devolução de venda' : n.op === 'dev_compra' ? 'Devolução de compra' : 'NF-e';
+  const tag = n => n.status === 'cancelada' ? '<span class="tag b">cancelada</span>' : (n.devolucoes || []).length ? '<span class="tag w">devolvida</span>' : tagStatus(n);
+  const meses = [...new Set([isoNow().slice(0, 7), ...todas.map(n => (n.data || '').slice(0, 7)).filter(Boolean)])].sort().reverse();
+  const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
+  const f = S.nfe, emAndamento = f && (f.itens.length || f.clienteId);
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">NF-e emitidas</h2>${pode('emitir') ? '<button class="btn pri" data-act="nfeNova" style="flex:0 0 auto">+ Nova NF-e</button>' : ''}</div>
+  ${emAndamento ? `<div class="card" style="border-color:#f1d9a6;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>NF-e em andamento</b><div class="small">${f.op !== 'venda' ? (f.op === 'dev_venda' ? 'Devolução de venda · ' : 'Devolução de compra · ') : ''}${esc((S.clientes.find(c => c.id === f.clienteId) || {}).nome || 'sem destinatário')} · ${f.itens.length} produto(s)${f.reenviar ? ' · correção de nota rejeitada' : ''}</div></div>
+    <button class="btn pri" data-act="nfeContinuar">Continuar</button><button class="btn bad" data-act="nfeDescartar">Descartar</button></div>` : ''}
+  <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="nfBusca">Buscar</label><input id="nfBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.nfBusca || '')}" autocomplete="off"></div>
+    <div style="flex:1 1 150px"><label for="nfMes">Mês</label><select id="nfMes" ${q ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
+  ${q ? '<p class="small" style="margin:-4px 0 8px">Buscando em todos os meses.</p>' : ''}
+  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} NF-e · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="fin-lista">${lista.slice(0, lim).map(n => `
+    <div class="fin-l nt-l" data-act="verNota" data-id="${esc(n.id)}"><div class="fin-v">${(n.data || '').slice(8, 10)}/${(n.data || '').slice(5, 7)}<small>${(n.data || '').slice(11, 16)}</small></div>
+      <div class="fin-d"><b>${nome(n)} nº ${n.numero} <span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span></b><span>${esc(n.destNome || '—')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</span></div>
+      <div class="fin-r"><b class="num">${brl(n.total)}</b>${tag(n)}</div></div>`).join('')}</div>`
+    : `<div class="empty">${q ? 'Nenhuma NF-e encontrada.' : todas.length ? 'Nenhuma NF-e neste mês. Escolha outro mês ou "Todos os meses".' : 'Nenhuma NF-e emitida ainda. Clique em "+ Nova NF-e".'}</div>`}
+    ${lista.length > lim ? `<div class="actions"><button class="btn" data-act="nfMais">Mostrar mais ${Math.min(30, lista.length - lim)}</button></div>` : ''}</div>`;
+}
 function vNfe(){
   const n = S.nfe, { e, cli, inter, precisaDifal } = nfeCtx(), L = nfeLinhas(), T = totais(L), simples = String(e.regime) !== '3';
   const ti = [['9','9 - Sem frete'],['0','0 - Por conta do emitente (CIF)'],['1','1 - Por conta do destinatário (FOB)'],['2','2 - Por conta de terceiros'],['3','3 - Próprio, por conta do emitente'],['4','4 - Próprio, por conta do destinatário']];
@@ -1012,7 +1038,7 @@ function vNfe(){
   const sec = (num, tit, corpo, extra = '') => `<div class="card nfe-sec"><h3 class="nfe-h"><span>${num}</span>${tit}${extra}</h3>${corpo}</div>`;
   const nf = (path, rot, v, attrs = '') => `<div><label>${rot}</label><input data-nf="${path}" value="${esc(v ?? '')}" ${attrs}></div>`;
   const tr = n.transp, vo = n.vol, dup = r2(n.dups.reduce((a, d) => a + numIn(d.valor), 0)), transps = (e.transportadoras || []);
-  return `<h2>NF-e (modelo 55)${n.op !== 'venda' ? ' — <span style="color:var(--warn)">' + (n.op === 'dev_venda' ? 'devolução de venda' : 'devolução de compra') + '</span>' : ''}</h2>${bannerCorrecao(n.reenviar, 'limparNfe')}
+  return `<div class="actions" style="margin:0 0 6px"><button class="btn sm" data-act="nfeLista">← Voltar para as NF-e emitidas</button></div><h2>NF-e (modelo 55)${n.op !== 'venda' ? ' — <span style="color:var(--warn)">' + (n.op === 'dev_venda' ? 'devolução de venda' : 'devolução de compra') + '</span>' : ''}</h2>${bannerCorrecao(n.reenviar, 'limparNfe')}
   <div class="grid2 nfe-grid"><div>
   ${sec(1, 'Dados da nota', `<div class="row"><div><label for="nfeOp">Tipo de operação</label><select id="nfeOp">${OPS.map(([c, t]) => `<option value="${c}" ${n.op === c ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
       <div><label for="nfeNat">Natureza da operação</label><input id="nfeNat" value="${esc(n.natureza)}"></div>
@@ -1477,7 +1503,7 @@ async function emitirNfe(){
     const ee = clone(emp()); ee.transportadoras = [...(ee.transportadoras || []), { nome:tr.nome.toUpperCase(), doc:trDoc, ie:dig(tr.ie), end:tr.end, mun:tr.mun, uf:tr.uf.toUpperCase(), placa:tr.placa.toUpperCase(), veicUf:tr.veicUf.toUpperCase(), rntc:tr.rntc }].slice(-30);
     put('empresas', ee).catch(() => {});
   }
-  S.nfe = nfeVazia(); S.buscaNfe = '';
+  S.nfe = nfeVazia(); S.buscaNfe = ''; S.nfeForm = false;
   render(); verNota(res.nota);
 }
 /* ---------- QR Code (gerador próprio, sem bibliotecas) para o cupom NFC-e ---------- */
@@ -1714,7 +1740,7 @@ function devolver(id){
   nf.itens = n.itens.map(i => { const p = (i.pid && S.produtos.find(x => x.id === i.pid)) || S.produtos.find(x => x.descricao === i.d);
     return p ? { pid:p.id, qtd:i.q, preco:i.v, desc:i.desc ? String(i.desc).replace('.', ',') : '' } : null; }).filter(Boolean);
   if (cli) { const e = emp(); const cfg = e.difal_uf && e.difal_uf[cli.uf]; if (cfg) nf.difal = { aliq:String(cfg.aliq), fcp:String(cfg.fcp || ''), metodo:cfg.metodo }; }
-  S.nfe = nf; S.tab = 'nfe'; closeModal(); render(); window.scrollTo(0, 0);
+  S.nfe = nf; S.nfeForm = true; S.tab = 'nfe'; closeModal(); render(); window.scrollTo(0, 0);
   toast(cli ? 'Confira as quantidades devolvidas antes de emitir.' : 'Selecione ou cadastre o cliente que está devolvendo.');
 }
 
@@ -2643,7 +2669,7 @@ function corrigirNota(id){
         ...(n.compra_id ? { compraId:n.compra_id, devItens:n.dev_itens } : {}) };
       if (!cli) toast('O cliente desta nota não está mais no cadastro: escolha o destinatário de novo.');
     }
-    nf.itens = nf.itens.filter(i => existe(i.pid)); nf.saida = ''; nf.reenviar = n.id; S.nfe = nf; S.buscaNfe = ''; S.tab = 'nfe';
+    nf.itens = nf.itens.filter(i => existe(i.pid)); nf.saida = ''; nf.reenviar = n.id; S.nfe = nf; S.nfeForm = true; S.buscaNfe = ''; S.tab = 'nfe';
   }
   closeModal(); render(); window.scrollTo(0, 0);
   if (faltam.length) toast('Produto(s) que não existem mais no cadastro ficaram de fora: ' + faltam.join(', '));
@@ -3479,7 +3505,7 @@ async function emitirDevCompra(btn){
           // impostos da nota de compra, na proporção devolvida (editáveis na tela da NF-e)
           dev:{ cst:'', bc:vicms > 0 ? rs(num(it.vBC) * k) : '', aliq:vicms > 0 ? pc(num(it.pICMS)) : '', icms:rs(vicms),
             bcst:vst > 0 ? rs(num(it.vBCST) * k) : '', aliqst:'', st:rs(vst), ipi:rs(l.vipi), pdev:pc(k * 100) } }; }) });
-    S.nfe = nf; S.tab = 'nfe'; closeModal(); render(); window.scrollTo(0, 0);
+    S.nfe = nf; S.nfeForm = true; S.tab = 'nfe'; closeModal(); render(); window.scrollTo(0, 0);
     toast(`Confira os impostos da devolução e clique em Emitir.${simples ? ' Com ICMS destacado sai com CSOSN 900.' : ''}`);
   } catch(err){ $('#errN').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; btn.disabled = false; }
 }
@@ -3942,7 +3968,7 @@ function vInicio(){
   const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
   const tk = H.v.length ? r2(H.total / H.v.length) : 0;
   return `${bannerCertificado()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
-  <div class="ini-acoes">${pode('emitir') ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe"><b>＋</b>Nova NF-e</button>' : ''}
+  <div class="ini-acoes">${pode('emitir') ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe" data-nfnova="1"><b>＋</b>Nova NF-e</button>' : ''}
     ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
   <div class="grid2"><div>
     <div class="card"><div class="small">Vendas de hoje</div>
@@ -4227,7 +4253,7 @@ let cliqueNoFundo = false;
 document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
-  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); perguntarPdvSePreciso(); return; }
+  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } if (t.dataset.tab === 'nfe') S.nfeForm = !!t.dataset.nfnova; S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); perguntarPdvSePreciso(); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
@@ -4296,6 +4322,11 @@ document.addEventListener('click', async ev => {
     case 'nfiOk': nfiOk(); break;
     case 'nfeCfopAuto': if (t.dataset.i !== undefined) delete S.nfe.itens[+t.dataset.i].cfopMan; else S.nfe.cfopMan = ''; render(); break;
     case 'limparNfe': S.nfe = nfeVazia(); render(); break;
+    case 'nfMais': S.nfLim = (S.nfLim || 30) + 30; render(); break;
+    case 'nfeNova': S.nfe = nfeVazia(); S.nfeForm = true; render(); window.scrollTo(0, 0); break;
+    case 'nfeContinuar': S.nfeForm = true; render(); window.scrollTo(0, 0); break;
+    case 'nfeLista': S.nfeForm = false; render(); window.scrollTo(0, 0); break;
+    case 'nfeDescartar': S.nfe = nfeVazia(); render(); break;
     case 'nfeCond': S.nfe.cond = t.dataset.v; if (t.dataset.v === 'prazo' && S.nfe.pag !== '15' && S.nfe.pag !== '05') S.nfe.pag = '15'; render(); break;
     case 'nfeAddDup': S.nfe.dups.push({ n:String(S.nfe.dups.length + 1).padStart(3, '0'), venc:isoNow().slice(0, 10), valor:'' }); render(); break;
     case 'nfeRemDup': S.nfe.dups.splice(+t.dataset.i, 1); render(); break;
@@ -4353,6 +4384,7 @@ document.addEventListener('input', ev => {
   const t = ev.target; if (inputV4(t)) return; if (autoPreencher(t)) return; if (inputEstoque(t)) return; if (inputFin(t)) return;
   if (t.id === 'busca'){ S.busca = t.value; $('#resV').innerHTML = resultadosHtml(separarMult(S.busca).q, 'addCart'); }
   else if (t.id === 'ntBusca'){ S.ntBusca = t.value; S.ntLim = 30; render(); }
+  else if (t.id === 'nfBusca'){ S.nfBusca = t.value; S.nfLim = 30; render(); }
   else if (t.id === 'buscaNfe'){ S.buscaNfe = t.value; $('#resN').innerHTML = resultadosHtml(S.buscaNfe, 'addNfe'); }
   else if (t.dataset.pv !== undefined){ S.pags[+t.dataset.pv].valor = t.value; }
   else if (t.id === 'descTot'){ S.descTotal.v = t.value; }
@@ -4394,6 +4426,7 @@ document.addEventListener('change', ev => {
   else if (t.dataset.pv !== undefined || ['descTot','nDescTot','nFrete','nSeguro','nOutras','dfAliq','dfFcp'].includes(t.id) || t.dataset.nd !== undefined){ later(); }
   else if (t.id === 'relIni' || t.id === 'relFim'){ if (t.value){ S[t.id] = t.value; S.relLim = 30; render(); } }
   else if (t.id === 'ntMes'){ S.ntMes = t.value; S.ntLim = 30; render(); }
+  else if (t.id === 'nfMes'){ S.nfMes = t.value; S.nfLim = 30; render(); }
   else if (t.id === 'dfMet'){ S.nfe.difal.metodo = t.value; render(); }
   else if (t.id === 'nfeCli'){ selCliente(t.value); }
   else if (t.dataset.papel !== undefined){ if (!pode('usuarios')) return; safe(() => db.collection('usuarios').doc(t.dataset.papel).update({ papel:t.value }), 'Papel alterado.'); }
