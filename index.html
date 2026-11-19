@@ -251,6 +251,7 @@ nav .nav-brand,nav .nav-sec{display:none}
 .fin-d span{font-size:12px;color:#6b7686;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fin-r{display:flex;align-items:center;gap:8px;flex:0 0 auto}.fin-r .btn.sm{padding:5px 10px;font-size:12px;min-height:0}.fin-r b{font-size:14px}
 @media(max-width:600px){.fin-r{flex-direction:column;align-items:flex-end;gap:3px}}
+.tag.g{background:#d7f3e1;color:#146c37}.cp-ok .fin-v,.cp-ok .fin-v small{color:#146c37}.cp-ag .fin-v,.cp-ag .fin-v small{color:var(--warn)}
 .nt-l{cursor:pointer}.nt-l:hover{background:#f7f9fc}.nt-l .fin-r .tag{min-width:78px;text-align:center}
 .pdv-esc{display:flex;flex-direction:column;gap:8px;margin:10px 0}.pdv-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:14px 16px;border:1px solid #dfe5ee;border-radius:12px;background:#fff;cursor:pointer;font:inherit}
 .pdv-op b{font-size:17px}.pdv-op span{font-size:13px;color:#6b7686}.pdv-op:hover{border-color:var(--brand)}.pdv-op.on{border-color:var(--brand);background:var(--brand-soft)}
@@ -2762,38 +2763,54 @@ function parseCompraXml(txt){
 
 /* ---------- aba Compras ---------- */
 function vCompras(){
-  const v = S.cpView || 'notas';
-  const nPend = S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave)).length;
-  if (v === 'recebidas' && pode('produto') && !S.recAuto){ S.recAuto = true; const m = (emp() || {}).mde || {};
+  // uma lista só: as compras lançadas e as notas que a SEFAZ trouxe e ainda aguardam o aceite (busca automática)
+  if (S.cpView === 'recebidas'){ S.cpView = 'notas'; S.cpSit = 'aguardando'; } // atalho do aviso no Início
+  if (pode('produto') && !S.recAuto){ S.recAuto = true; const m = (emp() || {}).mde || {};
     if (!m.sinc_em || Date.now() - new Date(m.sinc_em) > 15 * 60e3) setTimeout(() => recBuscar(null, true), 50); }
-  return `<h2>Compras</h2><div class="seg" style="margin-bottom:12px">${[['notas','Notas de compra'], ...(pode('produto') ? [['recebidas', `Recebidas da SEFAZ${nPend ? ` (${nPend})` : ''}`]] : [])].map(([k, l]) => `<button data-act="cpView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
-    + (v === 'recebidas' ? vRecebidas() : vNotasCompra());
+  return `<h2>Compras</h2>` + vNotasCompra();
 }
 function vNotasCompra(){
   // lista curta: mês atual por padrão (a busca procura em todos os meses), estornadas à parte e 30 por vez
-  const q = norm(S.cpBusca || ''), mes = S.cpMes === null || S.cpMes === undefined ? isoNow().slice(0, 7) : S.cpMes, sit = S.cpSit || 'ativas';
+  const q = norm(S.cpBusca || ''), mes = S.cpMes === null || S.cpMes === undefined ? isoNow().slice(0, 7) : S.cpMes, sit = S.cpSit || 'principal';
+  const verRec = pode('produto'), achaR = r => norm(r.emitente_nome).includes(q) || (dig(q).length >= 4 && (r.emitente_doc.includes(dig(q)) || r.chave.includes(dig(q)))) || String(+r.chave.slice(25, 34)) === (S.cpBusca || '').trim();
+  // aguardando aceite aparecem sempre (de qualquer mês), porque pedem uma resposta
+  const ag = verRec ? S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave) && (!q || achaR(r))) : [];
+  // confirmadas sem dar entrada no estoque (uso e consumo): contam como aceitas, no mês delas
+  const aceitas = verRec ? S.recebidas.filter(r => r.manifestacao === 'confirmacao' && r.situacao !== 'cancelada' && !compraDaChave(r.chave) && (q ? achaR(r) : !mes || String(r.data_emissao || '').slice(0, 7) === mes)) : [];
+  const recus = verRec ? S.recebidas.filter(r => ['desconhecimento','nao_realizada'].includes(r.manifestacao) && !compraDaChave(r.chave) && (!q || achaR(r))) : [];
   let L = [...S.compras].sort((a, b) => String(b.data_emissao || '').localeCompare(String(a.data_emissao || '')) || String(b.lancado_em || '').localeCompare(String(a.lancado_em || '')));
   if (q) L = L.filter(c => norm(c.fornecedor_nome).includes(q) || String(c.numero || '') === (S.cpBusca || '').trim() || (dig(q).length >= 4 && (dig(c.fornecedor_cnpj).includes(dig(q)) || dig(c.chave || '').includes(dig(q)))));
   else if (mes) L = L.filter(c => String(c.data_emissao || '').slice(0, 7) === mes);
   const val = L.filter(c => c.status !== 'estornada'), tot = r2(val.reduce((a, c) => a + num(c.total_nota), 0)), nEst = L.length - val.length;
   const nDev = val.filter(c => situacaoDev(c)).length;
-  L = sit === 'estornadas' ? L.filter(c => c.status === 'estornada') : sit === 'devolvidas' ? val.filter(c => situacaoDev(c)) : sit === 'todas' ? L : val;
+  const nDev2 = nDev;
+  L = sit === 'estornadas' ? L.filter(c => c.status === 'estornada') : sit === 'devolvidas' ? val.filter(c => situacaoDev(c)) : sit === 'aguardando' || sit === 'recusadas' ? [] : val;
+  const R = sit === 'principal' ? [...ag, ...aceitas] : sit === 'aguardando' ? ag : sit === 'ativas' ? aceitas : sit === 'recusadas' ? recus : [];
+  L = [...R.map(r => ({ rec:r, d:String(r.data_emissao || '') })), ...L.map(c => ({ c, d:String(c.data_emissao || '') }))]
+    .sort((a, b) => (b.rec && recPendente(b.rec) ? 1 : 0) - (a.rec && recPendente(a.rec) ? 1 : 0) || b.d.localeCompare(a.d));
   const meses = [...new Set([isoNow().slice(0, 7), ...S.compras.map(c => String(c.data_emissao || '').slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m))])].sort().reverse();
   const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
   const total = L.length, lim = S.cpLim || 30, mais = L.length - lim; L = L.slice(0, lim);
   const tagC = c => { if (c.status === 'estornada') return '<span class="tag b">estornada</span>'; const d = situacaoDev(c);
-    return d === 'total' ? '<span class="tag w">devolvida</span>' : d === 'parcial' ? '<span class="tag w">devolução parcial</span>' : '<span class="tag">lançada</span>'; };
+    return d === 'total' ? '<span class="tag w">devolvida</span>' : d === 'parcial' ? '<span class="tag w">devolução parcial</span>' : '<span class="tag g">✓ lançada</span>'; };
+  const dt = d => `<div class="fin-v">${d.slice(8, 10)}/${d.slice(5, 7)}<small>${d.slice(0, 4)}</small></div>`;
+  const linhaRec = r => { const pend = recPendente(r), aceita = r.manifestacao === 'confirmacao';
+    return `<div class="fin-l nt-l ${pend ? 'cp-ag' : aceita ? 'cp-ok' : ''}" data-act="verRecebida" data-id="${esc(r.chave)}">${dt(String(r.data_emissao || ''))}
+      <div class="fin-d"><b>${esc(r.emitente_nome || fmtDoc(r.emitente_doc))} <span style="font-weight:400;color:#7a8597;font-size:12px">nº ${+r.chave.slice(25, 34)}</span></b><span>${fmtDoc(r.emitente_doc)} · chegou da SEFAZ${pend && prazoRec(r) > 7 ? ` · <b style="color:var(--warn)">há ${prazoRec(r)} dias</b>` : ''}</span></div>
+      <div class="fin-r"><b class="num">${brl(r.valor || 0)}</b>${pend ? '<span class="tag w">aguardando aceite</span>' : aceita ? '<span class="tag g">✓ aceita</span>' : '<span class="tag b">recusada</span>'}</div></div>`; };
+  const linhaC = c => `<div class="fin-l nt-l ${c.status !== 'estornada' && !situacaoDev(c) ? 'cp-ok' : ''}" data-act="verCompra" data-id="${esc(c.id)}">${dt(String(c.data_emissao || ''))}
+      <div class="fin-d"><b>${esc(c.fornecedor_nome || 'Sem fornecedor')} <span style="font-weight:400;color:#7a8597;font-size:12px">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></b><span>${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</span></div>
+      <div class="fin-r"><b class="num">${brl(c.total_nota || 0)}</b>${tagC(c)}</div></div>`;
   return `${pode('produto') ? `<div class="actions" style="margin:0 0 12px"><label class="btn pri" style="flex:1">⤓ Importar XML (pode escolher vários)<input type="file" id="compraXml" accept=".xml" multiple hidden></label>
       <button class="btn" data-act="novaCompra">+ Lançar nota manualmente</button></div>` : ''}
     <div class="card"><div class="row" style="align-items:end"><div style="flex:2 1 220px"><label for="cpBusca">Buscar</label><input id="cpBusca" placeholder="Fornecedor, número, CNPJ ou chave" value="${esc(S.cpBusca || '')}" autocomplete="off"></div>
       <div style="flex:1 1 150px"><label for="cpMes">Mês de emissão</label><select id="cpMes" ${q ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
       ${q ? '<p class="small" style="margin:4px 0 0">Buscando em todos os meses.</p>' : ''}
-      <div class="stats"><div><b>${val.length}</b>notas</div><div><b>${brl(tot)}</b>em compras</div><div><b>${nEst}</b>estornadas</div></div>
-      <div class="seg" style="margin-top:8px">${[['ativas','Lançadas'],['devolvidas',`Com devolução (${nDev})`],['estornadas',`Estornadas (${nEst})`],['todas','Todas']].map(([k, l]) => `<button data-act="cpSit" data-s="${k}" class="${sit === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
-    <div class="card">${L.length ? `<div class="fin-lista">${L.map(c => `<div class="fin-l nt-l" data-act="verCompra" data-id="${esc(c.id)}"><div class="fin-v">${(c.data_emissao || '').slice(8, 10)}/${(c.data_emissao || '').slice(5, 7)}<small>${(c.data_emissao || '').slice(0, 4)}</small></div>
-      <div class="fin-d"><b>${esc(c.fornecedor_nome || 'Sem fornecedor')} <span style="font-weight:400;color:#7a8597;font-size:12px">nº ${esc(c.numero || '—')}${c.serie ? ' / ' + esc(c.serie) : ''}</span></b><span>${(c.itens || []).length} item(ns) · ${c.origem === 'xml' ? 'XML' : 'manual'}${c.tem_xml ? ' · XML guardado' : ''}</span></div>
-      <div class="fin-r"><b class="num">${brl(c.total_nota || 0)}</b>${tagC(c)}</div></div>`).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 30)} (faltam ${mais})</button></div>` : ''}${total > 30 ? `<p class="small" style="text-align:center">${total} nota(s) neste filtro</p>` : ''}`
-      : `<div class="empty">${S.compras.length ? (q ? 'Nenhuma nota encontrada.' : mes ? 'Nenhuma nota de compra neste mês. Escolha outro mês ou "Todos os meses".' : 'Nenhuma nota neste filtro.') : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
+      <div class="stats"><div><b>${val.length}</b>lançadas</div><div><b>${brl(tot)}</b>em compras</div>${verRec ? `<div><b style="color:${ag.length ? 'var(--warn)' : 'inherit'}">${ag.length}</b>aguardando aceite</div>` : `<div><b>${nEst}</b>estornadas</div>`}</div>
+      ${verRec && ((emp() || {}).mde || {}).sinc_em ? `<p class="small" style="margin:6px 0 0">As notas dos fornecedores chegam sozinhas da SEFAZ · última busca ${fmtData(((emp() || {}).mde || {}).sinc_em)}</p>` : ''}
+      <div class="seg" style="margin-top:8px">${[['principal','Todas'], ...(verRec ? [['aguardando',`Aguardando aceite (${ag.length})`]] : []), ['ativas','Lançadas'],['devolvidas',`Com devolução (${nDev2})`],['estornadas',`Estornadas (${nEst})`], ...(verRec && recus.length ? [['recusadas',`Recusadas (${recus.length})`]] : [])].map(([k, l]) => `<button data-act="cpSit" data-s="${k}" class="${sit === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="card">${L.length ? `<div class="fin-lista">${L.map(x => x.rec ? linhaRec(x.rec) : linhaC(x.c)).join('')}</div>${mais > 0 ? `<div class="actions"><button class="btn" data-act="cpMais">Mostrar mais ${Math.min(mais, 30)} (faltam ${mais})</button></div>` : ''}${total > 30 ? `<p class="small" style="text-align:center">${total} nota(s) neste filtro</p>` : ''}`
+      : `<div class="empty">${sit === 'aguardando' ? 'Nenhuma nota aguardando aceite.' : S.compras.length ? (q ? 'Nenhuma nota encontrada.' : mes ? 'Nenhuma nota de compra neste mês. Escolha outro mês ou "Todos os meses".' : 'Nenhuma nota neste filtro.') : 'Nenhuma compra lançada. Importe o XML da nota do fornecedor ou lance a nota manualmente.'}</div>`}</div>`;
 }
 
 /* ---------- notas recebidas da SEFAZ (Manifestação do Destinatário) ---------- */
@@ -2802,26 +2819,6 @@ const compraDaChave = ch => S.compras.find(c => c.chave === ch && c.status !== '
 const recPendente = r => r.situacao !== 'cancelada' && ['nulo','ciencia'].includes(r.manifestacao || 'nulo');
 function prazoRec(r){ // ciência/confirmação: 180 dias; desconhecimento é mais curto — usamos 10 dias como alerta
   const d = Math.floor((Date.now() - new Date(String(r.data_emissao).slice(0, 10) + 'T12:00:00-03:00')) / 864e5); return d;
-}
-function vRecebidas(){
-  const m = (emp() || {}).mde || {}, f = S.recFiltro || 'pend', q = norm(S.recBusca || '');
-  let L = [...S.recebidas].sort((a, b) => String(b.data_emissao).localeCompare(String(a.data_emissao)));
-  const filtros = { pend:recPendente, lanc:r => !!compraDaChave(r.chave), recus:r => ['desconhecimento','nao_realizada'].includes(r.manifestacao), canc:r => r.situacao === 'cancelada', todas:() => true };
-  const n = Object.fromEntries(Object.entries(filtros).map(([k, fn]) => [k, S.recebidas.filter(fn).length]));
-  L = L.filter(filtros[f] || filtros.pend);
-  if (q) L = L.filter(r => norm(r.emitente_nome).includes(q) || r.emitente_doc.includes(dig(q) || '@') || r.chave.includes(dig(q) || '@'));
-  const limR = S.recLim || 30, maisR = L.length - limR; L = L.slice(0, limR);
-  return `<div class="card"><div class="row" style="align-items:center"><div style="flex:1"><b>Notas emitidas contra o seu CNPJ</b>
-      <div class="small">A SEFAZ avisa toda nota de fornecedor emitida para ${esc(fmtDoc((emp() || {}).cnpj))}. Responda cada uma: aceite e dê entrada no estoque, ou recuse.${m.sinc_em ? `<br>Última busca: ${fmtData(m.sinc_em)}` : ''}</div></div>
-      <div style="flex:0 0 auto"><button class="btn pri" data-act="recBuscar">↻ Buscar notas agora</button></div></div>
-    ${m.ambiente === 'homologacao' || (!m.ambiente && S.ambiente !== 'producao') ? '<div class="msg warn" style="margin-top:8px">O sistema está em homologação. A SEFAZ de testes não traz as notas reais dos fornecedores: elas aparecem quando o token de produção da Focus for cadastrado.</div>' : ''}</div>
-  <div class="card"><input id="recBusca" placeholder="Buscar por fornecedor, CNPJ ou chave" value="${esc(S.recBusca || '')}" autocomplete="off">
-    <div class="seg" style="margin-top:8px">${[['pend','Aguardando resposta'],['lanc','Lançadas'],['recus','Recusadas'],['canc','Canceladas'],['todas','Todas']].map(([k, l]) => `<button data-act="recFiltro" data-f="${k}" class="${f === k ? 'on' : ''}">${l} (${n[k]})</button>`).join('')}</div></div>
-  <div class="card">${L.length ? `<div class="list">${L.map(r => { const c = compraDaChave(r.chave), [ml, mc] = MANIF[r.manifestacao] || MANIF.nulo;
-    return `<div class="it" data-act="verRecebida" data-id="${esc(r.chave)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(r.emitente_nome)}</div>
-      <div class="s">${fmtDoc(r.emitente_doc)} · emitida ${dataBR(r.data_emissao)}${recPendente(r) && prazoRec(r) > 7 ? ` · <b style="color:var(--warn)">há ${prazoRec(r)} dias</b>` : ''}</div></div>
-      <div style="text-align:right"><b class="num">${brl(r.valor)}</b><br>${r.situacao === 'cancelada' ? '<span class="tag b">cancelada pelo fornecedor</span>' : c ? '<span class="tag">lançada</span>' : `<span class="tag ${mc}">${ml}</span>`}</div></div>`; }).join('')}</div>${maisR > 0 ? `<div class="actions"><button class="btn" data-act="recMais">Mostrar mais ${Math.min(maisR, 30)} (faltam ${maisR})</button></div>` : ''}`
-    : `<div class="empty">${S.recebidas.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma nota recebida ainda. Clique em "Buscar notas agora".'}</div>`}</div>`;
 }
 async function recBuscar(btn, silencioso){
   if (btn) btn.disabled = true;
