@@ -305,6 +305,26 @@ body.pdv{background:#e9eef5}
 .pdv-rod{flex:0 0 auto;background:#0f1d33;color:#9fb3cf;font-size:12px;padding:6px 16px;display:flex;gap:16px;flex-wrap:wrap}.pdv-rod b{color:#fff;background:#1f3352;border-radius:4px;padding:0 5px}
 .pdv-ok{text-align:center}.pdv-ok .icone{font-size:46px;color:#0b7a4b}.pdv-ok .troco{font-size:34px;font-weight:800;color:#0b7a4b;margin:6px 0}
 @media(max-width:900px){.pdv-body{grid-template-columns:1fr;overflow:visible}.pdv-top{flex-wrap:wrap;gap:8px}.pdv-top .relogio{font-size:16px}.pdv-top button{padding:6px 9px;font-size:13px}.pdv-itens .hm{display:none}.pdv-ult .d{font-size:17px;white-space:normal}.pdv-ult .v{font-size:22px}.pdv-busca input{font-size:16px}.pdv-wrap{overflow-x:hidden}.pdv-wrap{height:auto;min-height:100vh}.pdv-itens{max-height:45vh}.pdv-total .v{font-size:36px}.pdv-top .info{display:none}}
+/* NF-e: formulário compacto (pedido do Lucas) */
+.nfe-grid .card{padding:12px 14px;margin-bottom:10px}
+.nfe-grid .nfe-h{margin:0 0 2px;font-size:15px;gap:8px}
+.nfe-grid .nfe-h>span:first-child{width:22px;height:22px;flex:0 0 22px;font-size:12px}
+.nfe-grid label{margin:6px 0 3px;font-size:12px}
+.nfe-grid input,.nfe-grid select,.nfe-grid textarea{padding:6px 10px;font-size:14px;border-radius:9px}
+.nfe-grid select{padding-right:30px}
+.nfe-grid .row{gap:8px}
+.nfe-grid .row>div{flex:1 1 140px}
+.nfe-grid .g3{gap:6px}
+.nfe-grid p.small,.nfe-grid .small{font-size:11.5px}
+.nfe-grid p.small{margin:4px 0 0}
+.nfe-grid .btn{padding:7px 12px;font-size:13.5px}
+.nfe-grid .actions{margin-top:8px}
+.nfe-grid .nfe-sec h4{margin:10px 0 0;font-size:12px}
+.nfe-grid .nfe-dest{padding:7px 10px;margin-top:6px;font-size:13px}
+.nfe-grid .seg button{padding:6px 10px}
+.nfe-grid .fin-l{padding:5px 4px}
+.nfe-grid .empty{padding:10px}
+.nfe-topo{margin:0 0 4px}.nfe-topo+h2{margin:0 0 8px;font-size:20px}
 </style>
 </head>
 <body>
@@ -1040,12 +1060,12 @@ function vNfe(){
   const sec = (num, tit, corpo, extra = '') => `<div class="card nfe-sec"><h3 class="nfe-h"><span>${num}</span>${tit}${extra}</h3>${corpo}</div>`;
   const nf = (path, rot, v, attrs = '') => `<div><label>${rot}</label><input data-nf="${path}" value="${esc(v ?? '')}" ${attrs}></div>`;
   const tr = n.transp, vo = n.vol, dup = r2(n.dups.reduce((a, d) => a + numIn(d.valor), 0)), transps = (e.transportadoras || []);
-  return `<div class="actions" style="margin:0 0 6px"><button class="btn sm" data-act="nfeLista">← Voltar para as NF-e emitidas</button></div><h2>NF-e (modelo 55)${n.op !== 'venda' ? ' — <span style="color:var(--warn)">' + (n.op === 'dev_venda' ? 'devolução de venda' : 'devolução de compra') + '</span>' : ''}</h2>${bannerCorrecao(n.reenviar, 'limparNfe')}
+  return `<div class="actions nfe-topo"><button class="btn sm" data-act="nfeLista" style="flex:0 0 auto">← Voltar para as NF-e emitidas</button></div><h2>NF-e (modelo 55)${n.op !== 'venda' ? ' — <span style="color:var(--warn)">' + (n.op === 'dev_venda' ? 'devolução de venda' : 'devolução de compra') + '</span>' : ''}</h2>${bannerCorrecao(n.reenviar, 'limparNfe')}
   <div class="grid2 nfe-grid"><div>
   ${sec(1, 'Dados da nota', `<div class="row"><div><label for="nfeOp">Tipo de operação</label><select id="nfeOp">${OPS.map(([c, t]) => `<option value="${c}" ${n.op === c ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
       <div><label for="nfeNat">Natureza da operação</label><input id="nfeNat" value="${esc(n.natureza)}"></div>
       <div style="flex:0 0 150px"><label for="nfeCfop">CFOP</label><input id="nfeCfop" inputmode="numeric" maxlength="4" value="${esc(n.cfopMan || nfeCfopComum(L))}" placeholder="${L.length ? 'varia por item' : 'automático'}"></div></div>
-    <p class="small" style="margin-top:4px">${n.cfopMan ? `CFOP <b>${esc(n.cfopMan)}</b> digitado à mão para todos os itens. <button class="btn sm" data-act="nfeCfopAuto">Voltar ao automático</button>` : 'CFOP preenchido automaticamente pelo cadastro de cada produto, de acordo com a operação e o destino. Se precisar, digite outro: vale para todos os itens.'}</p>
+    <p class="small" style="margin-top:4px">${n.cfopMan ? `CFOP <b>${esc(n.cfopMan)}</b> digitado à mão para todos os itens. <button class="btn sm" data-act="nfeCfopAuto">Voltar ao automático</button>` : 'CFOP vazio = automático pelo cadastro de cada produto. Se digitar, vale para todos os itens.'}</p>
     <div class="row"><div><label>Finalidade</label><input value="${n.op === 'venda' ? '1 - Normal' : '4 - Devolução'}" disabled></div>
       <div><label>Tipo</label><input value="${n.op === 'dev_venda' ? '0 - Entrada' : '1 - Saída'}" disabled></div>
       <div><label for="nfeSaida">Data/hora de saída</label><input id="nfeSaida" type="datetime-local" value="${esc(n.saida || isoNow().slice(0, 16))}"></div></div>
