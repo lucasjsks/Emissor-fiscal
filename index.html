@@ -944,20 +944,67 @@ function aplDescItem(i){
   ci.desc = d; closeModal(); render();
 }
 
-/* ---------- NF-e ---------- */
-// campos fiscais por item na devolução (ICMS, ICMS-ST, IPI devolvido); vazio = não destaca
-function nfeDevCampos(i, l, simples){
-  const d = S.nfe.itens[i].dev || {}, c = l.c;
-  const f = (k, rot, rs, ph = '') => `<div><label for="ndv${i}${k}">${rot}</label><input id="ndv${i}${k}" data-ndv="${i}:${k}" ${rs ? 'data-rs' : ''} inputmode="${k === 'cst' ? 'numeric' : 'decimal'}" value="${esc(d[k] ?? '')}" placeholder="${esc(ph)}"></div>`;
-  const tem = c.icms > 0 || c.st > 0 || c.ipiDev > 0;
-  return `<details class="nfe-dev" ${tem ? 'open' : ''} style="width:100%;margin-top:8px;border:1px solid var(--line-2);border-radius:10px;padding:6px 10px">
-    <summary style="cursor:pointer;font-weight:600;font-size:13px">Impostos da devolução (ICMS, ICMS-ST, IPI)${tem ? ` · <span class="small">ICMS ${brl(c.icms)}${c.st ? ' · ST ' + brl(c.st) : ''}${c.ipiDev ? ' · IPI ' + brl(c.ipiDev) : ''}</span>` : ''}</summary>
-    <p class="small" style="margin:6px 0">Para devolver o crédito, informe os impostos da nota de compra (proporcionais à quantidade devolvida).${simples ? ' Com ICMS ou ICMS-ST destacado o CSOSN vira 900.' : ''}</p>
-    <div class="g3">${f('cst', simples ? 'CSOSN' : 'CST', false, c.cst)}${f('bc', 'Base do ICMS', true)}${f('aliq', 'Alíquota ICMS (%)', false)}</div>
-    <div class="g3">${f('icms', 'Valor do ICMS', true, c.icms ? v2(c.icms.toFixed(2)) : '')}${f('bcst', 'Base do ICMS-ST', true)}${f('aliqst', 'Alíquota ICMS-ST (%)', false)}</div>
-    <div class="g3">${f('st', 'Valor do ICMS-ST', true, c.st ? v2(c.st.toFixed(2)) : '')}${f('ipi', 'IPI devolvido', true)}${f('pdev', '% devolvido da nota', false, '100')}</div>
-  </details>`;
+/* ---------- NF-e: janela de adicionar/editar produto ---------- */
+function nfeCfopAutoDe(ci, p, inter){ return ci.cfop ? (inter ? ({ '1':'2', '5':'6' }[ci.cfop[0]] || ci.cfop[0]) + ci.cfop.slice(1) : ci.cfop) : cfopOp(p.cfop, S.nfe.op, inter); }
+function nfiAbrir(idx){
+  const ci = idx === null ? null : S.nfe.itens[idx];
+  S.nfi = ci ? { idx, pid:ci.pid, cfop:ci.cfop || '', qtd:v2(ci.qtd), preco:v2(ci.preco), desc:ci.desc || '', cfopMan:ci.cfopMan || '', dev:{ ...(ci.dev || {}) }, busca:'' }
+    : { idx:null, pid:'', cfop:'', qtd:'1', preco:'', desc:'', cfopMan:'', dev:{}, busca:'' };
+  renderNfi();
 }
+function nfiCalc(){
+  const it = S.nfi, p = S.produtos.find(x => x.id === it.pid); if (!p) return null;
+  const { e, inter, naoContrib } = nfeCtx(), auto = nfeCfopAutoDe(it, p, inter);
+  const cfop = cfop4(it.cfopMan) ? it.cfopMan : cfop4(S.nfe.cfopMan) ? S.nfe.cfopMan : auto;
+  const c = calcItem(p, numIn(it.qtd), numIn(it.preco), cfop, e, { desc:numIn(it.desc), inter, semST:!!naoContrib || S.nfe.op !== 'venda', dev:S.nfe.op !== 'venda' ? it.dev : null });
+  return { p, c, auto };
+}
+function nfiPrevHtml(){
+  const r = nfiCalc(); if (!r) return ''; const c = r.c;
+  return `${linhaTot('Total do produto', r2(c.bruto - c.desc), 'big')}${c.icms ? linhaTot('ICMS (BC ' + brl(c.icmsBase) + ')', c.icms, 'small') : ''}${c.st ? linhaTot('ICMS-ST (BC ' + brl(c.stBase) + ')', c.st, 'small') : ''}${c.ipiDev ? linhaTot('IPI devolvido', c.ipiDev, 'small') : ''}<div class="small">CFOP ${esc(c.cfop)} · ${String((emp() || {}).regime) !== '3' ? 'CSOSN' : 'CST'} ${esc(c.cst)}</div>`;
+}
+function renderNfi(){
+  const it = S.nfi, e = emp() || {}, simples = String(e.regime) !== '3', r = nfiCalc(), dev = S.nfe.op !== 'venda';
+  const titulo = it.idx === null ? 'Adicionar produto' : 'Editar produto';
+  if (!r) return openModal(`${mhead(titulo)}
+    <label for="nfiBusca">Produto</label><input id="nfiBusca" autocomplete="off" placeholder="Nome, código ou código de barras…" value="${esc(it.busca)}">
+    <div class="results" id="nfiRes">${resultadosHtml(it.busca, 'nfiPick')}</div>
+    <div class="actions"><button class="btn" data-act="fechar">Cancelar</button></div>`), setTimeout(() => { const b = $('#nfiBusca'); if (b) b.focus(); }, 30);
+  const f = (k, rot, attrs = '', alvo = 'nfi') => `<div><label for="nfi_${k}">${rot}</label><input id="nfi_${k}" data-${alvo}="${k}" value="${esc((alvo === 'nfi' ? it[k] : it.dev[k]) ?? '')}" ${attrs}></div>`;
+  openModal(`${mhead(titulo)}
+    <div class="card" style="margin:0 0 10px;display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><b>${esc(r.p.descricao)}</b><div class="small">NCM ${fmtNcm(r.p.ncm)} · ${esc(r.p.unidade || 'UN')}${r.p.codigo ? ' · cód. ' + esc(r.p.codigo) : ''}</div></div>
+      ${it.idx === null ? '<button class="btn sm" data-act="nfiTrocar">Trocar</button>' : ''}</div>
+    <div class="g3">${f('qtd', 'Quantidade', 'inputmode="decimal"')}${f('preco', 'Valor unitário', 'data-rs inputmode="decimal"')}${f('desc', 'Desconto (R$)', 'data-rs inputmode="decimal" placeholder="R$ 0,00"')}</div>
+    <div class="g3">${f('cfopMan', 'CFOP', `inputmode="numeric" maxlength="4" placeholder="${esc(cfop4(S.nfe.cfopMan) ? S.nfe.cfopMan : r.auto)}"`)}<div style="grid-column:span 2;align-self:end" class="small">Vazio = ${cfop4(S.nfe.cfopMan) ? 'o CFOP da nota' : 'automático pelo cadastro'} (${esc(cfop4(S.nfe.cfopMan) ? S.nfe.cfopMan : r.auto)}).</div></div>
+    ${dev ? `<h3 style="margin:14px 0 4px">Impostos da devolução</h3>
+      <p class="small" style="margin:0 0 6px">Para devolver o crédito, informe os impostos da nota de compra (proporcionais à quantidade devolvida).${simples ? ' Com ICMS ou ICMS-ST o CSOSN vira 900.' : ''}</p>
+      <div class="g3">${f('cst', simples ? 'CSOSN' : 'CST', `inputmode="numeric" placeholder="${esc(r.c.cst)}"`, 'nfidv')}${f('bc', 'Base do ICMS', 'data-rs inputmode="decimal"', 'nfidv')}${f('aliq', 'Alíquota ICMS (%)', 'inputmode="decimal"', 'nfidv')}</div>
+      <div class="g3">${f('icms', 'Valor do ICMS', 'data-rs inputmode="decimal" placeholder="calculado"', 'nfidv')}${f('bcst', 'Base do ICMS-ST', 'data-rs inputmode="decimal"', 'nfidv')}${f('aliqst', 'Alíquota ICMS-ST (%)', 'inputmode="decimal"', 'nfidv')}</div>
+      <div class="g3">${f('st', 'Valor do ICMS-ST', 'data-rs inputmode="decimal" placeholder="calculado"', 'nfidv')}${f('ipi', 'IPI devolvido', 'data-rs inputmode="decimal"', 'nfidv')}${f('pdev', '% devolvido da nota', 'inputmode="decimal" placeholder="100"', 'nfidv')}</div>`
+    : `<p class="small" style="margin-top:10px">Impostos pelo cadastro do produto (${simples ? 'CSOSN' : 'CST'} ${esc(r.c.cst)}). Para mudar, edite o produto na aba Produtos.</p>`}
+    <div id="nfiPrev" style="margin-top:10px">${nfiPrevHtml()}</div>
+    <div id="errM"></div>
+    <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="nfiOk">${it.idx === null ? 'Inserir produto' : 'Salvar alterações'}</button></div>`);
+}
+function nfiOk(){
+  const it = S.nfi, r = nfiCalc(), errs = [];
+  if (!r) errs.push('Escolha o produto.');
+  else {
+    if (!(numIn(it.qtd) > 0)) errs.push('Informe a quantidade.');
+    if (!(numIn(it.preco) > 0)) errs.push('Informe o valor unitário.');
+    if (numIn(it.desc) >= r2(numIn(it.qtd) * numIn(it.preco)) && numIn(it.desc) > 0) errs.push('O desconto é maior que o valor do produto.');
+    if (it.cfopMan && !cfop4(it.cfopMan)) errs.push('O CFOP precisa ter 4 números (ou deixe vazio para o automático).');
+  }
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  const dev = Object.fromEntries(Object.entries(it.dev || {}).filter(([, v]) => String(v ?? '').trim() !== ''));
+  const novo = { ...(it.idx === null ? {} : S.nfe.itens[it.idx]), pid:it.pid, qtd:numIn(it.qtd), preco:numIn(it.preco), desc:it.desc };
+  if (cfop4(it.cfopMan)) novo.cfopMan = it.cfopMan; else delete novo.cfopMan;
+  if (Object.keys(dev).length) novo.dev = dev; else delete novo.dev;
+  if (it.idx === null) S.nfe.itens.push(novo); else S.nfe.itens[it.idx] = novo;
+  S.nfi = null; closeModal(); render();
+}
+
+/* ---------- NF-e ---------- */
 function vNfe(){
   const n = S.nfe, { e, cli, inter, precisaDifal } = nfeCtx(), L = nfeLinhas(), T = totais(L), simples = String(e.regime) !== '3';
   const ti = [['9','9 - Sem frete'],['0','0 - Por conta do emitente (CIF)'],['1','1 - Por conta do destinatário (FOB)'],['2','2 - Por conta de terceiros'],['3','3 - Próprio, por conta do emitente'],['4','4 - Próprio, por conta do destinatário']];
@@ -991,18 +1038,12 @@ function vNfe(){
     ${sel('dfMet','Base de cálculo', n.difal.metodo, [['dupla','Base dupla (LC 190/2022)'],['unica','Base única']])}
     ${simples ? '<div class="msg warn" style="margin-top:8px">Empresa do Simples Nacional: confirme se o DIFAL é exigido nesta operação antes de destacar.</div>' : ''}
     ${T.difal ? linhaTot('DIFAL para ' + esc(cli.uf), T.difal) + (T.fcpDest ? linhaTot('FCP para ' + esc(cli.uf), T.fcpDest) : '') + '<p class="small">Recolhido por GNRE — não soma no total da nota.</p>' : ''}</div>` : ''}
-  ${sec(3, 'Produtos', `<label for="buscaNfe">Adicionar produto</label><input id="buscaNfe" autocomplete="off" placeholder="Nome, código ou código de barras…" value="${esc(S.buscaNfe)}">
-    <div class="results" id="resN">${resultadosHtml(S.buscaNfe, 'addNfe')}</div>
-    ${L.length ? `<div class="list" style="margin-top:6px">${L.map((l, i) => `<div class="it" style="flex-wrap:wrap"><div class="grow" style="flex-basis:100%"><div class="t">${i + 1}. ${esc(l.p.descricao)}</div>
-      <div class="s">NCM ${fmtNcm(l.p.ncm)} · CST/CSOSN ${esc(l.c.cst)} · ${esc(l.p.unidade || 'UN')}${l.c.st ? ` · ST ${brl(l.c.st)} (MVA ${String(l.c.stMva).replace('.', ',')}%)` : ''}${l.c.icms ? ` · ICMS ${brl(l.c.icms)}` : ''}</div></div>
-      <div class="g3"><div><label>Quantidade</label><input id="nq${i}" data-nq="${i}" inputmode="decimal" value="${String(l.qtd).replace('.', ',')}"></div>
-      <div><label>Valor unitário</label><input id="np${i}" data-np="${i}" data-rs inputmode="decimal" value="${String(l.preco).replace('.', ',')}"></div>
-      <div><label>Desconto (R$)</label><input id="nd${i}" data-nd="${i}" data-rs inputmode="decimal" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
-      <div style="display:flex;width:100%;align-items:flex-end;gap:8px;margin-top:6px;flex-wrap:wrap"><div style="flex:0 0 110px"><label for="ncf${i}">CFOP</label><input id="ncf${i}" data-ncf="${i}" inputmode="numeric" maxlength="4" value="${esc(S.nfe.itens[i].cfopMan || l.c.cfop)}"></div>
-      <span class="small" style="flex:1;padding-bottom:8px">${S.nfe.itens[i].cfopMan ? `alterado à mão · <button class="btn sm" data-act="nfeCfopAuto" data-i="${i}">automático</button>` : n.cfopMan ? 'o da nota' : 'do cadastro'}</span></div>
-      ${n.op !== 'venda' ? nfeDevCampos(i, l, simples) : ''}
-      <div style="display:flex;width:100%;align-items:center;gap:8px;margin-top:6px"><b class="num" style="flex:1">${brl(r2(l.c.bruto - l.descItem))}</b>
-      <button class="btn sm bad" data-act="rmNfe" data-i="${i}">Remover</button></div></div>`).join('')}</div>` : '<div class="empty">Nenhum item.</div>'}`, L.length ? ` <span class="small" style="font-weight:500">(${L.length})</span>` : '')}
+  ${sec(3, 'Produtos', `<div class="actions" style="margin:0 0 8px"><button class="btn pri" data-act="nfiNovo" style="flex:1">+ Adicionar produto</button></div>
+    ${L.length ? `<div class="fin-lista">${L.map((l, i) => `<div class="fin-l nt-l" data-act="nfiEdit" data-i="${i}" title="Clique para editar">
+      <div class="fin-v" style="min-width:26px">${i + 1}</div>
+      <div class="fin-d"><b>${esc(l.p.descricao)}</b><span>${qtdTxt(l.qtd)} ${esc(l.p.unidade || 'UN')} × ${brl(l.preco)}${l.descItem ? ' · desc. ' + brl(l.descItem) : ''} · CFOP ${esc(l.c.cfop)} · ${simples ? 'CSOSN' : 'CST'} ${esc(l.c.cst)}${l.c.icms ? ' · ICMS ' + brl(l.c.icms) : ''}${l.c.st ? ' · ST ' + brl(l.c.st) : ''}${l.c.ipiDev ? ' · IPI dev. ' + brl(l.c.ipiDev) : ''}</span></div>
+      <div class="fin-r" style="flex-direction:row;align-items:center;gap:6px"><b class="num">${brl(r2(l.c.bruto - l.descItem))}</b><button class="x" data-act="rmNfe" data-i="${i}" aria-label="Remover ${esc(l.p.descricao)}">×</button></div></div>`).join('')}</div>
+      <p class="small" style="margin:6px 0 0">Clique num produto para alterar quantidade, valor, CFOP${n.op !== 'venda' ? ' e impostos' : ''}.</p>` : '<div class="empty">Nenhum produto. Clique em "Adicionar produto".</div>'}`, L.length ? ` <span class="small" style="font-weight:500">(${L.length})</span>` : '')}
   ${sec(4, 'Transporte', `<label for="nfeFrete">Modalidade do frete</label><select id="nfeFrete">${ti.map(([c, t]) => `<option value="${c}" ${n.frete === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
     ${n.frete !== '9' ? `<h4>Transportadora</h4>
       ${transps.length ? `<label for="nfeTrSel">Usar transportadora já cadastrada</label><select id="nfeTrSel"><option value="">— escolher —</option>${transps.map((x, k) => `<option value="${k}">${esc(x.nome)} — ${fmtDoc(x.doc)}</option>`).join('')}</select>` : ''}
@@ -4248,6 +4289,11 @@ document.addEventListener('click', async ev => {
     case 'emitirNfce': t.disabled = true; await emitirNfce(); t.disabled = false; break;
     case 'addNfe': { const p = P(); S.nfe.itens.push({ pid:id, qtd:1, preco:num(p.preco), desc:'' }); S.buscaNfe = ''; render(); break; }
     case 'rmNfe': S.nfe.itens.splice(+t.dataset.i, 1); render(); break;
+    case 'nfiNovo': nfiAbrir(null); break;
+    case 'nfiEdit': nfiAbrir(+t.dataset.i); break;
+    case 'nfiPick': { const p = P(); if (p){ S.nfi.pid = id; S.nfi.preco = v2(num(p.preco)); S.nfi.busca = ''; renderNfi(); setTimeout(() => { const q = $('#nfi_qtd'); if (q){ q.focus(); q.select(); } }, 30); } break; }
+    case 'nfiTrocar': S.nfi.pid = ''; renderNfi(); break;
+    case 'nfiOk': nfiOk(); break;
     case 'nfeCfopAuto': if (t.dataset.i !== undefined) delete S.nfe.itens[+t.dataset.i].cfopMan; else S.nfe.cfopMan = ''; render(); break;
     case 'limparNfe': S.nfe = nfeVazia(); render(); break;
     case 'nfeCond': S.nfe.cond = t.dataset.v; if (t.dataset.v === 'prazo' && S.nfe.pag !== '15' && S.nfe.pag !== '05') S.nfe.pag = '15'; render(); break;
@@ -4320,6 +4366,9 @@ document.addEventListener('input', ev => {
   else if (t.id === 'nomeCons'){ S.nomeCons = t.value; }
   else if (t.id === 'nfeNat'){ S.nfe.natureza = t.value; }
   else if (t.id === 'nfeCfop'){ const v = dig(t.value).slice(0, 4); S.nfe.cfopMan = v; if (v) S.nfe.itens.forEach(ci => { delete ci.cfopMan; }); }
+  else if (t.id === 'nfiBusca'){ S.nfi.busca = t.value; $('#nfiRes').innerHTML = resultadosHtml(t.value, 'nfiPick'); }
+  else if (t.dataset.nfi !== undefined && S.nfi){ S.nfi[t.dataset.nfi] = t.value; const pv = $('#nfiPrev'); if (pv) pv.innerHTML = nfiPrevHtml(); }
+  else if (t.dataset.nfidv !== undefined && S.nfi){ S.nfi.dev[t.dataset.nfidv] = t.value; const pv = $('#nfiPrev'); if (pv) pv.innerHTML = nfiPrevHtml(); }
   else if (t.dataset.ndv !== undefined){ const [k, f] = t.dataset.ndv.split(':'), ci = S.nfe.itens[+k]; ci.dev = ci.dev || {}; ci.dev[f] = t.value; }
   else if (t.dataset.ncf !== undefined){ const ci = S.nfe.itens[+t.dataset.ncf], v = dig(t.value).slice(0, 4); if (v) ci.cfopMan = v; else delete ci.cfopMan; }
   else if (t.id === 'nfeObs'){ S.nfe.obs = t.value; }
