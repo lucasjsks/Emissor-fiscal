@@ -493,17 +493,9 @@ function gtinOk(g){ g = dig(g); if (![8,12,13,14].includes(g.length)) return fal
 function validarProduto(p, e){
   const out = [], E = m => out.push({n:'erro', m}), A = m => out.push({n:'aviso', m}), I = m => out.push({n:'info', m});
   const ncm = dig(p.ncm), cap = ncm.slice(0, 2), simples = String(e && e.regime) !== '3', cst = dig(p.cst_csosn), cest = dig(p.cest);
+  // só o tamanho do NCM é conferido (sem ele a SEFAZ rejeita). As observações de NCM (tabela oficial, capítulo,
+  // descrição × NCM, NCM com ST, monofásico, cesta básica) foram retiradas a pedido do Lucas.
   if (ncm.length !== 8) E('NCM deve ter 8 dígitos.');
-  else if (!CAPS[cap]) E(`O capítulo ${cap} não existe na NCM.`);
-  else {
-    if (S.ncmMap){ if (!S.ncmMap[ncm]) E(`NCM ${fmtNcm(ncm)} não existe na tabela vigente.`); }
-    else I('Importe a tabela NCM oficial para conferir se o código existe.');
-    const d = norm(p.descricao);
-    for (const [re, prefs, nome, exc] of KW){
-      if (re.test(d) && !(exc && exc.test(d)) && !prefs.some(x => ncm.startsWith(x))){
-        A(`A descrição indica ${nome} (NCM ${prefs.map(fmtPref).join(' ou ')}), mas o NCM informado é do capítulo ${cap} — ${CAPS[cap]}.`); break; }
-    }
-  }
   if (simples && cst && !CSOSN_OK.includes(cst)) E(`CSOSN ${cst} não existe. Use 101, 102, 103, 201, 202, 203, 300, 400, 500 ou 900.`);
   if (!simples && cst && !CST_OK.includes(cst)) E(`CST ICMS ${cst} não existe para regime normal.`);
   const st = simples ? ['201','202','203','500'].includes(cst) : ['10','30','60','70'].includes(cst);
@@ -514,12 +506,6 @@ function validarProduto(p, e){
     else if (!(num(p.icms_aliq) > 0)) A('Informe a alíquota de ICMS própria para deduzir do ICMS-ST.');
   }
   if (!simples && ['20','70'].includes(cst) && !(num(p.icms_red) > 0)) A(`CST ${cst} é com redução de base: informe o percentual de redução.`);
-  if (!st && ncm.length === 8 && ST_NCM.some(x => ncm.startsWith(x))) I('Este NCM costuma ter substituição tributária. Confira no RICMS/PI se o produto está sujeito a ST.');
-  if (ncm.length === 8 && MONO.some(x => ncm.startsWith(x))){
-    if (simples) I('NCM pode ter PIS/COFINS monofásico: segregue essa receita no PGDAS-D.');
-    else if (p.pis_cst !== '04' || p.cofins_cst !== '04') A('NCM pode ter PIS/COFINS monofásico (na revenda, normalmente CST 04). Confira.');
-  }
-  // aviso de NCM da Cesta Básica Nacional retirado a pedido do Lucas
   if (p.gtin && p.gtin !== 'SEM GTIN' && !gtinOk(p.gtin)) E('Código de barras (GTIN) com dígito verificador inválido.');
   if (!(num(p.preco) > 0)) E('Informe o preço de venda.');
   return out;
@@ -553,9 +539,9 @@ function ncmFull(){
 function ncmInfoHtml(c){
   c = dig(c); if (c.length < 2) return '';
   const cap = c.slice(0, 2);
-  if (!CAPS[cap]) return `<span style="color:var(--bad)">✕ Capítulo ${esc(cap)} não existe.</span>`;
-  if (c.length === 8 && S.ncmMap) return S.ncmMap[c] ? `<span style="color:var(--ok)">✓ ${esc(ncmPath(c))}</span>` : `<span style="color:var(--bad)">✕ ${fmtNcm(c)} não existe na tabela vigente.</span>`;
-  return `Capítulo ${esc(cap)} — ${esc(CAPS[cap])}`;
+  // só mostra o nome do NCM quando conhece; sem avisos (pedido do Lucas)
+  if (c.length === 8 && S.ncmMap && S.ncmMap[c]) return esc(ncmPath(c));
+  return CAPS[cap] ? `Capítulo ${esc(cap)} — ${esc(CAPS[cap])}` : '';
 }
 function ncmBuscaHtml(q){
   const t = norm(q); if (t.length < 3) return '';
