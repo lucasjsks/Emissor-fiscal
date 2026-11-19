@@ -1018,13 +1018,15 @@ function vNfeLista(){
   const meses = [...new Set([isoNow().slice(0, 7), ...todas.map(n => (n.data || '').slice(0, 7)).filter(Boolean)])].sort().reverse();
   const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
   const f = S.nfe, emAndamento = f && (f.itens.length || f.clienteId);
-  return `<div class="row" style="align-items:center"><h2 style="flex:1">NF-e emitidas</h2>${pode('emitir') ? '<button class="btn pri" data-act="nfeNova" style="flex:0 0 auto">+ Nova NF-e</button>' : ''}</div>
+  const nVal = lista.filter(n => notaValida(n)).length, nCanc = lista.filter(n => n.status === 'cancelada').length;
+  return `<h2>NF-e emitidas</h2>${pode('emitir') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="nfeNova" style="flex:1">+ Nova NF-e</button></div>' : ''}
   ${emAndamento ? `<div class="card" style="border-color:#f1d9a6;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>NF-e em andamento</b><div class="small">${f.op !== 'venda' ? (f.op === 'dev_venda' ? 'Devolução de venda · ' : 'Devolução de compra · ') : ''}${esc((S.clientes.find(c => c.id === f.clienteId) || {}).nome || 'sem destinatário')} · ${f.itens.length} produto(s)${f.reenviar ? ' · correção de nota rejeitada' : ''}</div></div>
     <button class="btn pri" data-act="nfeContinuar">Continuar</button><button class="btn bad" data-act="nfeDescartar">Descartar</button></div>` : ''}
-  <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="nfBusca">Buscar</label><input id="nfBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.nfBusca || '')}" autocomplete="off"></div>
-    <div style="flex:1 1 150px"><label for="nfMes">Mês</label><select id="nfMes" ${q ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
-  ${q ? '<p class="small" style="margin:-4px 0 8px">Buscando em todos os meses.</p>' : ''}
-  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} NF-e · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="fin-lista">${lista.slice(0, lim).map(n => `
+  <div class="card"><div class="row" style="align-items:end"><div style="flex:2 1 220px"><label for="nfBusca">Buscar</label><input id="nfBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.nfBusca || '')}" autocomplete="off"></div>
+    <div style="flex:1 1 150px"><label for="nfMes">Mês de emissão</label><select id="nfMes" ${q ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
+    ${q ? '<p class="small" style="margin:4px 0 0">Buscando em todos os meses.</p>' : ''}
+    <div class="stats"><div><b>${nVal}</b>notas válidas</div><div><b>${brl(tot)}</b>em vendas</div><div><b>${nCanc}</b>canceladas</div></div></div>
+  <div class="card">${lista.length ? `<div class="fin-lista">${lista.slice(0, lim).map(n => `
     <div class="fin-l nt-l" data-act="verNota" data-id="${esc(n.id)}"><div class="fin-v">${(n.data || '').slice(8, 10)}/${(n.data || '').slice(5, 7)}<small>${(n.data || '').slice(11, 16)}</small></div>
       <div class="fin-d"><b>${nome(n)} nº ${n.numero} <span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span></b><span>${esc(n.destNome || '—')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</span></div>
       <div class="fin-r"><b class="num">${brl(n.total)}</b>${tag(n)}</div></div>`).join('')}</div>`
