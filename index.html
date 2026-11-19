@@ -2012,10 +2012,7 @@ function vRelatorios(){
   <div class="card"><h3 style="margin-top:0">Por forma de pagamento</h3>${Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => linhaTot(`${esc(nomeForma(f))} <span class="small">${Math.round(v / totF * 100)}%</span>`, v)).join('')}</div>
   <div class="card"><h3 style="margin-top:0">Produtos mais vendidos</h3><div class="list">${R.prod.slice(0, nProd).map((p, i) => `<div class="it"><div class="grow"><div class="t">${i + 1}. ${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u)}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>
     ${R.prod.length > 10 ? `<div class="actions"><button class="btn sm" data-act="relTodos">${S.relTodos ? 'Mostrar só os 10 primeiros' : `Ver todos (${R.prod.length})`}</button></div>` : ''}</div>
-  ${R.cli.length > 1 || R.cli[0].nome !== 'Consumidor não identificado' ? `<div class="card"><h3 style="margin-top:0">Por cliente</h3><div class="list">${R.cli.slice(0, 10).map(c => `<div class="it"><div class="grow"><div class="t">${esc(c.nome)}</div><div class="s">${c.qtd} venda(s)</div></div><b class="num">${brl(c.v)}</b></div>`).join('')}</div></div>` : ''}
-  <div class="card"><h3 style="margin-top:0">Vendas do período (${R.vend.length})</h3><div class="list">${R.vend.slice(0, lim).map(n => `
-    <div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer"><div class="grow"><div class="t">${n.modelo === '65' ? 'Cupom' : 'NF-e'} nº ${n.numero}</div><div class="s">${fmtData(n.data)} · ${esc(n.destNome || 'Consumidor')}</div></div><b class="num">${brl(n.total)}</b></div>`).join('')}</div>
-    ${R.vend.length > lim ? `<div class="actions"><button class="btn sm" data-act="relMais">Mostrar mais</button></div>` : ''}</div>`}`;
+  ${R.cli.length > 1 || R.cli[0].nome !== 'Consumidor não identificado' ? `<div class="card"><h3 style="margin-top:0">Por cliente</h3><div class="list">${R.cli.slice(0, 10).map(c => `<div class="it"><div class="grow"><div class="t">${esc(c.nome)}</div><div class="s">${c.qtd} venda(s)</div></div><b class="num">${brl(c.v)}</b></div>`).join('')}</div></div>` : ''}`}`;
 }
 async function exportRel(){
   const R = dadosRel();
