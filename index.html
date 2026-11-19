@@ -628,7 +628,7 @@ function calcItem(p, qtd, preco, cfop, e, x = {}){
   const simples = e && String(e.regime) !== '3', inter = !!x.inter, cst = p.cst_csosn || (simples ? '102' : '00');
   const baseOp = r2(bruto - desc + frete + seguro + outras), aliqInter = aliqInterOf(p.origem);
   const o = { bruto, desc, frete, seguro, outras, baseOp, cfop, cst, aliqInter, icmsBase:0, icmsAliq:0, icmsRed:0, icms:0,
-    stMva:0, stBase:0, stAliq:0, st:0, fcpStAliq:0, fcpSt:0, difal:null,
+    stMva:0, stBase:0, stAliq:0, st:0, fcpStAliq:0, fcpSt:0, difal:null, ipiDev:0, pDevol:0,
     pisCst:p.pis_cst || (simples ? '49' : '01'), pisAliq:num(p.pis_aliq), pis:0,
     cofCst:p.cofins_cst || (simples ? '49' : '01'), cofAliq:num(p.cofins_aliq), cof:0,
     cbs:r2(baseOp * CBS_2026 / 100), ibs:r2(baseOp * IBS_2026 / 100) };
@@ -658,6 +658,20 @@ function calcItem(p, qtd, preco, cfop, e, x = {}){
   if (o.pisAliq > 0) o.pis = r2(basePC * o.pisAliq / 100);
   if (o.cofAliq > 0) o.cof = r2(basePC * o.cofAliq / 100);
   o.basePC = basePC;
+  // Devolução: impostos digitados (ou trazidos da nota de compra) valem sobre o cálculo do cadastro.
+  // Empresa do Simples devolvendo compra de empresa do regime normal destaca o ICMS/ICMS-ST com CSOSN 900 (devolve o crédito).
+  if (x.dev){
+    const d = x.dev, vazio = v => v === undefined || v === null || String(v).trim() === '';
+    const bc = numIn(d.bc), al = numIn(d.aliq), bcst = numIn(d.bcst), alst = numIn(d.aliqst);
+    o.icmsRed = 0; o.icmsBase = bc; o.icmsAliq = al; o.icms = vazio(d.icms) ? r2(bc * al / 100) : numIn(d.icms);
+    if (!(o.icms > 0)) { o.icms = 0; o.icmsBase = 0; o.icmsAliq = 0; }
+    o.stMva = 0; o.stBase = bcst; o.stAliq = alst; o.fcpSt = 0; o.fcpStAliq = 0;
+    o.st = vazio(d.st) ? Math.max(0, r2(bcst * alst / 100 - o.icms)) : numIn(d.st);
+    if (!(o.st > 0)) { o.st = 0; o.stBase = 0; o.stAliq = 0; }
+    o.ipiDev = numIn(d.ipi); o.pDevol = numIn(d.pdev) || 100;
+    o.cst = !vazio(d.cst) ? dig(d.cst) : (o.icms > 0 || o.st > 0) ? (simples ? '900' : '90') : o.cst;
+    o.dev = true;
+  }
   return o;
 }
 function itemFocus(i, n, p, qtd, preco, c){
@@ -674,13 +688,15 @@ function itemFocus(i, n, p, qtd, preco, c){
   if (c.outras > 0) it.valor_outras_despesas = c.outras;
   if (c.icms > 0) Object.assign(it, { icms_modalidade_base_calculo:'3', icms_base_calculo:c.icmsBase, icms_aliquota:c.icmsAliq, icms_valor:c.icms });
   if (c.icmsRed > 0) it.icms_reducao_base_calculo = c.icmsRed;
-  if (c.stBase > 0){
-    Object.assign(it, { icms_modalidade_base_calculo_st:'4', icms_margem_valor_adicionado_st:c.stMva, icms_base_calculo_st:c.stBase, icms_aliquota_st:c.stAliq, icms_valor_st:c.st });
+  if (c.stBase > 0 || c.st > 0){
+    Object.assign(it, { icms_modalidade_base_calculo_st:'4', icms_base_calculo_st:c.stBase, icms_aliquota_st:c.stAliq, icms_valor_st:c.st });
+    if (c.stMva > 0 || !c.dev) it.icms_margem_valor_adicionado_st = c.stMva;
     if (c.fcpSt > 0) Object.assign(it, { fcp_base_calculo_st:c.stBase, fcp_percentual_st:c.fcpStAliq, fcp_valor_st:c.fcpSt });
   }
   if (c.difal) Object.assign(it, { icms_base_calculo_uf_destino:c.difal.base, fcp_base_calculo_uf_destino:c.difal.base, fcp_percentual_uf_destino:c.difal.fcpAliq,
     icms_aliquota_interna_uf_destino:c.difal.aliqDest, icms_aliquota_interestadual:c.difal.aliqInter, icms_percentual_partilha:100,
     fcp_valor_uf_destino:c.difal.fcp, icms_valor_uf_destino:c.difal.valor, icms_valor_uf_remetente:0 });
+  if (c.ipiDev > 0) Object.assign(it, { percentual_devolvido:c.pDevol, valor_ipi_devolvido:c.ipiDev }); // grupo impostoDevol
   if (c.pis > 0) Object.assign(it, { pis_base_calculo:c.basePC, pis_aliquota_porcentual:c.pisAliq, pis_valor:c.pis });
   if (c.cof > 0) Object.assign(it, { cofins_base_calculo:c.basePC, cofins_aliquota_porcentual:c.cofAliq, cofins_valor:c.cof });
   // Reforma (IBS/CBS) — guardado para mapear no layout RTC da Focus na fase do servidor
@@ -699,14 +715,14 @@ function montarLinhas(itens, e, opts){
   const dT = descTotalValor(liq.reduce((a, b) => a + b, 0), opts.descTotal);
   const rD = ratear(dT, liq), rF = ratear(opts.frete || 0, liq), rS = ratear(opts.seguro || 0, liq), rO = ratear(opts.outras || 0, liq);
   return itens.map((i, k) => ({ p:i.p, qtd:i.qtd, preco:i.preco, descItem:i.desc || 0,
-    c:calcItem(i.p, i.qtd, i.preco, i.cfop, e, { desc:r2((i.desc || 0) + rD[k]), frete:rF[k], seguro:rS[k], outras:rO[k], inter:opts.inter, difal:opts.difal, semST:opts.semST }) }));
+    c:calcItem(i.p, i.qtd, i.preco, i.cfop, e, { desc:r2((i.desc || 0) + rD[k]), frete:rF[k], seguro:rS[k], outras:rO[k], inter:opts.inter, difal:opts.difal, semST:opts.semST, dev:i.dev || null }) }));
 }
 function totais(L){
-  const t = { prod:0, desc:0, frete:0, seguro:0, outras:0, icmsBase:0, icms:0, stBase:0, st:0, fcpSt:0, difal:0, fcpDest:0, pis:0, cof:0, cbs:0, ibs:0 };
+  const t = { prod:0, desc:0, frete:0, seguro:0, outras:0, icmsBase:0, icms:0, stBase:0, st:0, fcpSt:0, difal:0, fcpDest:0, pis:0, cof:0, cbs:0, ibs:0, ipiDev:0 };
   L.forEach(({ c }) => { t.prod += c.bruto; t.desc += c.desc; t.frete += c.frete; t.seguro += c.seguro; t.outras += c.outras; t.icmsBase += c.icmsBase; t.icms += c.icms;
-    t.stBase += c.stBase; t.st += c.st; t.fcpSt += c.fcpSt; if (c.difal){ t.difal += c.difal.valor; t.fcpDest += c.difal.fcp; } t.pis += c.pis; t.cof += c.cof; t.cbs += c.cbs; t.ibs += c.ibs; });
+    t.stBase += c.stBase; t.st += c.st; t.fcpSt += c.fcpSt; if (c.difal){ t.difal += c.difal.valor; t.fcpDest += c.difal.fcp; } t.pis += c.pis; t.cof += c.cof; t.cbs += c.cbs; t.ibs += c.ibs; t.ipiDev += c.ipiDev || 0; });
   Object.keys(t).forEach(k => t[k] = r2(t[k]));
-  t.nota = r2(t.prod - t.desc + t.frete + t.seguro + t.outras + t.st + t.fcpSt);
+  t.nota = r2(t.prod - t.desc + t.frete + t.seguro + t.outras + t.st + t.fcpSt + t.ipiDev);
   return t;
 }
 function cartLinhas(){
@@ -727,7 +743,7 @@ function nfeLinhas(){
   const itens = S.nfe.itens.map(ci => { const p = S.produtos.find(x => x.id === ci.pid); if (!p) return null;
     const auto = ci.cfop ? (inter ? ({ '1':'2', '5':'6' }[ci.cfop[0]] || ci.cfop[0]) + ci.cfop.slice(1) : ci.cfop) : cfopOp(p.cfop, S.nfe.op, inter);
     const cfop = cfop4(ci.cfopMan) ? ci.cfopMan : cfop4(S.nfe.cfopMan) ? S.nfe.cfopMan : auto;
-    return { p, qtd:ci.qtd, preco:ci.preco, desc:numIn(ci.desc), cfop }; }).filter(Boolean);
+    return { p, qtd:ci.qtd, preco:ci.preco, desc:numIn(ci.desc), cfop, dev:S.nfe.op !== 'venda' && ci.dev ? ci.dev : null }; }).filter(Boolean);
   return montarLinhas(itens, e, { inter, semST:!!naoContrib || S.nfe.op !== 'venda', difal:precisaDifal ? S.nfe.difal : null, descTotal:S.nfe.descTotal,
     frete:numIn(S.nfe.vFrete), seguro:numIn(S.nfe.vSeguro), outras:numIn(S.nfe.vOutras) });
 }
@@ -735,6 +751,7 @@ function totaisPayload(T){
   const o = { valor_produtos:T.prod, valor_desconto:T.desc, valor_frete:T.frete, valor_seguro:T.seguro, valor_outras_despesas:T.outras,
     icms_base_calculo:T.icmsBase, icms_valor_total:T.icms, icms_base_calculo_st:T.stBase, icms_valor_total_st:T.st, valor_total:T.nota };
   if (T.fcpSt) o.fcp_valor_total_st = T.fcpSt;
+  if (T.ipiDev) o.valor_ipi_devolvido = T.ipiDev;
   if (T.difal || T.fcpDest){ o.icms_valor_total_uf_destino = T.difal; o.fcp_valor_total_uf_destino = T.fcpDest; o.icms_valor_total_uf_remetente = 0; }
   return o;
 }
@@ -928,6 +945,19 @@ function aplDescItem(i){
 }
 
 /* ---------- NF-e ---------- */
+// campos fiscais por item na devolução (ICMS, ICMS-ST, IPI devolvido); vazio = não destaca
+function nfeDevCampos(i, l, simples){
+  const d = S.nfe.itens[i].dev || {}, c = l.c;
+  const f = (k, rot, rs, ph = '') => `<div><label for="ndv${i}${k}">${rot}</label><input id="ndv${i}${k}" data-ndv="${i}:${k}" ${rs ? 'data-rs' : ''} inputmode="${k === 'cst' ? 'numeric' : 'decimal'}" value="${esc(d[k] ?? '')}" placeholder="${esc(ph)}"></div>`;
+  const tem = c.icms > 0 || c.st > 0 || c.ipiDev > 0;
+  return `<details class="nfe-dev" ${tem ? 'open' : ''} style="width:100%;margin-top:8px;border:1px solid var(--line-2);border-radius:10px;padding:6px 10px">
+    <summary style="cursor:pointer;font-weight:600;font-size:13px">Impostos da devolução (ICMS, ICMS-ST, IPI)${tem ? ` · <span class="small">ICMS ${brl(c.icms)}${c.st ? ' · ST ' + brl(c.st) : ''}${c.ipiDev ? ' · IPI ' + brl(c.ipiDev) : ''}</span>` : ''}</summary>
+    <p class="small" style="margin:6px 0">Para devolver o crédito, informe os impostos da nota de compra (proporcionais à quantidade devolvida).${simples ? ' Com ICMS ou ICMS-ST destacado o CSOSN vira 900.' : ''}</p>
+    <div class="g3">${f('cst', simples ? 'CSOSN' : 'CST', false, c.cst)}${f('bc', 'Base do ICMS', true)}${f('aliq', 'Alíquota ICMS (%)', false)}</div>
+    <div class="g3">${f('icms', 'Valor do ICMS', true, c.icms ? v2(c.icms.toFixed(2)) : '')}${f('bcst', 'Base do ICMS-ST', true)}${f('aliqst', 'Alíquota ICMS-ST (%)', false)}</div>
+    <div class="g3">${f('st', 'Valor do ICMS-ST', true, c.st ? v2(c.st.toFixed(2)) : '')}${f('ipi', 'IPI devolvido', true)}${f('pdev', '% devolvido da nota', false, '100')}</div>
+  </details>`;
+}
 function vNfe(){
   const n = S.nfe, { e, cli, inter, precisaDifal } = nfeCtx(), L = nfeLinhas(), T = totais(L), simples = String(e.regime) !== '3';
   const ti = [['9','9 - Sem frete'],['0','0 - Por conta do emitente (CIF)'],['1','1 - Por conta do destinatário (FOB)'],['2','2 - Por conta de terceiros'],['3','3 - Próprio, por conta do emitente'],['4','4 - Próprio, por conta do destinatário']];
@@ -970,6 +1000,7 @@ function vNfe(){
       <div><label>Desconto (R$)</label><input id="nd${i}" data-nd="${i}" data-rs inputmode="decimal" value="${esc(S.nfe.itens[i].desc || '')}"></div></div>
       <div style="display:flex;width:100%;align-items:flex-end;gap:8px;margin-top:6px;flex-wrap:wrap"><div style="flex:0 0 110px"><label for="ncf${i}">CFOP</label><input id="ncf${i}" data-ncf="${i}" inputmode="numeric" maxlength="4" value="${esc(S.nfe.itens[i].cfopMan || l.c.cfop)}"></div>
       <span class="small" style="flex:1;padding-bottom:8px">${S.nfe.itens[i].cfopMan ? `alterado à mão · <button class="btn sm" data-act="nfeCfopAuto" data-i="${i}">automático</button>` : n.cfopMan ? 'o da nota' : 'do cadastro'}</span></div>
+      ${n.op !== 'venda' ? nfeDevCampos(i, l, simples) : ''}
       <div style="display:flex;width:100%;align-items:center;gap:8px;margin-top:6px"><b class="num" style="flex:1">${brl(r2(l.c.bruto - l.descItem))}</b>
       <button class="btn sm bad" data-act="rmNfe" data-i="${i}">Remover</button></div></div>`).join('')}</div>` : '<div class="empty">Nenhum item.</div>'}`, L.length ? ` <span class="small" style="font-weight:500">(${L.length})</span>` : '')}
   ${sec(4, 'Transporte', `<label for="nfeFrete">Modalidade do frete</label><select id="nfeFrete">${ti.map(([c, t]) => `<option value="${c}" ${n.frete === c ? 'selected' : ''}>${t}</option>`).join('')}</select>
@@ -1002,7 +1033,7 @@ function vNfe(){
     <div class="row">${fld('nFrete','Frete (R$)', n.vFrete, 'data-rs inputmode="decimal"')}${fld('nSeguro','Seguro (R$)', n.vSeguro, 'data-rs inputmode="decimal"')}${fld('nOutras','Outras (R$)', n.vOutras, 'data-rs inputmode="decimal"')}</div>
     <p class="small">Desconto, frete, seguro e outras são rateados entre os itens pelo valor.</p>
     <div style="margin-top:10px">${linhaTot('Produtos', T.prod)}${T.desc ? linhaTot('Desconto', -T.desc, 'small') : ''}${T.frete ? linhaTot('Frete', T.frete, 'small') : ''}${T.seguro ? linhaTot('Seguro', T.seguro, 'small') : ''}${T.outras ? linhaTot('Outras despesas', T.outras, 'small') : ''}
-    ${T.icms ? linhaTot('ICMS próprio (BC ' + brl(T.icmsBase) + ')', T.icms, 'small') : ''}${T.st ? linhaTot('ICMS-ST (BC ' + brl(T.stBase) + ')', T.st, 'small') : ''}${T.fcpSt ? linhaTot('FCP-ST', T.fcpSt, 'small') : ''}
+    ${T.icms ? linhaTot('ICMS próprio (BC ' + brl(T.icmsBase) + ')', T.icms, 'small') : ''}${T.st ? linhaTot('ICMS-ST (BC ' + brl(T.stBase) + ')', T.st, 'small') : ''}${T.ipiDev ? linhaTot('IPI devolvido', T.ipiDev, 'small') : ''}${T.fcpSt ? linhaTot('FCP-ST', T.fcpSt, 'small') : ''}
     ${linhaTot('IBS/CBS (2026, informativo)', T.cbs + T.ibs, 'small')}${linhaTot('Total da nota', T.nota, 'big')}</div>
     <div id="errN"></div>
     <div class="actions"><button class="btn bad" data-act="limparNfe">Limpar</button><button class="btn pri" data-act="emitirNfe" ${L.length && cli ? '' : 'disabled'}>${n.op === 'venda' ? 'Emitir NF-e' : 'Emitir devolução'}</button></div>
@@ -1339,6 +1370,9 @@ async function emitirNfe(){
   if (!cli) errs.push('Selecione o destinatário.');
   if (!n.natureza) errs.push('Informe a natureza da operação.');
   if (n.op !== 'venda' && !chaveOk(n.ref)) errs.push('Informe a chave de acesso (44 dígitos) da nota que está sendo devolvida.');
+  if (n.op !== 'venda') L.forEach(l => { if (l.c.icms > 0 && !(l.c.icmsBase > 0)) errs.push(`${esc(l.p.descricao)}: informe a base do ICMS da devolução.`);
+    if (l.c.st > 0 && !(l.c.stBase > 0)) errs.push(`${esc(l.p.descricao)}: informe a base do ICMS-ST da devolução (está na nota de compra).`); });
+  if (n.op !== 'venda' && String(e.regime) !== '3') L.forEach(l => { if ((l.c.icms > 0 || l.c.st > 0) && l.c.cst !== '900') errs.push(`${esc(l.p.descricao)}: para destacar ICMS/ICMS-ST na devolução, empresa do Simples usa CSOSN 900 (deixe o campo CSOSN vazio que o sistema coloca).`); });
   if (n.cfopMan && !cfop4(n.cfopMan)) errs.push('O CFOP da nota precisa ter 4 números (ou apague para voltar ao automático).');
   n.itens.forEach(ci => { if (ci.cfopMan && !cfop4(ci.cfopMan)) { const p = S.produtos.find(x => x.id === ci.pid); errs.push(`O CFOP de ${esc(p ? p.descricao : 'um item')} precisa ter 4 números.`); } });
   { const ini = n.op === 'dev_venda' ? (inter ? '2' : '1') : (inter ? '6' : '5'), exp = n.op === 'dev_venda' ? '3' : '7';
@@ -3359,7 +3393,7 @@ function renderDevCompra(){
   openModal(`${mhead('Devolver ao fornecedor')}
   <div class="card" style="margin:0 0 10px"><b>${esc(f.fantasia || f.nome || c.fornecedor_nome)}</b> <span class="small">${fmtDoc(c.fornecedor_cnpj)}</span><br>
     <span class="small">Nota de compra nº ${esc(c.numero)} · emissão ${dataBR(c.data_emissao)} · ${brl(c.total_nota)}</span></div>
-  <p class="small">Informe quanto vai voltar de cada item (na unidade da nota do fornecedor). O sistema emite a <b>NF-e de devolução</b> referenciando a nota de compra, tira os itens do estoque e devolve na mesma proporção os descontos, frete, IPI e ICMS-ST.</p>
+  <p class="small">Informe quanto vai voltar de cada item (na unidade da nota do fornecedor). O sistema monta a <b>NF-e de devolução</b> referenciando a nota de compra, com os descontos, frete, ICMS, ICMS-ST e IPI na mesma proporção. Você confere os impostos na tela da NF-e e emite; os itens saem do estoque quando a nota for autorizada.</p>
   <div class="actions" style="margin:0 0 8px"><button class="btn sm" data-act="dcTudo">Devolver tudo</button><button class="btn sm" data-act="dcNada">Zerar quantidades</button></div>
   ${(c.itens || []).map((it, i) => { const resta = rq(num(it.qCom) - num(dv[i]));
     return `<div class="it" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line-2)"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(it.xProd || nomeProd(it.produto_id))}</div>
@@ -3369,7 +3403,7 @@ function renderDevCompra(){
   <div id="dcTot" style="margin-top:10px">${linhas.length ? `${ipi ? linhaTot('IPI devolvido', ipi, 'small') : ''}${st ? linhaTot('ICMS-ST devolvido', st, 'small') : ''}${linhaTot('Total da devolução', total, 'big')}` : '<div class="small">Nenhum item marcado.</div>'}</div>
   <div class="msg warn">Devolução de compra ainda não foi testada na SEFAZ-PI. Faça primeiro em homologação e confira a nota antes de usar de verdade.</div>
   <div id="errN"></div>
-  <div class="actions"><button class="btn" data-act="verCompra" data-id="${esc(c.id)}">Voltar</button><button class="btn pri" data-act="emitirDevCompra" ${linhas.length ? '' : 'disabled'}>Emitir NF-e de devolução</button></div>`);
+  <div class="actions"><button class="btn" data-act="verCompra" data-id="${esc(c.id)}">Voltar</button><button class="btn pri" data-act="emitirDevCompra" ${linhas.length ? '' : 'disabled'}>Montar NF-e de devolução →</button></div>`);
 }
 async function clienteDoFornecedor(c){
   const f = S.fornecedores.find(x => x.id === c.fornecedor_id) || c.fornecedor || {}, doc = dig(f.cnpj || c.fornecedor_cnpj);
@@ -3383,26 +3417,30 @@ async function clienteDoFornecedor(c){
   return novo;
 }
 async function emitirDevCompra(btn){
-  const D = calcDevCompra(), c = D.c, errs = [];
+  // monta a NF-e de devolução com os impostos proporcionais da nota de compra e abre na tela da NF-e para conferir e emitir
+  const D = calcDevCompra(), c = D.c, errs = [], e = emp() || {}, simples = String(e.regime) !== '3';
   D.linhas.forEach(l => { if (l.q > l.resta + 0.0001) errs.push(`${esc(l.it.xProd)}: só dá para devolver ${qtdTxt(l.resta)} ${esc(l.it.uCom)}.`);
     if (!S.produtos.some(p => p.id === l.it.produto_id)) errs.push(`${esc(l.it.xProd)}: o produto foi excluído do cadastro.`); });
   if (!D.linhas.length) errs.push('Informe a quantidade de pelo menos um item.');
   if (errs.length) return $('#errN').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
-  btn.disabled = true; $('#errN').innerHTML = '<div class="msg info">Emitindo a NF-e de devolução…</div>';
-  const antes = S.nfe;
+  btn.disabled = true;
   try {
-    const cli = await clienteDoFornecedor(c), nf = nfeVazia();
-    const mot = val('dcMot');
-    Object.assign(nf, { op:'dev_compra', natureza:NAT_OP.dev_compra, ref:c.chave, clienteId:cli.id, frete:'9', vOutras:v2(D.outras), compraId:c.id,
+    const cli = await clienteDoFornecedor(c), nf = nfeVazia(), mot = val('dcMot');
+    const rs = v => v > 0 ? v2(r2(v).toFixed(2)) : '', pc = v => v > 0 ? v2(String(r2(v))) : '';
+    Object.assign(nf, { op:'dev_compra', natureza:NAT_OP.dev_compra, ref:c.chave, clienteId:cli.id, frete:'9', vOutras:rs(D.linhas.reduce((a, l) => a + l.ex, 0)), compraId:c.id,
       devItens:D.linhas.map(l => ({ i:l.i, q:l.q })),
       obs:[`Devolução ref. NF-e ${c.numero} série ${c.serie || ''} de ${dataBR(c.data_emissao)}`, mot && 'Motivo: ' + mot,
-        D.ipi && 'IPI devolvido ' + brl(D.ipi), D.st && 'ICMS-ST devolvido ' + brl(D.st)].filter(Boolean).join('. '),
-      itens:D.linhas.map(l => ({ pid:l.it.produto_id, qtd:l.qEst, preco:l.preco, desc:l.desc ? v2(l.desc) : '',
-        cfop:CFOP_ST_COMPRA.includes(String(l.it.cfop)) || num(l.it.vICMSST) > 0 ? '5411' : '5202' })) });
-    S.nfe = nf;
-    await emitirNfe();
-  } catch(err){ $('#errN').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
-  finally { S.nfe = antes; const b = $('[data-act=emitirDevCompra]'); if (b) b.disabled = false; }
+        D.ipi && 'IPI devolvido ' + brl(D.ipi)].filter(Boolean).join('. '),
+      itens:D.linhas.map(l => { const k = l.q / num(l.it.qCom), it = l.it;
+        const vicms = r2(num(it.vICMS) * k), vst = l.vst;
+        return { pid:it.produto_id, qtd:l.qEst, preco:l.preco, desc:l.desc ? v2(l.desc) : '',
+          cfop:CFOP_ST_COMPRA.includes(String(it.cfop)) || num(it.vICMSST) > 0 ? '5411' : '5202',
+          // impostos da nota de compra, na proporção devolvida (editáveis na tela da NF-e)
+          dev:{ cst:'', bc:vicms > 0 ? rs(num(it.vBC) * k) : '', aliq:vicms > 0 ? pc(num(it.pICMS)) : '', icms:rs(vicms),
+            bcst:vst > 0 ? rs(num(it.vBCST) * k) : '', aliqst:'', st:rs(vst), ipi:rs(l.vipi), pdev:pc(k * 100) } }; }) });
+    S.nfe = nf; S.tab = 'nfe'; closeModal(); render(); window.scrollTo(0, 0);
+    toast(`Confira os impostos da devolução e clique em Emitir.${simples ? ' Com ICMS destacado sai com CSOSN 900.' : ''}`);
+  } catch(err){ $('#errN').innerHTML = `<div class="msg err">${esc(err.message)}</div>`; btn.disabled = false; }
 }
 
 /* ---------- ficha de estoque do produto (inventário e movimentações) ---------- */
@@ -4282,6 +4320,7 @@ document.addEventListener('input', ev => {
   else if (t.id === 'nomeCons'){ S.nomeCons = t.value; }
   else if (t.id === 'nfeNat'){ S.nfe.natureza = t.value; }
   else if (t.id === 'nfeCfop'){ const v = dig(t.value).slice(0, 4); S.nfe.cfopMan = v; if (v) S.nfe.itens.forEach(ci => { delete ci.cfopMan; }); }
+  else if (t.dataset.ndv !== undefined){ const [k, f] = t.dataset.ndv.split(':'), ci = S.nfe.itens[+k]; ci.dev = ci.dev || {}; ci.dev[f] = t.value; }
   else if (t.dataset.ncf !== undefined){ const ci = S.nfe.itens[+t.dataset.ncf], v = dig(t.value).slice(0, 4); if (v) ci.cfopMan = v; else delete ci.cfopMan; }
   else if (t.id === 'nfeObs'){ S.nfe.obs = t.value; }
   else if (t.id === 'nfeFisco'){ S.nfe.fisco = t.value; }
@@ -4302,7 +4341,7 @@ document.addEventListener('change', ev => {
   else if (t.dataset.qi !== undefined){ const q = numIn(t.value); const i = +t.dataset.qi; if (q > 0) S.cart[i].qtd = q; else S.cart.splice(i, 1); later(); }
   else if (t.dataset.nq !== undefined){ S.nfe.itens[+t.dataset.nq].qtd = numIn(t.value); later(); }
   else if (t.dataset.np !== undefined){ S.nfe.itens[+t.dataset.np].preco = numIn(t.value); later(); }
-  else if (t.id === 'nfeCfop' || t.dataset.ncf !== undefined){ later(); }
+  else if (t.id === 'nfeCfop' || t.dataset.ncf !== undefined || t.dataset.ndv !== undefined){ later(); }
   else if (t.dataset.pv !== undefined || ['descTot','nDescTot','nFrete','nSeguro','nOutras','dfAliq','dfFcp'].includes(t.id) || t.dataset.nd !== undefined){ later(); }
   else if (t.id === 'relIni' || t.id === 'relFim'){ if (t.value){ S[t.id] = t.value; S.relLim = 30; render(); } }
   else if (t.id === 'ntMes'){ S.ntMes = t.value; S.ntLim = 30; render(); }
