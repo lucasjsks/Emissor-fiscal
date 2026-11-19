@@ -2766,8 +2766,8 @@ function vCompras(){
   const nPend = S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave)).length;
   if (v === 'recebidas' && pode('produto') && !S.recAuto){ S.recAuto = true; const m = (emp() || {}).mde || {};
     if (!m.sinc_em || Date.now() - new Date(m.sinc_em) > 15 * 60e3) setTimeout(() => recBuscar(null, true), 50); }
-  return `<h2>Compras</h2><div class="seg" style="margin-bottom:12px">${[['notas','Notas de compra'], ...(pode('produto') ? [['recebidas', `Recebidas da SEFAZ${nPend ? ` (${nPend})` : ''}`]] : []), ['fornecedores','Fornecedores']].map(([k, l]) => `<button data-act="cpView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
-    + (v === 'notas' ? vNotasCompra() : v === 'recebidas' ? vRecebidas() : vFornecedores());
+  return `<h2>Compras</h2><div class="seg" style="margin-bottom:12px">${[['notas','Notas de compra'], ...(pode('produto') ? [['recebidas', `Recebidas da SEFAZ${nPend ? ` (${nPend})` : ''}`]] : [])].map(([k, l]) => `<button data-act="cpView" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div>`
+    + (v === 'recebidas' ? vRecebidas() : vNotasCompra());
 }
 function vNotasCompra(){
   // lista curta: mês atual por padrão (a busca procura em todos os meses), estornadas à parte e 30 por vez
@@ -3036,7 +3036,7 @@ function renderCompraManual(){
   ${c.corrige ? '<div class="msg warn">A nota original já foi estornada. Corrija os dados e lance de novo.</div>' : ''}
   <h3 style="margin-top:4px">Fornecedor</h3>
   ${sel('cm_fornecedor_id', 'Fornecedor', c.fornecedor_id, [['','— selecione —'], ...forn.map(f => [f.id, (f.fantasia || f.nome) + ' · ' + fmtDoc(f.cnpj)])]).replace('<select ', '<select data-cm="fornecedor_id" ')}
-  <p class="small">Fornecedor novo? Cadastre antes em Compras → Fornecedores (o CNPJ preenche tudo sozinho).</p>
+  ${pode('produto') ? `<div class="actions" style="margin-top:4px"><button class="btn sm" data-act="novoFornecedor">+ Novo fornecedor</button>${c.fornecedor_id ? `<button class="btn sm" data-act="editFornecedor" data-id="${esc(c.fornecedor_id)}">Editar dados do fornecedor</button>` : ''}</div>` : ''}
   <h3>Dados da nota</h3>
   <div class="row">${sel('cm_modelo', 'Tipo', c.modelo, MODELOS_COMPRA).replace('<select ', '<select data-cm="modelo" ')}${campo('numero', 'Número *', 'inputmode="numeric"')}${campo('serie', 'Série', 'inputmode="numeric"')}</div>
   ${c.modelo !== 'papel' ? `${campo('chave', 'Chave de acesso (44 dígitos)', 'inputmode="numeric" autocomplete="off"')}<div class="small" id="cmChaveInfo">${c.chave ? (chaveOk(c.chave) ? '<span style="color:var(--ok)">✓ chave válida</span>' : '<span style="color:var(--bad)">✕ chave inválida</span>') : ''}</div>` : ''}
@@ -3134,6 +3134,7 @@ function danfeCompraHtml(c){
   ${(c.itens || []).map(i => `<tr><td>${esc(i.xProd || '')}</td><td>${esc(nomeProd(i.produto_id))}</td><td>${num(i.fator) !== 1 ? '1 ' + esc(i.uCom) + ' = ' + qtdTxt(i.fator) : '—'}</td><td>${qtdTxt(i.qtd_estoque)}</td><td>${brl(i.custo_unit)}</td></tr>`).join('')}</table></div>
   <div class="small" style="margin-top:6px">Documento auxiliar gerado pelo NotaOne${c.origem === 'xml' ? ' a partir do XML da nota' : ' a partir do lançamento manual'} · lançada em ${fmtData(c.lancado_em)}.</div></div>`;
 }
+const fornDaCompra = c => S.fornecedores.find(f => f.id === c.fornecedor_id) || S.fornecedores.find(f => f.cnpj && f.cnpj === dig(c.fornecedor_cnpj || ''));
 function verCompra(id){
   const c = S.compras.find(x => x.id === id); if (!c) return;
   const ger = pode('produto'), ativa = c.status !== 'estornada';
@@ -3143,6 +3144,7 @@ function verCompra(id){
     <button class="btn pri" data-act="imprimirCompra" data-id="${esc(id)}">📄 Gerar PDF (DANFE)</button>
     ${c.tem_xml ? `<button class="btn" data-act="baixarXmlCompra" data-id="${esc(id)}">⤓ Baixar XML</button>` : ''}
     ${ativa && ger && situacaoDev(c) !== 'total' ? `<button class="btn" data-act="devCompra" data-id="${esc(id)}">↩ Devolver ao fornecedor</button>` : ''}
+    ${ger && fornDaCompra(c) ? `<button class="btn" data-act="editFornecedor" data-id="${esc(fornDaCompra(c).id)}">Dados do fornecedor</button>` : ''}
     ${ativa && ger && !devsDaCompra(id).length ? `<button class="btn" data-act="corrigirCompra" data-id="${esc(id)}">Corrigir</button>` : ''}
   </div>
   ${devsDaCompra(id).length ? `<div class="card" style="margin:10px 0"><b>Devoluções desta compra</b>${devsDaCompra(id).map(n => `<div class="it" data-act="verNota" data-id="${esc(n.id)}" style="cursor:pointer;display:flex;gap:8px;padding:8px 0"><div style="flex:1">NF-e nº ${n.numero} · ${fmtData(n.data)}</div>${tagStatus(n)} <b class="num">${brl(n.total)}</b></div>`).join('')}</div>` : ''}
@@ -3392,7 +3394,7 @@ async function clienteDoFornecedor(c){
   const o = { doc, nome:(f.nome || c.fornecedor_nome || '').toUpperCase(), ind_ie:dig(f.ie) ? '1' : '9', ie:dig(f.ie), email:f.email || '', logradouro:f.logradouro || '', numero:f.numero || 'S/N',
     bairro:f.bairro || '', cep:dig(f.cep), municipio:f.municipio || '', cod_municipio:dig(f.cod_municipio), uf:f.uf || '', fornecedor:true };
   const falta = [!o.logradouro && 'endereço', !o.bairro && 'bairro', !o.municipio && 'município', o.cod_municipio.length !== 7 && 'código IBGE do município', !o.uf && 'UF'].filter(Boolean);
-  if (falta.length) throw new Error(`Complete o cadastro do fornecedor (Compras → Fornecedores): falta ${falta.join(', ')}.`);
+  if (falta.length) throw new Error(`Complete o cadastro do fornecedor (na nota de compra, botão "Dados do fornecedor"): falta ${falta.join(', ')}.`);
   const novo = await put('clientes', o);
   if (!S.clientes.some(x => x.id === novo.id)) S.clientes.push(novo); // ainda não chegou pelo tempo real
   return novo;
@@ -3441,19 +3443,6 @@ async function verEstoque(id){
 }
 
 /* ---------- fornecedores ---------- */
-function vFornecedores(){
-  const qf = norm(S.fnBusca || ''), limF = S.fnLim || 30, porCnpj = {};
-  let L = [...S.fornecedores].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-  if (qf) L = L.filter(f => norm(f.nome).includes(qf) || norm(f.fantasia).includes(qf) || (dig(qf).length >= 4 && dig(f.cnpj).includes(dig(qf))));
-  const maisF = L.length - limF; L = L.slice(0, limF);
-  S.compras.forEach(c => { if (c.status === 'estornada') return; const x = porCnpj[c.fornecedor_cnpj] || (porCnpj[c.fornecedor_cnpj] = { n:0, v:0 }); x.n++; x.v += num(c.total_nota); });
-  return `${pode('produto') ? '<div class="actions" style="margin:0 0 12px"><button class="btn pri" data-act="novoFornecedor">+ Fornecedor</button></div>' : ''}
-    ${S.fornecedores.length > 8 ? `<div class="card"><input id="fnBusca" placeholder="Buscar fornecedor por nome ou CNPJ" value="${esc(S.fnBusca || '')}" autocomplete="off"></div>` : ''}
-    <div class="card">${L.length ? `<div class="list">${L.map(f => { const cs = porCnpj[f.cnpj] || { n:0, v:0 };
-      return `<div class="it" data-act="editFornecedor" data-id="${esc(f.id)}" style="cursor:pointer"><div class="grow"><div class="t">${esc(f.fantasia || f.nome)}</div>
-        <div class="s">${fmtDoc(f.cnpj)} · ${esc(f.municipio || '')}/${esc(f.uf || '')}</div></div><div style="text-align:right"><b class="num">${brl(cs.v)}</b><br><span class="small">${cs.n} compra(s)</span></div></div>`; }).join('')}</div>${maisF > 0 ? `<div class="actions"><button class="btn" data-act="fnMais">Mostrar mais ${Math.min(maisF, 30)} (faltam ${maisF})</button></div>` : ''}`
-      : `<div class="empty">${S.fornecedores.length ? 'Nenhum fornecedor encontrado.' : 'Os fornecedores entram sozinhos quando você importa uma nota de compra.'}</div>`}</div>`;
-}
 /* ---------- FINANCEIRO: contas a pagar e a receber ----------
    Títulos automáticos (não gravados): parcelas das compras a prazo, duplicatas das NF-e a prazo e vendas em "Crédito loja".
    Só a baixa (pagamento/recebimento) é gravada em financeiro/<id do título>. Contas lançadas à mão ficam inteiras em financeiro/<id>. */
@@ -3640,7 +3629,8 @@ async function salvarFornecedor(id){
   if (!o.nome) errs.push('Informe a razão social.');
   if (S.fornecedores.some(f => f.cnpj === o.cnpj && f.id !== id)) errs.push('Já existe um fornecedor com esse CNPJ.');
   if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
-  if (await safe(() => put('fornecedores', o), 'Fornecedor salvo.')) closeModal();
+  let salvo = null; if (!(await safe(async () => { salvo = await put('fornecedores', o); }, 'Fornecedor salvo.'))) return;
+  if (S.cmVoltar && S.cm){ S.cmVoltar = false; if (salvo && salvo.id){ S.cm.fornecedor_id = salvo.id; S.fornecedores = [...S.fornecedores.filter(f => f.id !== salvo.id), salvo]; } renderCompraManual(); } else closeModal();
 }
 
 /* ---------- eventos ---------- */
@@ -3693,8 +3683,8 @@ async function acoesEstoque(a, t, id){
       t.disabled = true; const { error } = await SB.rpc('ajustar_estoque', { e:S.empId, pid:id, novo_saldo:numIn(v), motivo:val('ajMot') }); t.disabled = false;
       if (error){ $('#errM').innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return true; }
       toast('Saldo ajustado.'); verEstoque(id); return true; }
-    case 'novoFornecedor': formFornecedor(); return true;
-    case 'editFornecedor': formFornecedor(clone(S.fornecedores.find(x => x.id === id))); return true;
+    case 'novoFornecedor': S.cmVoltar = !!(S.cm && $('#cm_fornecedor_id')); formFornecedor(); return true;
+    case 'editFornecedor': S.cmVoltar = !!(S.cm && $('#cm_fornecedor_id')); formFornecedor(clone(S.fornecedores.find(x => x.id === id))); return true;
     case 'salvarFornecedor': salvarFornecedor(id); return true;
     case 'delFornecedor': confirmar('Excluir este fornecedor? As compras já lançadas continuam no histórico.', 'confDelFornecedor', id); return true;
     case 'confDelFornecedor': if (await safe(() => del('fornecedores', id), 'Fornecedor excluído.')) closeModal(); return true;
