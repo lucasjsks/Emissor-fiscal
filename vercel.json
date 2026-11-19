@@ -1,4 +1,4 @@
 {
-  "crons": [{ "path": "/api/contador", "schedule": "0 10 * * *" }],
-  "functions": { "api/contador.js": { "maxDuration": 60 } }
+  "crons": [{ "path": "/api/contador", "schedule": "0 10 * * *" }, { "path": "/api/recebidas", "schedule": "0 11 * * *" }],
+  "functions": { "api/contador.js": { "maxDuration": 60 }, "api/recebidas.js": { "maxDuration": 60 } }
 }

@@ -2826,9 +2826,21 @@ function vRecebidas(){
 async function recBuscar(btn, silencioso){
   if (btn) btn.disabled = true;
   try { const r = await api('recebidas', { empresa_id:S.empId, acao:'buscar' }); if (!silencioso) toast(r.gravadas ? `${r.gravadas} nota(s) atualizada(s).` : 'Nenhuma nota nova.'); }
-  catch(e){ if (!silencioso) toast(e.message); else S.recErro = e.message; }
+  catch(e){ S.recErroEm = Date.now(); if (!silencioso) toast(e.message); else S.recErro = e.message; }
   finally { if (btn) btn.disabled = false; }
 }
+// busca sozinha as notas de compra na SEFAZ enquanto o sistema está aberto (além da busca diária do servidor):
+// a cada 15 min; depois de um erro (ex.: Manifestação não liberada na Focus), só tenta de novo em 6 h
+let recAutoRodando = false;
+async function autoRecebidas(){
+  const e = emp(); if (S.mode !== 'db' || !e || !navigator.onLine || recAutoRodando || !pode('produto')) return;
+  const m = e.mde || {}; if (!m.sinc_em && !(e.certificado || {}).manifestacao) return;
+  const agora = Date.now(), ult = Math.max(m.sinc_em ? +new Date(m.sinc_em) : 0, S.recTentouEm || 0);
+  if (agora - ult < 15 * 60e3 || (S.recErroEm && agora - S.recErroEm < 6 * 3600e3)) return;
+  recAutoRodando = true; S.recTentouEm = agora;
+  try { await recBuscar(null, true); } finally { recAutoRodando = false; }
+}
+setInterval(autoRecebidas, 60e3);
 function verRecebida(chave){
   const r = S.recebidas.find(x => x.chave === chave); if (!r) return;
   const c = compraDaChave(chave), [ml] = MANIF[r.manifestacao] || MANIF.nulo, aberta = r.situacao !== 'cancelada', resp = ['confirmacao','desconhecimento','nao_realizada'].includes(r.manifestacao);

@@ -295,3 +295,12 @@ test('notas recebidas: a mesma nota repetida na lista não derruba a gravação 
   const d = docs['empresas/E1/recebidas/' + c1];
   assert.equal(d.versao, 4); assert.equal(d.manifestacao, 'ciencia'); assert.equal(d.compra_id, 'C9');
 });
+
+test('notas recebidas: busca automática (cron) só com CRON_SECRET e só empresas com Manifestação', async () => {
+  const { default: h, temMde } = await import('../api/recebidas.js');
+  assert.equal(temMde({ mde:{ sinc_em:'2026-11-01T10:00:00-03:00' } }), true);
+  assert.equal(temMde({ certificado:{ manifestacao:true } }), true);
+  assert.equal(temMde({ cnpj:'1' }), false);
+  const res = () => { const o = { code:0, body:null }; o.status = c => { o.code = c; return o; }; o.json = b => { o.body = b; return o; }; return o; };
+  const r1 = res(); await h({ method:'GET', headers:{} }, r1); assert.equal(r1.code, 401);
+});
