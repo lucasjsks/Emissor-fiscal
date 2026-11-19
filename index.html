@@ -2036,8 +2036,7 @@ function imprimirRel(){
   ${tab('Resumo', ['', 'Valor'], [lin('Faturamento', brl(R.fat)), lin('Vendas', R.vend.length), lin('Ticket médio', brl(tk)), lin('Descontos concedidos', brl(R.desc)), lin('Devoluções', brl(R.devV)), lin('Faturamento líquido', brl(r2(R.fat - R.devV))), lin('Canceladas (fora do total)', R.canc.length)])}
   ${tab('Por forma de pagamento', ['Forma', 'Valor'], Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => lin(esc(nomeForma(f)), brl(v))))}
   ${Object.keys(R.dia).length > 1 ? tab('Por dia', ['Dia', 'Valor'], Object.entries(R.dia).sort().map(([d, v]) => lin(dBR(d), brl(v)))) : ''}
-  ${tab('Produtos vendidos', ['Produto', 'Quantidade', 'Valor'], R.prod.map(p => `<tr><td>${esc(p.d)}</td><td class="r">${qtdTxt(p.q)} ${esc(p.u)}</td><td class="r">${brl(p.v)}</td></tr>`), [1, 2])}
-  ${tab('Vendas', ['Nota', 'Data', 'Cliente', 'Total'], R.vend.map(n => `<tr><td>${n.modelo === '65' ? 'Cupom' : 'NF-e'} ${n.numero}</td><td>${fmtData(n.data)}</td><td>${esc(n.destNome || 'Consumidor')}</td><td class="r">${brl(n.total)}</td></tr>`))}`;
+  ${tab('Produtos vendidos', ['Produto', 'Quantidade', 'Valor'], R.prod.map(p => `<tr><td>${esc(p.d)}</td><td class="r">${qtdTxt(p.q)} ${esc(p.u)}</td><td class="r">${brl(p.v)}</td></tr>`), [1, 2])}`;
   imprimirDoc('Relatório de vendas', css, corpo);
 }
 
