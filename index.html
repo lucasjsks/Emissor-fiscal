@@ -338,6 +338,12 @@ body.pdv{background:#e9eef5}
 #mbox.compacto .small,#mbox.compacto p.small{font-size:11.5px;margin:3px 0 0}
 #mbox.compacto .btn{padding:8px 12px;font-size:13.5px}
 #mbox.compacto .actions{margin-top:10px}
+/* Lista de produtos compacta: uma linha por produto, preço e estoque lado a lado */
+.prod-l .fin-r{flex-direction:row;align-items:center;gap:14px}
+.prod-l .prod-p{min-width:84px;text-align:right;font-size:14px}
+.prod-l .prod-e{min-width:92px;text-align:right;font-weight:600;font-size:13.5px}
+.prod-l .prod-e small{font-weight:500;color:#6b7686;font-size:11px}
+.prod-l .fin-d span .tag{font-size:10.5px;padding:1px 6px}
 </style>
 </head>
 <body>
@@ -1207,9 +1213,9 @@ function vProdutos(){
   <div class="stats"><div><b>${V.length}</b>produtos</div><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${P.filter(baixo).length}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${nErr}</b>com erro fiscal</div></div>
   <div class="card"><input id="estBusca" placeholder="Buscar por nome, código ou código de barras…" value="${esc(S.estBusca || '')}" autocomplete="off">
     <div class="seg" style="margin-top:8px">${chips.filter(([k, , n]) => k === 'todos' || n || f === k).map(([k, l, n]) => `<button data-act="filtroProd" data-f="${k}" class="${f === k ? 'on' : ''}">${l}${k !== 'todos' ? ` (${n})` : ''}</button>`).join('')}</div></div>
-  <div class="card">${lista.length ? `<div class="list">${lista.map(({ p, v }) => `<div class="it" data-act="editProd" data-id="${esc(p.id)}" style="cursor:pointer"><div class="grow"><div class="t">${p.favorito ? '★ ' : ''}${esc(p.descricao)}</div>
-    <div class="s">${p.codigo ? 'cód. ' + esc(p.codigo) + ' · ' : ''}NCM ${fmtNcm(p.ncm)}${temSaldo(p) ? ` · custo médio ${brl(p.custo_medio || 0)}` : ''}${num(p.estoque_min) > 0 ? ' · mín. ' + qtdTxt(p.estoque_min) : ''} ${tag(v)}</div></div>
-    <div style="text-align:right;min-width:92px"><b class="num">${brl(p.preco)}</b><br><span class="num" style="color:${cor(p)};font-weight:600">${temSaldo(p) ? qtdTxt(p.estoque) : '—'}</span> <span class="small">${esc(p.unidade || 'UN')}</span></div></div>`).join('')}</div>`
+  <div class="card">${lista.length ? `<div class="fin-lista">${lista.map(({ p, v }) => `<div class="fin-l nt-l prod-l" data-act="editProd" data-id="${esc(p.id)}">
+    <div class="fin-d"><b>${p.favorito ? '★ ' : ''}${esc(p.descricao)}</b><span>${p.codigo ? 'cód. ' + esc(p.codigo) + ' · ' : ''}NCM ${fmtNcm(p.ncm)}${temSaldo(p) ? ` · custo ${brl(p.custo_medio || 0)}` : ''}${num(p.estoque_min) > 0 ? ' · mín. ' + qtdTxt(p.estoque_min) : ''} ${tag(v)}</span></div>
+    <div class="fin-r"><b class="num prod-p">${brl(p.preco)}</b><span class="num prod-e" style="color:${cor(p)}">${temSaldo(p) ? qtdTxt(p.estoque) : '—'} <small>${esc(p.unidade || 'UN')}</small></span></div></div>`).join('')}</div>`
     : `<div class="empty">${V.length ? 'Nenhum produto neste filtro.' : 'Nenhum produto cadastrado. Cadastre aqui ou importe uma nota de compra na aba Compras.'}</div>`}</div>
   <p class="small">Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.</p>`;
 }
