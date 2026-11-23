@@ -21,6 +21,10 @@
     {
       "source": "/site",
       "destination": "/site/index.html"
+    },
+    {
+      "source": "/site/cadastro",
+      "destination": "/site/cadastro.html"
     }
   ]
 }

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Criar conta — NotaOne</title>
+<meta name="description" content="Crie sua conta no NotaOne e comece a testar a emissão de NF-e e cupom fiscal hoje mesmo.">
+<link rel="icon" href="/img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,sans-serif;color:#0A1630;background:#F5F7FB}
+a{color:#0E7A5A}a:hover{color:#0A1630}
+header{background:#0A1630;color:#fff}
+.nav{max-width:1100px;margin:0 auto;padding:18px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.marca{display:flex;align-items:center;gap:12px;text-decoration:none;color:#fff;flex:1 1 auto}
+.marca img{width:44px;height:44px;object-fit:contain}
+.marca b{font-family:'Space Grotesk',sans-serif;font-size:24px;letter-spacing:-.5px}
+.marca b span{color:#C6F432}
+.marca small{display:block;font-size:10px;letter-spacing:3px;color:#B8C2D9;font-weight:600;margin-top:3px}
+.nav a.bt{color:#0A1630;background:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:10px 16px;border-radius:999px}
+.wrap{max-width:1100px;margin:0 auto;padding:40px 24px 64px;display:flex;gap:40px;flex-wrap:wrap;align-items:flex-start}
+.lado{flex:1 1 340px;min-width:0}
+.lado h1{font-family:'Space Grotesk',sans-serif;font-size:42px;line-height:1.08;letter-spacing:-1.5px;margin:0 0 14px}
+.lado p{color:#4A5875;font-size:17px;line-height:1.6;margin:0 0 18px}
+.lado ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.lado li{display:flex;gap:10px;align-items:flex-start;font-size:16px;line-height:1.45}
+.lado li svg{flex-shrink:0;margin-top:2px}
+.card{flex:1 1 420px;min-width:0;max-width:520px;background:#fff;border:1px solid #E6EAF1;border-radius:22px;padding:28px;box-shadow:0 20px 50px rgba(10,22,48,.08)}
+.card h2{font-family:'Space Grotesk',sans-serif;margin:0 0 4px;font-size:26px}
+.card .sub{color:#4A5875;margin:0 0 16px;font-size:15px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 5px}
+input{width:100%;font:inherit;font-size:15px;padding:11px 13px;border:1px solid #CDD5E2;border-radius:11px;background:#fff;color:#0A1630}
+input:focus{outline:2px solid #0E7A5A;outline-offset:1px;border-color:#0E7A5A}
+.duo{display:flex;gap:12px;flex-wrap:wrap}.duo>div{flex:1 1 180px;min-width:0}
+.senha{position:relative}.senha button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:#4A5875;font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:8px}
+.enviar{width:100%;margin-top:18px;background:#0A1630;color:#fff;border:0;border-radius:999px;padding:15px;font:inherit;font-weight:700;font-size:16px;cursor:pointer;min-height:48px}
+.enviar:disabled{opacity:.6;cursor:wait}
+.msg{margin-top:14px;padding:12px 14px;border-radius:12px;font-size:14.5px;line-height:1.5}
+.msg.err{background:#FDECEC;color:#8A1C1C}
+.msg.ok{background:#E7F5EE;color:#0F5132}
+.peq{font-size:13px;color:#4A5875;margin:12px 0 0;text-align:center}
+.feito{text-align:center}.feito h2{margin-bottom:8px}
+.feito .bt2{display:inline-block;margin-top:16px;background:#0A1630;color:#fff;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:999px}
+@media (max-width:640px){.lado h1{font-size:32px}.card{padding:22px}}
+</style>
+</head>
+<body>
+<header><div class="nav">
+<a class="marca" href="/site"><img src="/img/logo.png" alt=""><span><b>Nota<span>One</span></b><small>EMISSÃO INTELIGENTE</small></span></a>
+<a class="bt" href="https://emissor-fiscal-orpin.vercel.app">Acessar sistema</a>
+</div></header>
+
+<main class="wrap">
+<section class="lado">
+<h1>Crie sua conta e comece hoje.</h1>
+<p>Leva menos de um minuto. Depois é só confirmar o e-mail e entrar no sistema.</p>
+<ul>
+<li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>A conta começa em <b>modo de teste</b>: emita notas de teste, sem valor fiscal, e conheça tudo com calma.</li>
+<li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Os dados da empresa vêm da Receita pelo CNPJ: você só confere.</li>
+<li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Para emitir de verdade, você envia o certificado digital A1 e a gente ativa o plano de <b>R$ 89,99/mês</b>.</li>
+<li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>Dúvidas? Fale no WhatsApp <a href="https://wa.me/5586981931921" target="_blank" rel="noopener">(86) 98193-1921</a>.</li>
+</ul>
+</section>
+
+<section class="card" id="caixa">
+<form id="form" novalidate>
+<h2>Criar conta</h2>
+<p class="sub">Todos os campos são obrigatórios.</p>
+<label for="nome">Seu nome</label><input id="nome" autocomplete="name" required>
+<div class="duo">
+<div><label for="fone">WhatsApp</label><input id="fone" inputmode="tel" autocomplete="tel" placeholder="(86) 99999-9999" required></div>
+<div><label for="cnpj">CNPJ da empresa</label><input id="cnpj" inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00" required></div>
+</div>
+<label for="empresa">Nome da empresa</label><input id="empresa" autocomplete="organization" required>
+<label for="email">E-mail (será o seu login)</label><input id="email" type="email" autocomplete="email" required>
+<label for="senha">Senha (mínimo 8 caracteres)</label>
+<div class="senha"><input id="senha" type="password" autocomplete="new-password" minlength="8" required><button type="button" id="ver" aria-label="Mostrar senha">Mostrar</button></div>
+<div id="msg"></div>
+<button class="enviar" id="enviar" type="submit">Criar minha conta</button>
+<p class="peq">Já tem conta? <a href="https://emissor-fiscal-orpin.vercel.app">Acessar sistema</a></p>
+</form>
+</section>
+</main>
+
+<script type="module">
+const $ = s => document.querySelector(s), dig = v => String(v || '').replace(/\D/g, '');
+const msg = (t, tipo = 'err') => { $('#msg').innerHTML = `<div class="msg ${tipo}">${t}</div>`; };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+function cnpjOk(c){
+  c = dig(c); if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false;
+  const calc = n => { let s = 0, p = n - 7; for (let i = 0; i < n; i++){ s += +c[i] * p--; if (p < 2) p = 9; } const r = s % 11; return r < 2 ? 0 : 11 - r; };
+  return calc(12) === +c[12] && calc(13) === +c[13];
+}
+const fmtCnpj = d => d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2}).*/, '$1.$2.$3/$4-$5');
+const fmtFone = d => d.length > 10 ? d.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3') : d.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
+$('#cnpj').addEventListener('blur', e => { const d = dig(e.target.value); if (d.length === 14) e.target.value = fmtCnpj(d); });
+$('#fone').addEventListener('blur', e => { const d = dig(e.target.value); if (d.length >= 10) e.target.value = fmtFone(d); });
+$('#ver').addEventListener('click', () => { const s = $('#senha'), v = s.type === 'password'; s.type = v ? 'text' : 'password'; $('#ver').textContent = v ? 'Esconder' : 'Mostrar'; });
+
+let SB = null;
+async function supa(){
+  if (SB) return SB;
+  const r = await fetch('/api/config'); const c = await r.json();
+  if (!r.ok) throw new Error(c.erro || 'Não foi possível conectar. Tente de novo em instantes.');
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  return SB = createClient(c.supabaseUrl, c.supabaseAnonKey);
+}
+
+$('#form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const nome = $('#nome').value.trim(), fone = dig($('#fone').value), cnpj = dig($('#cnpj').value), empresa = $('#empresa').value.trim(),
+    email = $('#email').value.trim().toLowerCase(), senha = $('#senha').value, errs = [];
+  if (nome.length < 3) errs.push('Informe o seu nome.');
+  if (fone.length < 10) errs.push('Informe o WhatsApp com DDD.');
+  if (!cnpjOk(cnpj)) errs.push('CNPJ inválido. Confira os números.');
+  if (empresa.length < 2) errs.push('Informe o nome da empresa.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.push('E-mail inválido.');
+  if (senha.length < 8) errs.push('A senha precisa ter pelo menos 8 caracteres.');
+  if (errs.length) return msg(errs.join('<br>'));
+  const bt = $('#enviar'); bt.disabled = true; bt.textContent = 'Criando sua conta…'; $('#msg').innerHTML = '';
+  try {
+    const sb = await supa();
+    const { data, error } = await sb.auth.signUp({ email, password:senha, options:{ emailRedirectTo:location.origin,
+      data:{ nome, telefone:fone, empresa, cnpj, origem:'site' } } });
+    const jaExiste = (error && /already|registered|exists/i.test(error.message)) || (data && data.user && Array.isArray(data.user.identities) && !data.user.identities.length);
+    if (jaExiste) throw new Error('Já existe uma conta com este e-mail. <a href="https://emissor-fiscal-orpin.vercel.app">Acesse o sistema</a> com a sua senha ou use "Esqueci a senha".');
+    if (error) throw new Error(/password/i.test(error.message) ? 'Senha fraca: use pelo menos 8 caracteres, misturando letras e números.' : /email/i.test(error.message) ? 'E-mail inválido. Confira o endereço.' : esc(error.message));
+    if (data.session){ location.href = '/'; return; }
+    $('#caixa').innerHTML = `<div class="feito"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7 12.5l3.5 3.5L17 9"></path></svg>
+      <h2>Conta criada!</h2><p>Enviamos um link de confirmação para <b>${esc(email)}</b>.<br>Abra o e-mail, clique no link e entre no sistema. Os dados da sua empresa já vão estar preenchidos.</p>
+      <p class="peq">Não chegou? Olhe a caixa de spam ou fale no WhatsApp <a href="https://wa.me/5586981931921" target="_blank" rel="noopener">(86) 98193-1921</a>.</p>
+      <a class="bt2" href="https://emissor-fiscal-orpin.vercel.app">Acessar sistema</a></div>`;
+  } catch(e){ msg(e.message || 'Não foi possível criar a conta. Tente de novo.'); bt.disabled = false; bt.textContent = 'Criar minha conta'; }
+});
+</script>
+</body>
+</html>

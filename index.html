@@ -1259,7 +1259,9 @@ const val = id => { const el = document.getElementById(id); return el ? el.value
 const mhead = t => `<div class="mhead"><h2>${t}</h2><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>`;
 
 function formEmpresa(e){
-  e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1' };
+  const meta = S.meuMeta || {}, doSite = !e && dig(meta.cnpj).length === 14;
+  e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1',
+    cnpj:dig(meta.cnpj), fantasia:meta.empresa || '', telefone:meta.telefone || '' };
   openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}
   <div class="row">${fld('eRazao','Razão social *',e.razao)}${fld('eFant','Nome fantasia',e.fantasia)}</div>
   <div class="row">${fld('eCnpj','CNPJ * (preenche o resto sozinho)',fmtDoc(e.cnpj),'inputmode="numeric" autocomplete="off"')}${fld('eIe','Inscrição estadual *',e.ie,'inputmode="numeric"')}</div>
@@ -1277,6 +1279,7 @@ function formEmpresa(e){
   <div id="errM"></div>
   <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar dados da empresa</button></div>
   ${e.id ? `<div style="margin-top:18px">${cardAmbiente()}${cardCertificado()}</div>` : ''}`);
+  if (doSite) setTimeout(() => { const c = $('#eCnpj'); if (c) autoPreencher(c); }, 50); // busca razão social e endereço na Receita
 }
 async function salvarEmp(id){
   const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),
@@ -2560,6 +2563,7 @@ async function aoMudarSessao(session){
   const uidAtual = session && session.user ? session.user.id : null;
   if (uidAtual && uidAtual === S.meuId && S.logado){ render(); return; }
   S.carregando = false; S.meuId = uidAtual; S.meuEmail = uidAtual ? session.user.email : ''; S.logado = !!uidAtual;
+  S.meuMeta = uidAtual ? (session.user.user_metadata || {}) : {}; // dados do cadastro feito no site (nome, telefone, empresa, cnpj)
   unsubs.forEach(u => u()); unsubs = []; if (S.unsubEmp){ S.unsubEmp(); S.unsubEmp = null; } if (db && db.fechar) db.fechar();
   S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null;
   if (!uidAtual){ db = null; render(); renderBadge(); return; }
@@ -2567,6 +2571,10 @@ async function aoMudarSessao(session){
   await SB.rpc('aceitar_convites');
   const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm;
   startDb(); carregarNcm(); render(); renderBadge();
+  // cadastro feito pelo site: no primeiro acesso, abre o cadastro da empresa já com o CNPJ (a Receita preenche o resto)
+  if (S.meuMeta && dig(S.meuMeta.cnpj).length === 14) setTimeout(() => {
+    if (S.meuId === uidAtual && S.logado && !S.empresas.length && !$('#mbox').innerHTML.trim()){ S.tab = 'empresa'; render(); formEmpresa(); }
+  }, 2500);
 }
 async function carregarPapel(id){
   if (!SB || !id){ S.papel = 'gerente'; S.isAdmin = true; S.papelEmp = null; return; }
