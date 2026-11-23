@@ -7,6 +7,7 @@ Sistema SaaS de emissão de NF-e/NFC-e (Piauí) do Lucas, que trabalha em escrit
   - Camada de dados `criarShim()` imita a API doc/collection/onSnapshot sobre a tabela `docs` (path, col, empresa_id, data jsonb) com Realtime.
   - Caminhos: `empresas/<id>`, `empresas/<id>/{produtos,clientes,notas,caixas,perfis,inutilizacoes,fornecedores,compras,compras_xml,vinculos,movimentos,recebidas}/<doc>`, `ncm/<doc>`.
 - `api/` — funções Vercel (Node 18+, ESM, só `fetch` e módulos do próprio Node). `_lib.js` (auth, Supabase service role, Focus), `config.js`, `emitir.js`, `evento.js` (consultar/cancelar/cce/inutilizar), `recebidas.js` (MD-e: buscar/manifestar/xml), `certificado.js`, `ambiente.js`.
+- `site/index.html` — **site de apresentação** (página estática, sem JS; mesma marca dos stories: navy #0A1630, verde-limão #C6F432, Space Grotesk + Inter), servida em `/site` (rewrite no `vercel.json`). O sistema continua em `/` (os e-mails de cadastro/senha do Supabase voltam para a raiz). Plano R$ 89,99/mês, WhatsApp (86) 98193-1921, e-mail lucas.sousa.20006@gmail.com. Rascunho editável no canvas de design "NotaOne — Site de apresentação". Quando houver domínio próprio, decidir se o site vai para a raiz e o sistema para `/app` (ajustar redirect do Supabase).
 - `supabase/schema.sql` — tabelas, RLS, RPCs. **Idempotente**: altere sempre de forma que possa rodar de novo.
 
 ## Regras
