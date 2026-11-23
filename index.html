@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#f4f5f2; --card:#ffffff; --ink:#1c2321; --muted:#66716d; --line:#dfe3df;
@@ -344,6 +344,59 @@ body.pdv{background:#e9eef5}
 .prod-l .prod-e{min-width:92px;text-align:right;font-weight:600;font-size:13.5px}
 .prod-l .prod-e small{font-weight:500;color:#6b7686;font-size:11px}
 .prod-l .fin-d span .tag{font-size:10.5px;padding:1px 6px}
+
+/* ================== VISUAL A — marca NotaOne (menu escuro, igual ao site) ================== */
+:root{--bg:#F4F6FA;--ink:#0A1630;--muted:#5A6680;--line:#E8ECF3;--line-2:#EEF1F6;--navy:#0A1630;--navy-2:#13244A;--lima:#C6F432;--radius:18px;--shadow:none}
+body{background:var(--bg);color:var(--ink)}
+h1,h2,.mhead h2,.stats b,.total.big,.login-tit{font-family:'Space Grotesk',Inter,sans-serif}
+h2{letter-spacing:-.03em}
+::selection{background:#E9F9B8}
+/* quadros */
+.card{background:#fff;border:1px solid var(--line);box-shadow:none;border-radius:18px}
+.stats div{background:#fff;border:1px solid var(--line);border-radius:14px}
+/* botões */
+.btn{border-radius:12px;border-color:#E3E8F0;box-shadow:none;font-weight:600}
+.btn:hover{background:#F7F9FC;border-color:#D5DCE7}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff;box-shadow:none}
+.btn.pri:hover{background:var(--navy-2);border-color:var(--navy-2)}
+.btn.pri:disabled{background:#8E9BB8;border-color:#8E9BB8}
+.seg button{background:#fff;border:1px solid #E3E8F0;color:#34425E}
+.seg button:hover{background:#F7F9FC}
+.seg button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+input,select,textarea{border-color:#DDE3EC;border-radius:12px}
+input:focus,select:focus,textarea:focus{border-color:var(--navy);box-shadow:0 0 0 4px rgba(10,22,48,.10)}
+/* cabeçalho: some no fundo, sem faixa branca */
+header{background:var(--bg);border-bottom:0}
+header select{background-color:#fff;border-color:#E3E8F0}
+.sair{border-color:#E3E8F0}
+/* Início */
+.ini-acoes button{border-color:#E3E8F0;border-radius:12px;min-height:46px}
+.ini-acoes button:first-child{background:var(--navy);border-color:var(--navy);color:#fff}
+.ini-acoes button:first-child b{color:var(--lima)}
+.ini-acoes button b{color:var(--navy)}
+.ini-barras i{background:#D9E0EC;border-radius:8px 8px 3px 3px}
+.ini-barras>div:last-child i{background:var(--navy)}
+.ini-forma i{background:var(--navy);opacity:1}
+/* login */
+.login-tit,.login-tit b{background:none;-webkit-background-clip:initial;background-clip:initial;color:var(--navy);font-weight:700}
+.login-tit b{color:#0E7A5A}
+.login-sub{color:var(--muted);letter-spacing:.18em;text-transform:uppercase;font-size:11.5px;font-weight:600}
+/* celular: barra inferior */
+nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
+/* computador: menu lateral escuro */
+@media(min-width:1000px){
+  nav{background:var(--navy);border-right:0}
+  nav .nav-brand{color:#fff}
+  nav .nav-brand span,nav .nav-brand b{background:none;-webkit-background-clip:initial;background-clip:initial;font-family:'Space Grotesk',Inter,sans-serif;font-weight:700}
+  nav .nav-brand span{color:#fff}nav .nav-brand b{color:var(--lima)}
+  nav .nav-sec{color:#8E9BB8;letter-spacing:.1em;font-size:10.5px}
+  nav button{color:#C9D2E4;font-weight:500}
+  nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+  nav button.on{background:rgba(198,244,50,.13);color:var(--lima);font-weight:600}
+  nav::-webkit-scrollbar{width:0}
+  header{padding-top:14px}
+}
+.pdv-top{background:var(--navy)}
 </style>
 </head>
 <body>
