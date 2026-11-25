@@ -1348,13 +1348,13 @@ function vEmpresa(){
     <p>CPF ${fmtDoc(e.cpf)}${e.telefone ? ' · ' + esc(e.telefone) : ''}<br>${esc(e.logradouro)}, ${esc(e.numero)} — ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)}${e.cep ? ' · CEP ' + esc(e.cep) : ''}</p>
     <p><span class="tag w">Sem nota fiscal</span> <span class="small">Próxima venda nº <b>${esc(e.prox_venda || 1)}</b></span></p>
     ${pode('empresa') ? '<p class="small">Abriu o CNPJ? Toque em <b>Editar</b> e escolha <b>CNPJ</b>: a loja passa a emitir nota fiscal, sem perder nada.</p>' : ''}</div>
-  ${cardPlano()}
   ${gancho('empresaHtml', '')}
   ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
   ${cardImpressao()}
   ${cardBalanca()}
+  ${cardPlano()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das vendas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes.</p>
     <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}`;
@@ -1370,7 +1370,6 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
-  ${cardPlano()}
   ${gancho('empresaHtml', '')}
   ${cardFuncionarios()}
   ${cardAssinatura()}
@@ -1379,6 +1378,7 @@ function vEmpresa(){
   ${cardCiencia()}
   ${cardImpressao()}
   ${cardBalanca()}
+  ${cardPlano()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
     <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}
