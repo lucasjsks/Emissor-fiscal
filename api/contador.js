@@ -57,7 +57,7 @@ export async function montarPacote(empresaId, e, mes){
   const amb = ambienteEmp(e), teste = amb !== 'producao';
   const doAmb = n => (n.ambiente === 'producao' ? 'producao' : 'homologacao') === amb;
   const notas = (await colecao(`empresas/${empresaId}/notas`, `&data->>data=like.${mes}*`)).map(r => r.data)
-    .filter(n => n && doAmb(n) && !n.corrigida_por).sort((a, b) => String(a.data).localeCompare(String(b.data)));
+    .filter(n => n && n.modelo !== '99' && doAmb(n) && !n.corrigida_por).sort((a, b) => String(a.data).localeCompare(String(b.data)));
   const inut = (await colecao(`empresas/${empresaId}/inutilizacoes`, `&data->>em=like.${mes}*`)).map(r => r.data).filter(i => i && doAmb(i));
   const compras = (await colecao(`empresas/${empresaId}/compras`, `&data->>data_emissao=like.${mes}*`)).map(r => ({ id:r.path.split('/').pop(), ...r.data }))
     .filter(c => c.status !== 'estornada');

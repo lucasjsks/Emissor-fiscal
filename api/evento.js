@@ -33,6 +33,19 @@ export default rota(async (req, b) => {
   const n = b.ref ? await getDoc(path) : null;
   if (!n) throw new Falha('Nota não encontrada.', 404);
   amb = n.ambiente === 'producao' ? 'producao' : 'homologacao'; // cada nota volta ao ambiente em que foi emitida
+  // venda sem nota (empresa com CPF): não existe na SEFAZ — só consultar (devolve como está) e cancelar (aqui mesmo)
+  if (n.modelo === '99'){
+    if (tipo === 'consultar') return { ok:true, nota:n };
+    if (tipo !== 'cancelar') throw new Falha('Venda sem nota fiscal não tem essa opção.');
+    if (n.status !== 'autorizada') throw new Falha('Esta venda já está cancelada.');
+    const just = String(b.justificativa || '').replace(/\s+/g, ' ').trim();
+    if (just.length < 5) throw new Falha('Escreva o motivo do cancelamento (pelo menos 5 letras).');
+    n.status = 'cancelada'; n.justificativa = just; n.cancelada_em = isoBR(); n.cancelada_por = u.id;
+    n.eventos = [...(n.eventos || []), { tipo:'cancelamento', texto:just, em:n.cancelada_em }];
+    await putDoc(path, n, u.id);
+    await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:n.ref, desfazer:true });
+    return { ok:true, nota:n };
+  }
   const base = `/v2/${n.modelo === '65' ? 'nfce' : 'nfe'}/${encodeURIComponent(n.ref)}`;
 
   if (tipo === 'consultar'){

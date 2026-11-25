@@ -1,4 +1,6 @@
 // POST /api/emitir — reserva o número, envia a NFC-e/NF-e para a Focus e grava a nota.
+// modelo '99' = VENDA SEM NOTA (empresa cadastrada com CPF, doc_tipo 'cpf'): não vai para a Focus/SEFAZ;
+// ganha número próprio (prox_venda), fica 'autorizada' (vale para caixa, financeiro e relatórios) e baixa o estoque.
 import { rota, Falha, usuario, papelDe, getDoc, putDoc, rpc, sb, focus, statusDe, resumoFocus, mensagemFocus, ambienteEmp, isoBR } from './_lib.js';
 
 // campos que o sistema usa internamente e não vão para a Focus
@@ -22,7 +24,7 @@ export const numeroPerdido = n => {
 export default rota(async (req, b) => {
   const u = await usuario(req);
   const { empresa_id, modelo, payload, nota, extras = {} } = b;
-  if (!empresa_id || !['55','65'].includes(modelo) || !payload || !nota) throw new Falha('Requisição incompleta.');
+  if (!empresa_id || !['55','65','99'].includes(modelo) || !payload || !nota) throw new Falha('Requisição incompleta.');
   const papel = await papelDe(empresa_id, u.id);
   if (!papel) throw new Falha('Você não tem acesso a esta empresa.', 403);
   const devolucao = nota.op && nota.op !== 'venda';
@@ -32,6 +34,9 @@ export default rota(async (req, b) => {
   const emp = await getDoc('empresas/' + empresa_id);
   if (!emp) throw new Falha('Empresa não encontrada.', 404);
   const amb = ambienteEmp(emp), tipo = modelo === '65' ? 'nfce' : 'nfe';
+  const semNota = emp.doc_tipo === 'cpf';
+  if (semNota && modelo !== '99') throw new Falha('Empresa cadastrada com CPF não emite nota fiscal. Para emitir, cadastre o CNPJ em Empresa → Editar.');
+  if (!semNota && modelo === '99') throw new Falha('Esta empresa emite nota fiscal: a venda sai em cupom (NFC-e).');
 
   // correção de nota rejeitada: reenvia com o MESMO número e a mesma referência (a Focus aceita reenviar
   // uma referência rejeitada). Se a rejeição deixou o número usado (duplicidade/denegação), vai com número novo.
@@ -42,6 +47,17 @@ export default rota(async (req, b) => {
     const ja = await getDoc(`empresas/${empresa_id}/vendas_id/${vid}`);
     const feita = ja && ja.ref && await getDoc(`empresas/${empresa_id}/notas/${ja.ref}`);
     if (feita) return { nota:feita, mensagem:'Esta venda já tinha virado nota. Nada foi enviado de novo.', repetida:true };
+  }
+  if (modelo === '99'){
+    if (devolucao || b.reenviar) throw new Falha('Requisição inválida para venda sem nota.');
+    const numero = await rpc('proximo_numero', { e:empresa_id, campo:'prox_venda' });
+    const ref = `${empresa_id.slice(0, 8)}-99-${numero}`;
+    if (vid) await putDoc(`empresas/${empresa_id}/vendas_id/${vid}`, { ref, em:isoBR() }, u.id);
+    const final = { ...nota, id:ref, ref, modelo:'99', serie:'', numero, empresa_id, status:'autorizada', ambiente:amb, sem_nota:true,
+      chave:null, focus:null, payload:null, emitida_por:u.id, data:payload.data_emissao || isoBR(), op:'venda' };
+    await putDoc(`empresas/${empresa_id}/notas/${ref}`, final, u.id);
+    await rpc('aplicar_estoque_nota', { e:empresa_id, p_ref:ref, desfazer:false });
+    return { nota:final, mensagem:'Venda registrada.' };
   }
   let antiga = null;
   if (b.reenviar){

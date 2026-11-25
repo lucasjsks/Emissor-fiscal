@@ -67,8 +67,9 @@ language sql stable security definer set search_path = public as $$
     when p_col = 'ncm' then public.eh_admin()
     when p_empresa is null then false
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
-    when split_part(p_col, '/', 3) in ('produtos','perfis','fornecedores','compras_xml','financeiro') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
-    when split_part(p_col, '/', 3) in ('clientes','caixas') then public.meu_papel(p_empresa) is not null
+    when split_part(p_col, '/', 3) in ('perfis','fornecedores','compras_xml','financeiro') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
+    -- produtos: o funcionário (operador) também cadastra e edita (não apaga; custo protegido pelo gatilho proteger_custo_operador)
+    when split_part(p_col, '/', 3) in ('produtos','clientes','caixas') then public.meu_papel(p_empresa) is not null
     else false
   end
 $$;
@@ -117,7 +118,8 @@ alter table public.admins enable row level security;
 
 drop policy if exists docs_ler on public.docs;
 create policy docs_ler on public.docs for select to authenticated
-  using (col = 'ncm' or public.meu_papel(empresa_id) is not null);
+  -- empresas/<id>/segredos (senha do gerente, em hash) só o servidor lê
+  using (col = 'ncm' or (public.meu_papel(empresa_id) is not null and split_part(col, '/', 3) <> 'segredos'));
 
 drop policy if exists docs_inserir on public.docs;
 create policy docs_inserir on public.docs for insert to authenticated
@@ -153,19 +155,24 @@ begin
   return novo;
 end $$;
 
--- um CNPJ só pode estar em UMA empresa do sistema (contas diferentes não podem cadastrar a mesma empresa).
+-- documento da empresa: o CNPJ ou, na empresa cadastrada com CPF (sem nota fiscal), o CPF do dono
+create or replace function public.doc_empresa(d jsonb) returns text
+language sql immutable as $$
+  select coalesce(nullif(regexp_replace(coalesce(d->>'cnpj', ''), '\D', '', 'g'), ''), regexp_replace(coalesce(d->>'cpf', ''), '\D', '', 'g'))
+$$;
+
+-- um CNPJ (ou CPF) só pode estar em UMA empresa do sistema (contas diferentes não podem cadastrar a mesma empresa).
 -- Confere ao criar e quando o CNPJ é trocado; empresas antigas repetidas continuam podendo salvar outros dados.
 create index if not exists docs_empresas_cnpj on public.docs ((regexp_replace(coalesce(data->>'cnpj', ''), '\D', '', 'g'))) where col = 'empresas';
 create or replace function public.cnpj_unico() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare d text := regexp_replace(coalesce(new.data->>'cnpj', ''), '\D', '', 'g');
+declare d text := public.doc_empresa(new.data);
 begin
   if new.col <> 'empresas' or d = '' then return new; end if;
-  if tg_op = 'UPDATE' and d = regexp_replace(coalesce(old.data->>'cnpj', ''), '\D', '', 'g') then return new; end if;
+  if tg_op = 'UPDATE' and d = public.doc_empresa(old.data) then return new; end if;
   perform pg_advisory_xact_lock(hashtext('cnpj_unico:' || d));
-  if exists (select 1 from public.docs x where x.col = 'empresas' and x.path <> new.path
-             and regexp_replace(coalesce(x.data->>'cnpj', ''), '\D', '', 'g') = d) then
-    raise exception 'Este CNPJ já está cadastrado no NotaOne em outra conta. Se a empresa é sua, entre com a conta dela ou fale com o suporte.';
+  if exists (select 1 from public.docs x where x.col = 'empresas' and x.path <> new.path and public.doc_empresa(x.data) = d) then
+    raise exception 'Este % já está cadastrado no NotaOne em outra conta. Se a empresa é sua, entre com a conta dela ou fale com o suporte.', case when length(d) = 11 then 'CPF' else 'CNPJ' end;
   end if;
   return new;
 end $$;
@@ -223,12 +230,62 @@ begin
   if current_user in ('authenticated', 'anon') and not public.eh_admin() then raise exception 'Sem permissão.'; end if;
   if p_limite < 1 or p_limite > 50 then raise exception 'Limite inválido.'; end if;
   update public.docs set data = jsonb_set(data, '{limite_caixas}', to_jsonb(p_limite), true)
-   where col = 'empresas' and regexp_replace(coalesce(data->>'cnpj', ''), '\D', '', 'g') = regexp_replace(p_cnpj, '\D', '', 'g');
+   where col = 'empresas' and public.doc_empresa(data) = regexp_replace(p_cnpj, '\D', '', 'g');
   get diagnostics n = row_count;
-  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ.'; end if;
+  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ/CPF.'; end if;
   return 'Limite de caixas atualizado para ' || p_limite;
 end $$;
 revoke execute on function public.definir_limite_caixas(text, int) from public, anon;
+
+-- FUNCIONÁRIOS: o dono cria o acesso pelo sistema (api/equipe.js). Limite do plano em limite_funcionarios (padrão 2).
+-- A tela não muda o limite (gatilho abaixo); o suporte libera mais: select public.definir_limite_funcionarios('CNPJ ou CPF', 3);
+create or replace function public.proteger_limite_funcionarios() returns trigger
+language plpgsql as $$
+begin
+  if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
+  -- campos que só o servidor grava: limite do plano, lista de funcionários (quadros da tela de escolha) e aviso de senha do gerente criada
+  if tg_op = 'UPDATE' then
+    new.data := (new.data - 'limite_funcionarios' - 'funcionarios' - 'senha_gerente') || jsonb_strip_nulls(jsonb_build_object(
+      'limite_funcionarios', old.data->'limite_funcionarios', 'funcionarios', old.data->'funcionarios', 'senha_gerente', old.data->'senha_gerente'));
+  else
+    new.data := new.data - 'limite_funcionarios' - 'funcionarios' - 'senha_gerente';
+  end if;
+  return new;
+end $$;
+drop trigger if exists proteger_limite_funcionarios on public.docs;
+create trigger proteger_limite_funcionarios before insert or update on public.docs
+  for each row execute function public.proteger_limite_funcionarios();
+create or replace function public.definir_limite_funcionarios(p_doc text, p_limite int) returns text
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if current_user in ('authenticated', 'anon') and not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  if p_limite < 0 or p_limite > 50 then raise exception 'Limite inválido.'; end if;
+  update public.docs set data = jsonb_set(data, '{limite_funcionarios}', to_jsonb(p_limite), true)
+   where col = 'empresas' and public.doc_empresa(data) = regexp_replace(p_doc, '\D', '', 'g');
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ/CPF.'; end if;
+  return 'Limite de funcionários atualizado para ' || p_limite;
+end $$;
+revoke execute on function public.definir_limite_funcionarios(text, int) from public, anon;
+
+-- o funcionário (operador) cadastra e edita produtos, mas não mexe no custo (fica o que estava)
+create or replace function public.proteger_custo_operador() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if split_part(new.col, '/', 3) <> 'produtos' or current_user not in ('authenticated', 'anon')
+     or coalesce(public.meu_papel(new.empresa_id), '') <> 'operador' then return new; end if;
+  if tg_op = 'UPDATE' then
+    new.data := (new.data - 'custo' - 'custo_medio' - 'cod_forn')
+      || jsonb_strip_nulls(jsonb_build_object('custo', old.data->'custo', 'custo_medio', old.data->'custo_medio', 'cod_forn', old.data->'cod_forn'));
+  else
+    new.data := new.data - 'custo' - 'custo_medio' - 'cod_forn';
+  end if;
+  return new;
+end $$;
+drop trigger if exists proteger_custo_operador on public.docs;
+create trigger proteger_custo_operador before insert or update on public.docs
+  for each row execute function public.proteger_custo_operador();
 
 create or replace function public.listar_membros(e text)
 returns table (user_id uuid, email text, papel text, criado_em timestamptz, pendente boolean)
@@ -289,7 +346,7 @@ create or replace function public.proximo_numero(e text, campo text) returns int
 language plpgsql security definer set search_path = public as $$
 declare n int;
 begin
-  if campo not in ('prox_nfce','prox_nfe') then raise exception 'Campo inválido.'; end if;
+  if campo not in ('prox_nfce','prox_nfe','prox_venda') then raise exception 'Campo inválido.'; end if;
   update public.docs
      set data = jsonb_set(data, array[campo], to_jsonb(coalesce((data->>campo)::int, 1) + 1))
    where path = 'empresas/' || e
@@ -444,7 +501,7 @@ begin
   for it in select value from jsonb_array_elements(coalesce(n->'itens', '[]'::jsonb)) loop
     if nullif(it->>'pid', '') is null or (it->>'q') is null then continue; end if;
     perform public._mover(e, it->>'pid', dir * (it->>'q')::numeric, tipo, p_ref,
-      (case n->>'modelo' when '65' then 'NFC-e ' else 'NF-e ' end) || (n->>'numero'), null, null);
+      (case n->>'modelo' when '65' then 'NFC-e ' when '99' then 'Venda ' else 'NF-e ' end) || (n->>'numero'), null, null);
   end loop;
   update public.docs set data = data || jsonb_build_object('estoque_aplicado', not desfazer) where path = caminho;
 end $$;

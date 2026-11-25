@@ -399,6 +399,12 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
   header{padding-top:14px}
 }
 .pdv-top{background:var(--navy)}
+/* tela "Quem vai usar o sistema?" */
+.perfil-tela{max-width:720px;margin:40px auto;text-align:center}.perfil-logo{width:64px;height:64px}.perfil-tela h2{margin:10px 0 4px}
+.perfil-grade{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin:24px 0}
+.perfil-card{width:190px;padding:22px 14px;border:1px solid #e3e8f0;border-radius:18px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;color:#0A1630;transition:transform .12s,box-shadow .12s}
+.perfil-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(10,22,48,.12)}.perfil-card b{font-size:17px}.perfil-card small{color:#6b778c}.perfil-card em{font-style:normal;font-size:11px;color:#1a7f37;background:#e7f6ec;border-radius:20px;padding:2px 8px}
+.perfil-ic{width:64px;height:64px;border-radius:50%;background:#0A1630;color:#C6F432;display:flex;align-items:center;justify-content:center;font:700 26px 'Space Grotesk',sans-serif}
 </style>
 </head>
 <body>
@@ -406,6 +412,7 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
   <h1 id="hTitle">NotaOne</h1>
   <select id="empSel" aria-label="Empresa"></select>
   <span class="badge" id="badge">…</span>
+  <button class="sair" id="btnTrocar" data-act="perfTrocar" title="Trocar de usuário" aria-label="Trocar de usuário" style="display:none"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5M16 4l3 3-3 3M19 7h-5"/></svg><span>Trocar usuário</span></button>
   <button class="sair" id="btnSair" data-act="pedirSair" title="Sair da conta" aria-label="Sair da conta" style="display:none"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/></svg><span>Sair</span></button>
 </header>
 <div class="amb" id="ambBar" style="display:none">Ambiente de <b>homologação</b>: as notas vão para a SEFAZ de testes e não têm valor fiscal.</div>
@@ -513,7 +520,7 @@ function renderBadge(){
   const b = $('#badge');
   if (!S.logado){ b.textContent = ''; b.style.display = 'none'; return; }
   // sem o papel (cada empresa tem um usuário só): mostra apenas "teste" quando estiver em homologação
-  const txt = S.ambiente === 'producao' ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
+  const txt = S.papel === 'operador' ? 'funcionário' : S.ambiente === 'producao' || semNota() ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
   b.title = S.meuEmail || '';
 }
 async function safe(fn, okMsg){
@@ -868,12 +875,23 @@ const ICON = {
 };
 const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['financeiro','Financeiro'],['relatorios','Relatórios'],['empresa','Empresa']];
 const NAV_SEC = { venda:'Vendas', compras:'Gestão', empresa:'Configuração' };
+// empresa cadastrada com CPF: não emite nota fiscal (vende com comprovante não fiscal, modelo '99')
+const semNota = (e = emp()) => !!e && e.doc_tipo === 'cpf';
+// funcionário (operador): só vendas, caixa, produtos e clientes
+const ABAS_OPERADOR = ['venda','nfe','notas','caixa','produtos','clientes'];
+function abas(){
+  const sn = semNota(), op = S.papel === 'operador';
+  return TABS.filter(([k]) => !(sn && k === 'nfe') && (!op || ABAS_OPERADOR.includes(k)) && !(op && k === 'nfe' && !pode('emitir')))
+    .map(([k, l]) => [k, sn && k === 'venda' ? 'Vender' : sn && k === 'notas' ? 'Vendas' : l]);
+}
+const nomeModelo = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '99' ? 'Venda' : n.modelo === '65' ? 'Cupom' : 'NF-e';
+const verCusto = () => S.papel !== 'operador';
 function renderNav(){
   $('#nav').innerHTML = `<div class="nav-brand"><img src="img/logo.png" alt=""><span>Nota<b>One</b></span></div>`
-    + TABS.map(([k, l]) => `${NAV_SEC[k] ? `<div class="nav-sec">${NAV_SEC[k]}</div>` : ''}<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" aria-label="${l}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${l}</span></button>`).join('');
+    + abas().map(([k, l]) => `${NAV_SEC[k] ? `<div class="nav-sec">${NAV_SEC[k]}</div>` : ''}<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" aria-label="${l}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${l}</span></button>`).join('');
 }
 function renderHeader(){
-  const sel = $('#empSel'), tb = TABS.find(([k]) => k === S.tab);
+  const sel = $('#empSel'), tb = abas().find(([k]) => k === S.tab);
   if (emp()) S.ambiente = ambAtual();
   $('#hTitle').textContent = S.logado && tb ? tb[1] : 'NotaOne';
   // cada conta tem uma única empresa: sem opção de "nova empresa" depois que ela existe
@@ -887,14 +905,18 @@ function render(){
   const ae = document.activeElement, aid = ae && ae.id, sel = ae && ae.selectionStart, val = ae && ae.value;
   renderNav(); renderHeader(); botaoSuporte();
   const m = $('#main');
-  const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
+  const e = emp(), perf = !S.carregando && !S.falha && S.logado && !S.recuperando ? precisaPerfil() : false, fora = S.carregando || S.falha || !S.logado || S.recuperando || !!perf;
   $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
-  $('#ambBar').style.display = !fora && S.ambiente !== 'producao' ? '' : 'none';
+  $('#btnTrocar').style.display = !fora && e && (e.funcionarios || []).length && e.senha_gerente ? '' : 'none';
+  $('#ambBar').style.display = !fora && S.ambiente !== 'producao' && !semNota() ? '' : 'none';
+  if (!fora && e && !abas().some(([k]) => k === S.tab)) S.tab = abas()[0][0]; // aba fora do acesso (funcionário) ou NF-e em empresa sem nota
   if (S.pdv && (fora || S.tab !== 'venda' || !e)) S.pdv = false;
   document.body.classList.toggle('pdv', !!S.pdv);
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
   else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
+  else if (perf === 'carregando'){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
+  else if (perf){ m.innerHTML = vQuemUsa(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
   } else if (S.pdv && S.tab === 'venda') m.innerHTML = vPdv();
@@ -917,9 +939,10 @@ function pagResumo(total){
   return { soma, din, falta:Math.max(0, r2(total - soma)), troco:Math.max(0, r2(soma - total)) };
 }
 function vVenda(){
-  if (!S.produtos.length) return `<h2>Cupom fiscal (NFC-e)</h2><div class="card empty">Cadastre pelo menos um produto para começar a vender.${pode('produto') ? '<br><br><button class="btn pri" data-act="novoProd">Cadastrar produto</button>' : ''}</div>`;
+  const tituloV = semNota() ? 'Vender' : 'Cupom fiscal (NFC-e)';
+  if (!S.produtos.length) return `<h2>${tituloV}</h2><div class="card empty">Cadastre pelo menos um produto para começar a vender.${pode('cadProduto') ? '<br><br><button class="btn pri" data-act="novoProd">Cadastrar produto</button>' : ''}</div>`;
   const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), lim = num(e.limite_cpf_nfce || 10000);
-  return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1;min-width:220px">Cupom fiscal (NFC-e)</h2>${modoPdv() ? `<button class="btn" data-act="trocarPdv" title="Trocar de caixa" style="flex:0 0 auto">${meuPdv() ? `<b>${esc(meuPdv().nome)}</b>${caixaAberto() ? '' : ' (fechado)'} · trocar` : 'Escolher caixa'}</button>` : ''}<button class="btn pri" data-act="pdvAbrir" title="Frente de caixa em tela cheia">🖥 Abrir PDV (tela cheia)</button></div>${bannerCorrecao(S.reenviar65, 'limpar')}
+  return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1;min-width:220px">${tituloV}</h2>${modoPdv() ? `<button class="btn" data-act="trocarPdv" title="Trocar de caixa" style="flex:0 0 auto">${meuPdv() ? `<b>${esc(meuPdv().nome)}</b>${caixaAberto() ? '' : ' (fechado)'} · trocar` : 'Escolher caixa'}</button>` : ''}<button class="btn pri" data-act="pdvAbrir" title="Frente de caixa em tela cheia">🖥 Abrir PDV (tela cheia)</button></div>${bannerCorrecao(S.reenviar65, 'limpar')}
   <div class="grid2"><div>
     <div class="card"><label for="busca">Buscar produto (nome, código ou código de barras)</label>
       <input id="busca" autocomplete="off" placeholder="Digite ou passe o leitor…" value="${esc(S.busca)}">
@@ -934,7 +957,7 @@ function vVenda(){
     <div><div class="card">
       ${linhaTot('Subtotal', T.prod, 'small')}${T.desc ? linhaTot('Descontos', -T.desc, 'small') : ''}
       ${linhaTot('Total', T.nota, 'big')}
-      ${linhaTot('IBS/CBS destacado (2026, informativo)', T.cbs + T.ibs, 'small')}
+      ${semNota() ? '' : linhaTot('IBS/CBS destacado (2026, informativo)', T.cbs + T.ibs, 'small')}
       <label for="descTot">Desconto no total</label>
       <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="descTipo" data-t="${t}" class="${S.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
         <input id="descTot" ${S.descTotal.tipo === '%' ? '' : 'data-rs'} inputmode="decimal" placeholder="0" value="${esc(S.descTotal.tipo === '%' ? semRS(S.descTotal.v) : S.descTotal.v)}"></div>
@@ -943,15 +966,15 @@ function vVenda(){
       ${S.pags.length ? `<div class="list" style="margin-top:6px">${S.pags.map((p, i) => `<div class="it" style="padding:6px 0"><div class="grow">${esc(PAG_NOME[p.forma])}</div>
         <input id="pv${i}" data-pv="${i}" data-rs inputmode="decimal" style="width:110px;text-align:right" value="${esc(p.valor)}"><button class="x" data-act="rmPag" data-i="${i}" aria-label="Remover">×</button></div>`).join('')}</div>` : ''}
       ${pg.falta > 0 && S.pags.length ? linhaTot('Falta receber', pg.falta) : ''}${pg.troco > 0 ? linhaTot('<b>Troco</b>', pg.troco) : ''}
-      <label for="cpf">CPF do consumidor ${T.nota >= lim ? '<b style="color:var(--bad)">(obrigatório nesta venda)</b>' : '(opcional)'}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
+      <label for="cpf">CPF do ${semNota() ? 'cliente (opcional)' : `consumidor ${T.nota >= lim ? '<b style="color:var(--bad)">(obrigatório nesta venda)</b>' : '(opcional)'}`}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
       <label for="nomeCons">Nome (opcional)</label><input id="nomeCons" value="${esc(S.nomeCons)}">
       ${CONTINGENCIA_DISPONIVEL ? `<label class="chk"><input type="checkbox" data-act="contOn" ${S.conting ? 'checked' : ''}> Contingência offline (sem internet)</label>` : ''}
       ${!navigator.onLine ? '<div class="msg warn">Sem internet: o cupom não consegue ser enviado agora.</div>' : ''}
       ${S.conting ? '<div class="msg warn">Em contingência: o cupom sai marcado e precisa ser transmitido em até 24 horas (aba Notas).</div>' : ''}
       ${!caixaAberto() ? (modoPdv() ? `<div class="msg info">${meuPdv() ? esc(meuPdv().nome) + ' fechado.' : 'Escolha o caixa deste computador.'} <u data-act="trocarPdv" style="cursor:pointer"><b>${meuPdv() ? 'Abrir caixa' : 'Escolher caixa'}</b></u></div>` : '<div class="msg info">Caixa fechado. Abra o caixa na aba <b>Caixa</b> para vender.</div>') : ''}
       <div id="errV"></div>
-      <div class="actions"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Limpar</button><button class="btn pri" data-act="emitirNfce" ${L.length ? '' : 'disabled'}>${S.conting ? 'Emitir em contingência' : 'Emitir cupom'}</button></div>
-      <p class="small">Venda para CNPJ não sai em NFC-e: use a aba NF-e. CPF obrigatório a partir de ${brl(lim)}.</p>
+      <div class="actions"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Limpar</button><button class="btn pri" data-act="emitirNfce" ${L.length ? '' : 'disabled'}>${semNota() ? 'Finalizar venda' : S.conting ? 'Emitir em contingência' : 'Emitir cupom'}</button></div>
+      <p class="small">${semNota() ? 'A venda sai com comprovante (não é documento fiscal), baixa o estoque e entra no caixa e nos relatórios.' : `Venda para CNPJ não sai em NFC-e: use a aba NF-e. CPF obrigatório a partir de ${brl(lim)}.`}</p>
     </div></div></div>`;
 }
 // ---------- PDV: frente de caixa profissional (tela cheia) ----------
@@ -963,7 +986,7 @@ function vPdv(){
   const agora = new Date(), hora = agora.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), data = agora.toLocaleDateString('pt-BR');
   return `<div class="pdv-wrap">
   <div class="pdv-top"><div class="marca"><img src="img/logo.png" alt="">NotaOne <small>PDV</small></div>
-    <div class="info"><span>Empresa <b>${esc(e.fantasia || e.razao || '')}</b></span><span ${modoPdv() ? 'data-act="trocarPdv" style="cursor:pointer" title="Trocar de caixa"' : ''}>${modoPdv() ? `<b>${esc(nomeCaixa() || 'Escolher caixa')}</b> ${cx ? 'aberto' : 'fechado'}` : `Caixa <b>${cx ? 'aberto' : 'fechado'}</b>`}</span>${ambAtual() !== 'producao' ? '<span style="color:#fbbf24"><b style="color:#fbbf24">HOMOLOGAÇÃO</b> · sem valor fiscal</span>' : ''}${!navigator.onLine ? '<span style="color:#fca5a5"><b style="color:#fca5a5">SEM INTERNET</b></span>' : ''}</div>
+    <div class="info"><span>Empresa <b>${esc(e.fantasia || e.razao || '')}</b></span><span ${modoPdv() ? 'data-act="trocarPdv" style="cursor:pointer" title="Trocar de caixa"' : ''}>${modoPdv() ? `<b>${esc(nomeCaixa() || 'Escolher caixa')}</b> ${cx ? 'aberto' : 'fechado'}` : `Caixa <b>${cx ? 'aberto' : 'fechado'}</b>`}</span>${ambAtual() !== 'producao' && !semNota() ? '<span style="color:#fbbf24"><b style="color:#fbbf24">HOMOLOGAÇÃO</b> · sem valor fiscal</span>' : ''}${!navigator.onLine ? '<span style="color:#fca5a5"><b style="color:#fca5a5">SEM INTERNET</b></span>' : ''}</div>
     <div class="relogio" id="pdvRelogio" title="${data}">${hora}</div>
     <button data-act="pdvTela">${document.fullscreenElement ? '⤡ Sair da tela cheia' : '⤢ Tela cheia'}</button><button class="sair" data-act="pdvSair">Fechar PDV</button></div>
   ${bannerCorrecao(S.reenviar65, 'limpar') ? `<div style="padding:12px 12px 0">${bannerCorrecao(S.reenviar65, 'limpar')}</div>` : ''}
@@ -994,7 +1017,7 @@ function vPdv(){
       <label for="descTot" style="margin-top:0">Desconto no total <span class="small">(F10)</span></label>
       <div class="row" style="flex-wrap:nowrap"><div class="seg" style="flex:0 0 auto">${['R$','%'].map(t => `<button data-act="descTipo" data-t="${t}" class="${S.descTotal.tipo === t ? 'on' : ''}">${t}</button>`).join('')}</div>
         <input id="descTot" ${S.descTotal.tipo === '%' ? '' : 'data-rs'} inputmode="decimal" placeholder="0" value="${esc(S.descTotal.tipo === '%' ? semRS(S.descTotal.v) : S.descTotal.v)}"></div>
-      <label for="cpf">CPF na nota <span class="small">(F3)</span> ${T.nota >= lim ? '<b style="color:var(--bad)">obrigatório</b>' : ''}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
+      <label for="cpf">${semNota() ? 'CPF do cliente' : 'CPF na nota'} <span class="small">(F3)</span> ${T.nota >= lim && !semNota() ? '<b style="color:var(--bad)">obrigatório</b>' : ''}</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(S.cpf)}">
       ${CONTINGENCIA_DISPONIVEL ? `<label class="chk"><input type="checkbox" data-act="contOn" ${S.conting ? 'checked' : ''}> Contingência offline</label>` : ''}
     </div></div>
     <div id="errV"></div>
@@ -1017,11 +1040,11 @@ document.addEventListener('fullscreenchange', () => { if (S.pdv) render(); });
 setInterval(() => { const r = document.getElementById('pdvRelogio'); if (r) r.textContent = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }); }, 10000);
 // depois de autorizar no PDV: tela rápida com troco e próxima venda
 function pdvConcluido(nota, troco){
-  const ok = nota.status === 'autorizada' || nota.status === 'contingencia';
+  const ok = nota.status === 'autorizada' || nota.status === 'contingencia', sn = nota.modelo === '99', nomeN = sn ? 'Venda' : 'Cupom';
   openModal(`<div class="pdv-ok" id="pdvOk"><div class="icone">${ok ? '✔' : '!'}</div><h2 style="margin:4px 0">${nota.status === 'contingencia' ? 'Cupom em contingência' : 'Venda concluída'}</h2>
-    <p class="small">Cupom nº ${nota.numero} · ${brl(nota.total)}</p>${troco > 0 ? `<div class="small">Troco</div><div class="troco">${brl(troco)}</div>` : ''}
-    <div class="actions" style="justify-content:center">${nota.status === 'autorizada' && (nota.focus || {}).qrcode_url ? `<button class="btn" data-act="pdvImprimir" data-id="${esc(nota.id)}">Imprimir cupom</button>` : ''}
-      <button class="btn" data-act="verNota" data-id="${esc(nota.id)}">Ver cupom</button><button class="btn pri" data-act="pdvNova">Nova venda (Enter)</button></div></div>`);
+    <p class="small">${nomeN} nº ${nota.numero} · ${brl(nota.total)}</p>${troco > 0 ? `<div class="small">Troco</div><div class="troco">${brl(troco)}</div>` : ''}
+    <div class="actions" style="justify-content:center">${nota.status === 'autorizada' && (sn || (nota.focus || {}).qrcode_url) ? `<button class="btn" data-act="pdvImprimir" data-id="${esc(nota.id)}">${sn ? 'Imprimir comprovante' : 'Imprimir cupom'}</button>` : ''}
+      <button class="btn" data-act="verNota" data-id="${esc(nota.id)}">${sn ? 'Ver comprovante' : 'Ver cupom'}</button><button class="btn pri" data-act="pdvNova">Nova venda (Enter)</button></div></div>`);
   setTimeout(() => { const b = document.querySelector('[data-act=pdvNova]'); if (b) b.focus(); }, 50);
 }
 function formDescItem(i){
@@ -1122,7 +1145,7 @@ function vNfeLista(){
     <div class="stats"><div><b>${nVal}</b>notas válidas</div><div><b>${brl(tot)}</b>em vendas</div><div><b>${nCanc}</b>canceladas</div></div></div>
   <div class="card">${lista.length ? `<div class="fin-lista">${lista.slice(0, lim).map(n => `
     <div class="fin-l nt-l" data-act="verNota" data-id="${esc(n.id)}"><div class="fin-v">${(n.data || '').slice(8, 10)}/${(n.data || '').slice(5, 7)}<small>${(n.data || '').slice(11, 16)}</small></div>
-      <div class="fin-d"><b>${nome(n)} nº ${n.numero} <span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span></b><span>${esc(n.destNome || '—')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</span></div>
+      <div class="fin-d"><b>${nome(n)} nº ${n.numero} ${n.serie ? `<span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span>` : ''}</b><span>${esc(n.destNome || '—')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}</span></div>
       <div class="fin-r"><b class="num">${brl(n.total)}</b>${tag(n)}</div></div>`).join('')}</div>`
     : `<div class="empty">${q ? 'Nenhuma NF-e encontrada.' : todas.length ? 'Nenhuma NF-e neste mês. Escolha outro mês ou "Todos os meses".' : 'Nenhuma NF-e emitida ainda. Clique em "+ Nova NF-e".'}</div>`}
     ${lista.length > lim ? `<div class="actions"><button class="btn" data-act="nfMais">Mostrar mais ${Math.min(30, lista.length - lim)}</button></div>` : ''}</div>`;
@@ -1226,24 +1249,24 @@ function vNotas(){
     .filter(n => f === 'todas' || (f === '65' && n.modelo === '65') || (f === '55' && n.modelo === '55') || (f === 'canc' && n.status === 'cancelada')
     || (f === 'pend' && n.status === 'contingencia') || (f === 'prob' && notaProblema(n)) || (f === 'dev' && n.op && n.op !== 'venda')).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   const tot = lista.filter(n => notaValida(n) && (n.op || 'venda') === 'venda').reduce((s, n) => s + (n.total || 0), 0);
-  const nome = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '65' ? 'Cupom' : 'NF-e';
+  const nome = nomeModelo, sn = semNota();
   const tag = n => n.corrigida_por ? `<span class="tag">corrigida → nº ${n.corrigida_por.numero}</span>` : n.status === 'cancelada' ? '<span class="tag b">cancelada</span>' : n.status === 'contingencia' ? '<span class="tag b">contingência</span>'
     : (n.devolucoes || []).length ? '<span class="tag w">devolvida</span>' : tagStatus(n);
   const meses = [...new Set([isoNow().slice(0, 7), ...S.notas.filter(n => S.ntTestes ? !daAmb(n) : daAmb(n)).map(n => (n.data || '').slice(0, 7)).filter(Boolean)])].sort().reverse();
   const nomeMes = m => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
-  return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1">Notas emitidas${S.ntTestes ? ' <span class="tag w">de teste</span>' : ''}</h2></div>
+  return `${bannerFila()}<div class="row" style="align-items:center"><h2 style="flex:1">${sn ? 'Vendas' : 'Notas emitidas'}${S.ntTestes ? ' <span class="tag w">de teste</span>' : ''}</h2></div>
   ${pend.length ? `<div class="card" style="border-color:#efc5c2"><b>${pend.length} cupom(ns) em contingência</b><p class="small">Transmita assim que a internet voltar. Prazo: 24 horas após a emissão.${pend.some(n => prazoCont(n) < agora) ? ' <b style="color:var(--bad)">Há prazo vencido.</b>' : ''}</p>
     ${pode('emitir') ? '<button class="btn pri" data-act="transmitirTodas">Transmitir todos</button>' : ''}</div>` : ''}
-  ${pode('inutilizar') || pode('backup') ? `<div class="actions" style="margin:0 0 12px">${pode('inutilizar') ? '<button class="btn" data-act="inutilizar">Inutilizar numeração</button>' : ''}${pode('backup') ? '<button class="btn" data-act="pacote">Pacote do mês p/ contador</button>' : ''}</div>` : ''}
-  <div class="seg" style="margin-bottom:12px">${[['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],...(S.notas.some(notaProblema) || f === 'prob' ? [['prob','Com problema']] : []),['canc','Canceladas']].map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="ntBusca">Buscar</label><input id="ntBusca" placeholder="Número, cliente, CPF/CNPJ ou chave" value="${esc(S.ntBusca || '')}" autocomplete="off"></div>
+  ${!sn && (pode('inutilizar') || pode('backup')) ? `<div class="actions" style="margin:0 0 12px">${pode('inutilizar') ? '<button class="btn" data-act="inutilizar">Inutilizar numeração</button>' : ''}${pode('backup') ? '<button class="btn" data-act="pacote">Pacote do mês p/ contador</button>' : ''}</div>` : ''}
+  <div class="seg" style="margin-bottom:12px">${(sn ? [['todas','Todas'],['canc','Canceladas']] : [['todas','Todas'],['65','Cupons'],['55','NF-e'],['dev','Devoluções'],['pend','Contingência'],...(S.notas.some(notaProblema) || f === 'prob' ? [['prob','Com problema']] : []),['canc','Canceladas']]).map(([k, l]) => `<button data-act="filtro" data-f="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="row" style="margin-bottom:10px;align-items:end"><div style="flex:2 1 220px"><label for="ntBusca">Buscar</label><input id="ntBusca" placeholder="${sn ? 'Número, cliente ou CPF' : 'Número, cliente, CPF/CNPJ ou chave'}" value="${esc(S.ntBusca || '')}" autocomplete="off"></div>
     <div style="flex:1 1 150px"><label for="ntMes">Mês</label><select id="ntMes" ${q || urgente ? 'disabled' : ''}><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nomeMes(m)}</option>`).join('')}</select></div></div>
   ${q ? '<p class="small" style="margin:-4px 0 8px">Buscando em todos os meses.</p>' : ''}
-  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} nota(s) · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="fin-lista">${lista.slice(0, lim).map(n => `
+  <div class="card">${lista.length ? `<div class="small" style="margin-bottom:4px">${lista.length} ${sn ? 'venda(s)' : 'nota(s)'} · ${brl(tot)} em vendas válidas${lista.length > lim ? ` · mostrando ${lim}` : ''}</div><div class="fin-lista">${lista.slice(0, lim).map(n => `
     <div class="fin-l nt-l" data-act="verNota" data-id="${esc(n.id)}"><div class="fin-v">${(n.data || '').slice(8, 10)}/${(n.data || '').slice(5, 7)}<small>${(n.data || '').slice(11, 16)}</small></div>
-      <div class="fin-d"><b>${nome(n)} nº ${n.numero} <span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span></b><span>${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}${n.corrige ? ` · substitui nº ${cadeiaCorrecao(n).map(x => x.numero).join(', ')}` : ''}</span></div>
+      <div class="fin-d"><b>${nome(n)} nº ${n.numero} ${n.serie ? `<span style="font-weight:400;color:#7a8597;font-size:12px">série ${n.serie}</span>` : ''}</b><span>${esc(n.destNome || 'Consumidor')}${(n.eventos || []).some(x => x.tipo === 'cce') ? ' · CC-e' : ''}${n.corrige ? ` · substitui nº ${cadeiaCorrecao(n).map(x => x.numero).join(', ')}` : ''}</span></div>
       <div class="fin-r"><b class="num">${brl(n.total)}</b>${tag(n)}</div></div>`).join('')}</div>`
-    : `<div class="empty">Nenhuma nota ${q ? 'encontrada' : mes && !urgente ? 'neste mês' : 'por aqui'}.</div>`}
+    : `<div class="empty">Nenhuma ${sn ? 'venda' : 'nota'} ${q ? 'encontrada' : mes && !urgente ? 'neste mês' : 'por aqui'}.</div>`}
     ${lista.length > lim ? `<div class="actions"><button class="btn" data-act="ntMais">Mostrar mais ${Math.min(30, lista.length - lim)}</button></div>` : ''}</div>
   ${S.inutilizacoes.length ? `<details class="card"><summary style="cursor:pointer"><b>Inutilizações (${S.inutilizacoes.length})</b></summary><div class="list">${[...S.inutilizacoes].sort((a, b) => b.em.localeCompare(a.em)).map(i => `<div class="it"><div class="grow"><div class="t">${i.modelo === '65' ? 'NFC-e' : 'NF-e'} série ${esc(i.serie)}: nº ${i.ini}${i.fim > i.ini ? ' a ' + i.fim : ''}</div><div class="s">${fmtData(i.em)} · ${esc(i.justificativa)}</div></div></div>`).join('')}</div></details>` : ''}`;
 }
@@ -1261,18 +1284,19 @@ function vProdutos(){
     return ne ? `<span class="tag b">✕ ${ne} fiscal</span>` : na ? `<span class="tag w">⚠ ${na} fiscal</span>` : ''; };
   const cor = p => !temSaldo(p) ? 'var(--muted)' : p.estoque < 0 ? 'var(--bad)' : baixo(p) ? 'var(--warn)' : 'var(--ink)';
   const m = S.ncmMeta || {};
+  const sn = semNota(), vc = verCusto();
   const chips = [['todos','Todos', V.length], ['baixo','Estoque baixo', P.filter(baixo).length], ['neg','Negativos', P.filter(neg).length], ['sem','Sem entrada', P.filter(p => !temSaldo(p)).length],
-    ['fav','Atalhos do cupom', P.filter(p => p.favorito).length], ['erro','Erro fiscal', nErr], ['aviso','Aviso fiscal', nAv]];
-  return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos e estoque</h2>${pode('produto') ? '<button class="btn pri" data-act="novoProd" style="flex:0 0 auto">+ Produto</button>' : ''}</div>
-  ${segProd()}
-  <div class="stats"><div><b>${V.length}</b>produtos</div><div><b>${brl(valor)}</b>em estoque (custo)</div><div><b style="color:var(--warn)">${P.filter(baixo).length}</b>abaixo do mínimo</div><div><b style="color:var(--bad)">${nErr}</b>com erro fiscal</div></div>
+    ['fav','Atalhos do cupom', P.filter(p => p.favorito).length], ...(sn ? [] : [['erro','Erro fiscal', nErr], ['aviso','Aviso fiscal', nAv]])];
+  return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos e estoque</h2>${pode('cadProduto') ? '<button class="btn pri" data-act="novoProd" style="flex:0 0 auto">+ Produto</button>' : ''}</div>
+  ${sn || !pode('produto') ? '' : segProd()}
+  <div class="stats"><div><b>${V.length}</b>produtos</div>${vc ? `<div><b>${brl(valor)}</b>em estoque (custo)</div>` : ''}<div><b style="color:var(--warn)">${P.filter(baixo).length}</b>abaixo do mínimo</div>${sn ? '' : `<div><b style="color:var(--bad)">${nErr}</b>com erro fiscal</div>`}</div>
   <div class="card"><input id="estBusca" placeholder="Buscar por nome, código ou código de barras…" value="${esc(S.estBusca || '')}" autocomplete="off">
     <div class="seg" style="margin-top:8px">${chips.filter(([k, , n]) => k === 'todos' || n || f === k).map(([k, l, n]) => `<button data-act="filtroProd" data-f="${k}" class="${f === k ? 'on' : ''}">${l}${k !== 'todos' ? ` (${n})` : ''}</button>`).join('')}</div></div>
   <div class="card">${lista.length ? `<div class="fin-lista">${lista.map(({ p, v }) => `<div class="fin-l nt-l prod-l" data-act="editProd" data-id="${esc(p.id)}">
-    <div class="fin-d"><b>${p.favorito ? '★ ' : ''}${esc(p.descricao)}</b><span>${p.codigo ? 'cód. ' + esc(p.codigo) + ' · ' : ''}NCM ${fmtNcm(p.ncm)}${temSaldo(p) ? ` · custo ${brl(p.custo_medio || 0)}` : ''}${num(p.estoque_min) > 0 ? ' · mín. ' + qtdTxt(p.estoque_min) : ''} ${tag(v)}</span></div>
+    <div class="fin-d"><b>${p.favorito ? '★ ' : ''}${esc(p.descricao)}</b><span>${p.codigo ? 'cód. ' + esc(p.codigo) + (sn ? '' : ' · ') : ''}${sn ? '' : 'NCM ' + fmtNcm(p.ncm)}${temSaldo(p) && vc ? ` · custo ${brl(p.custo_medio || 0)}` : ''}${num(p.estoque_min) > 0 ? ' · mín. ' + qtdTxt(p.estoque_min) : ''} ${sn ? '' : tag(v)}</span></div>
     <div class="fin-r"><b class="num prod-p">${brl(p.preco)}</b><span class="num prod-e" style="color:${cor(p)}">${temSaldo(p) ? qtdTxt(p.estoque) : '—'} <small>${esc(p.unidade || 'UN')}</small></span></div></div>`).join('')}</div>`
     : `<div class="empty">${V.length ? 'Nenhum produto neste filtro.' : 'Nenhum produto cadastrado. Cadastre aqui ou importe uma nota de compra na aba Compras.'}</div>`}</div>
-  <p class="small">Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.</p>`;
+  <p class="small">${pode('produto') ? 'Toque num produto para editar o cadastro, ver o histórico do estoque ou fazer inventário. As entradas vêm da aba <b>Compras</b>; as saídas, das vendas.' : 'Toque num produto para editar o cadastro. O estoque muda pelas vendas e pelas compras lançadas pelo dono.'}</p>`;
 }
 function vClientes(){
   const cs = [...S.clientes].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
@@ -1283,6 +1307,19 @@ function vClientes(){
 function vEmpresa(){
   const e = emp();
   if (!e) return `<h2>Empresa</h2><div class="card empty">Nenhuma empresa cadastrada.<br><br><button class="btn pri" data-act="novaEmp">Cadastrar empresa</button></div>`;
+  if (semNota(e)) return `<div class="row" style="align-items:center"><h2 style="flex:1">Empresa</h2>${pode('empresa') ? '<button class="btn" data-act="editEmp" style="flex:0 0 auto">Editar</button>' : ''}</div>
+  <div class="card"><div class="t" style="font-weight:700;font-size:16px">${esc(e.fantasia || e.razao)}</div><div class="small">${esc(e.razao)}</div>
+    <p>CPF ${fmtDoc(e.cpf)}${e.telefone ? ' · ' + esc(e.telefone) : ''}<br>${esc(e.logradouro)}, ${esc(e.numero)} — ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)}${e.cep ? ' · CEP ' + esc(e.cep) : ''}</p>
+    <p><span class="tag w">Sem nota fiscal</span> <span class="small">Próxima venda nº <b>${esc(e.prox_venda || 1)}</b></span></p>
+    ${pode('empresa') ? '<p class="small">Abriu o CNPJ? Toque em <b>Editar</b> e escolha <b>CNPJ</b>: a loja passa a emitir nota fiscal, sem perder nada.</p>' : ''}</div>
+  ${cardFuncionarios()}
+  ${cardAssinatura()}
+  ${cardCaixas()}
+  ${cardImpressao()}
+  ${cardBalanca()}
+  ${cardUsuarios()}
+  ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das vendas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes.</p>
+    <div class="actions"><button class="btn" data-act="exportar">Exportar planilha</button><button class="btn" data-act="importarBackup">Importar planilha</button></div></div>` : ''}`;
   const dUf = Object.entries(e.difal_uf || {});
   return `<div class="row" style="align-items:center"><h2 style="flex:1">Empresa emitente</h2>${pode('empresa') ? '<button class="btn" data-act="editEmp" style="flex:0 0 auto">Editar</button>' : ''}</div>
   <div class="card"><div class="t" style="font-weight:700;font-size:16px">${esc(e.razao)}</div><div class="small">${esc(e.fantasia || '')}</div>
@@ -1295,6 +1332,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
   ${cardContador()}
@@ -1314,11 +1352,28 @@ const sel = (id, label, v, opts) => `<div><label for="${id}">${label}</label><se
 const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
 const mhead = t => `<div class="mhead"><h2>${t}</h2><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>`;
 
-function formEmpresa(e){
-  const meta = S.meuMeta || {}, doSite = !e && dig(meta.cnpj).length === 14;
+// cadastro da empresa: CNPJ (emite nota fiscal) ou CPF (loja sem CNPJ: vende sem nota, com estoque, financeiro e relatórios)
+function formEmpresa(e, tipo){
+  const meta = S.meuMeta || {}, doSite = !e && !tipo && dig(meta.cnpj).length === 14;
   e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1',
-    cnpj:dig(meta.cnpj), fantasia:meta.empresa || '', telefone:meta.telefone || '' };
-  openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}
+    cnpj:dig(meta.cnpj), cpf:dig(meta.cpf), razao:meta.tipo === 'cpf' ? (meta.nome || '') : '', fantasia:meta.empresa || '', telefone:meta.telefone || '' };
+  tipo = tipo || (e.id ? (e.doc_tipo === 'cpf' ? 'cpf' : 'cnpj') : meta.tipo === 'cpf' ? 'cpf' : 'cnpj');
+  S.empForm = { e, tipo };
+  const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  if (tipo === 'cpf'){
+    openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
+    <p class="small">Para quem ainda não tem CNPJ: vende no caixa e no PDV com <b>comprovante de venda (não é documento fiscal)</b>, controla estoque, financeiro e relatórios. Quando abrir o CNPJ, é só trocar aqui para <b>CNPJ</b> — nada se perde.</p>
+    <div class="row">${fld('eRazao','Nome do dono *',e.razao)}${fld('eFant','Nome da loja *',e.fantasia)}</div>
+    <div class="row">${fld('eCpf','CPF do dono *',fmtDoc(e.cpf),'inputmode="numeric" autocomplete="off"')}${fld('eFone','Telefone',e.telefone,'inputmode="tel"')}</div>
+    <div class="row">${fld('eLog','Endereço (rua) *',e.logradouro)}${fld('eNum','Número *',e.numero)}</div>
+    <div class="row">${fld('eBai','Bairro *',e.bairro)}${fld('eCep','CEP (preenche o endereço)',e.cep,'inputmode="numeric" autocomplete="off"')}</div>
+    <div class="row">${fld('eMun','Município *',e.municipio)}${sel('eUf','UF',e.uf,UFS.map(u => [u,u]))}</div>
+    <div id="errM"></div>
+    <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar dados da empresa</button></div>`);
+    return;
+  }
+  openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
+  ${e.doc_tipo === 'cpf' ? '<div class="msg info">Abriu o CNPJ? Preencha os dados abaixo e salve: a loja passa a emitir nota fiscal. As vendas, o estoque e o financeiro continuam.</div>' : ''}
   <div class="row">${fld('eRazao','Razão social *',e.razao)}${fld('eFant','Nome fantasia',e.fantasia)}</div>
   <div class="row">${fld('eCnpj','CNPJ * (preenche o resto sozinho)',fmtDoc(e.cnpj),'inputmode="numeric" autocomplete="off"')}${fld('eIe','Inscrição estadual *',e.ie,'inputmode="numeric"')}</div>
   <div id="eAutoInfo" class="small" style="margin-top:4px">${e.id ? '' : 'Digite o CNPJ: razão social, endereço e município vêm da Receita Federal.'}</div>
@@ -1338,6 +1393,7 @@ function formEmpresa(e){
   if (doSite) setTimeout(() => { const c = $('#eCnpj'); if (c) autoPreencher(c); }, 50); // busca razão social e endereço na Receita
 }
 async function salvarEmp(id){
+  if ((S.empForm || {}).tipo === 'cpf') return salvarEmpCpf(id);
   const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),
     logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), cod_municipio:dig(val('eCodMun')), uf:val('eUf'),
     serie_nfce:dig(val('eSNfce')) || '1', prox_nfce:parseInt(dig(val('ePNfce'))) || 1, serie_nfe:dig(val('eSNfe')) || '1', prox_nfe:parseInt(dig(val('ePNfe'))) || 1,
@@ -1353,32 +1409,55 @@ async function salvarEmp(id){
   if (o.cod_municipio.length !== 7) errs.push('Código IBGE do município deve ter 7 dígitos (Teresina = 2211001).');
   if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
   if (!o.id) delete o.id;
+  o.doc_tipo = 'cnpj'; // empresa com CNPJ emite nota fiscal (quem era CPF e abriu o CNPJ passa a emitir)
+  const novo = !o.id; let salvo;
+  if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
+}
+async function salvarEmpCpf(id){
+  const o = { id:id || undefined, doc_tipo:'cpf', razao:val('eRazao').toUpperCase(), fantasia:val('eFant'), cpf:dig(val('eCpf')), cnpj:'', telefone:val('eFone'),
+    logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), uf:val('eUf') };
+  const antigo = id ? S.empresas.find(x => x.id === id) : null;
+  if (antigo){
+    if (antigo.doc_tipo !== 'cpf' && S.notas.some(n => n.modelo !== '99')) return $('#errM').innerHTML = '<div class="msg err">Esta empresa já emitiu notas fiscais com CNPJ: não dá para voltar para CPF.</div>';
+    Object.keys(antigo).forEach(k => { if (o[k] === undefined && k !== 'id') o[k] = clone(antigo[k]); });
+  } else Object.assign(o, { regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:1, serie_nfe:'1', prox_nfe:1, prox_venda:1 });
+  const errs = [];
+  if (!o.razao) errs.push('Informe o nome do dono.');
+  if (!o.fantasia) errs.push('Informe o nome da loja.');
+  if (!cpfOk(o.cpf)) errs.push('CPF inválido.');
+  if (!o.logradouro || !o.numero || !o.bairro || !o.municipio) errs.push('Complete o endereço.');
+  if (o.cep && o.cep.length !== 8) errs.push('CEP deve ter 8 dígitos.');
+  if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  if (!o.id) delete o.id;
   const novo = !o.id; let salvo;
   if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
 }
 
+// loja com CPF (sem nota fiscal): o produto não leva nenhuma informação fiscal (NCM, CFOP, CST, impostos)
+const CAMPOS_FISCAIS_PROD = () => [...Object.keys(TAXMAP), 'ncm', 'cest', 'origem', 'perfil_id'];
 function formProduto(p){
   const e = emp(), simples = String(e.regime) !== '3';
+  if (semNota(e)) p = p || { unidade:'UN' };
   p = p || { unidade:'UN', origem:'0', cfop:'5102', cst_csosn:simples ? '102' : '00', pis_cst:simples ? '49' : '01', cofins_cst:simples ? '49' : '01', pis_aliq:'0', cofins_aliq:'0', icms_aliq:simples ? '0' : '20,5', cst_ibscbs:'000', cclasstrib:'000001', gtin:'SEM GTIN' };
   openModal(`${mhead(p.id ? 'Editar produto' : 'Novo produto')}
   ${fld('pDesc','Descrição *',p.descricao)}
-  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
+  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}${fld('pCod','Código interno',p.codigo)}${fld('pGtin',semNota(e) ? 'Código de barras' : 'Código de barras (GTIN)',p.gtin)}</div>
   <label class="chk"><input type="checkbox" id="pFav" ${p.favorito ? 'checked' : ''}> Mostrar como atalho no cupom (botão de toque rápido)</label>
   <p class="small">Produto vendido na balança: o <b>Código interno</b> deve ser o mesmo código cadastrado na balança.</p>
-  <h3>Tributação</h3>
+  ${semNota(e) ? '' : `<div><h3>Tributação</h3>
   <div class="row">${fld('pNcm','NCM * (8 dígitos)',p.ncm,'inputmode="numeric"')}${fld('pCest','CEST',p.cest,'inputmode="numeric"')}</div>
   <div id="ncmInfo" class="small" style="margin-top:4px">${ncmInfoHtml(p.ncm)}</div>
   ${perfilSelHtml(p)}
   ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
-  <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p>
+  <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p></div>`}
   <h3>Estoque</h3>
-  <div class="row"><div><label>Saldo atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b>${p.custo_medio ? ` · custo médio ${brl(p.custo_medio)}` : ''}</div></div>
+  <div class="row"><div><label>Saldo atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b>${p.custo_medio && verCusto() ? ` · custo médio ${brl(p.custo_medio)}` : ''}</div></div>
     ${fld('pEstMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}</div>
   <p class="small">O saldo muda só por compras, vendas e ajustes de inventário.</p>
-  ${p.id ? `<button class="btn" data-act="verEstoque" data-id="${esc(p.id)}">📦 Histórico e inventário</button>` : ''}
-  <h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>
+  ${p.id && pode('produto') ? `<button class="btn" data-act="verEstoque" data-id="${esc(p.id)}">📦 Histórico e inventário</button>` : ''}
+  ${semNota(e) ? '' : `<h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>`}
   <div id="errM"></div>
-  <div class="actions">${p.id ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
+  <div class="actions">${p.id && pode('produto') ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
   $('#mbox').classList.add('compacto'); // cadastro de produto mais junto (pedido do Lucas)
 }
 async function salvarProd(id, force){
@@ -1389,11 +1468,15 @@ async function salvarProd(id, force){
   if (pf && Object.entries(taxOf(pf)).some(([k, v]) => String(v) !== String(o[k]))) o.perfil_id = '';
   if (o.gtin.toUpperCase() === 'SEM GTIN') o.gtin = 'SEM GTIN'; else o.gtin = dig(o.gtin);
   if (id) o.id = id;
-  const errs = [];
+  const errs = [], sn = semNota();
   if (!o.descricao) errs.push('Informe a descrição.');
   if (!(o.preco > 0)) errs.push('Informe um preço maior que zero.');
-  if (!/^5\d{3}$/.test(o.cfop)) errs.push('CFOP deve ser de saída interna (começando com 5).');
-  if (!o.cst_csosn) errs.push('Informe o CST/CSOSN.');
+  if (!sn && !/^5\d{3}$/.test(o.cfop)) errs.push('CFOP deve ser de saída interna (começando com 5).');
+  if (!sn && !o.cst_csosn) errs.push('Informe o CST/CSOSN.');
+  if (sn){ if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+    // sem nota fiscal: nenhuma informação fiscal vai para o cadastro (e a que existir é retirada)
+    CAMPOS_FISCAIS_PROD().forEach(k => delete o[k]); o.gtin = o.gtin === 'SEM GTIN' ? '' : o.gtin;
+    if (await safe(() => put('produtos', o), 'Produto salvo.')) closeModal(); return; }
   const v = validarProduto(o, emp());
   $('#valP').innerHTML = validarHtml(v);
   if (errs.length || temErro(v)){ $('#errM').innerHTML = `<div class="msg err">${errs.length ? errs.join('<br>') : 'Corrija os erros da conferência fiscal acima.'}</div>`; return; }
@@ -1442,12 +1525,12 @@ function baseEmitente(e){ return { cnpj_emitente:e.cnpj, inscricao_estadual_emit
 const FILA_KEY = () => 'notaone.fila.' + (S.empId || '');
 function lerFila(){ try { return JSON.parse(localStorage.getItem(FILA_KEY()) || '[]'); } catch(_){ return []; } }
 function gravarFila(f){ try { localStorage.setItem(FILA_KEY(), JSON.stringify(f)); return true; } catch(_){ return false; } }
-function guardarNaFila(payload, nota, troco){
-  const f = lerFila(); f.push({ id:nota.venda_id, payload, nota, venda_em:isoNow(), total:nota.total, troco });
+function guardarNaFila(payload, nota, troco, modelo = '65'){
+  const f = lerFila(); f.push({ id:nota.venda_id, payload, nota, venda_em:isoNow(), total:nota.total, troco, modelo });
   if (!gravarFila(f)) return $('#errV').innerHTML = '<div class="msg err">Sem internet e não foi possível guardar a venda neste navegador. Anote a venda e emita quando a internet voltar.</div>';
   S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; S.busca = ''; render();
   openModal(`<div class="pdv-ok" id="pdvOk"><div class="icone" style="color:#b45309">⏳</div><h2 style="margin:4px 0">Venda guardada</h2>
-    <p>Estamos <b>sem internet</b>. A venda de <b>${brl(nota.total)}</b> ficou guardada neste computador e o cupom fiscal será emitido <b>sozinho</b> assim que a internet voltar.</p>
+    <p>Estamos <b>sem internet</b>. A venda de <b>${brl(nota.total)}</b> ficou guardada neste computador e ${modelo === '99' ? 'será registrada' : 'o cupom fiscal será emitido'} <b>sozinho</b> assim que a internet voltar.</p>
     ${troco > 0 ? `<div class="small">Troco</div><div class="troco">${brl(troco)}</div>` : ''}
     <p class="small">Não feche nem recarregue esta página até a internet voltar. Se o cliente quiser o cupom, envie depois pelo WhatsApp (aba Notas → abrir o cupom → Enviar).</p>
     <div class="actions" style="justify-content:center"><button class="btn pri" data-act="pdvNova">Nova venda (Enter)</button></div></div>`);
@@ -1461,7 +1544,12 @@ async function processarFila(manual){
   filaRodando = true; let ok = 0, rej = 0;
   try {
     for (const item of [...f]){
-      const payload = clone(item.payload), nota = clone(item.nota);
+      const payload = clone(item.payload), nota = clone(item.nota), modelo = item.modelo || '65';
+      if (modelo === '99'){ // venda sem nota: fica com a hora em que foi feita
+        let r; try { r = await api('emitir', { empresa_id:S.empId, modelo, payload, nota, extras:{} }); }
+        catch(e){ if (e.semRede) break; item.erro = e.message; gravarFila(lerFila().map(x => x.id === item.id ? item : x)); continue; }
+        gravarFila(lerFila().filter(x => x.id !== item.id)); ok++; continue;
+      }
       // a SEFAZ só aceita cupom com a hora de agora: a hora da venda vai nas informações adicionais
       payload.data_emissao = isoNow(); nota.data = payload.data_emissao; nota.venda_em = item.venda_em;
       const aviso = `Venda realizada em ${fmtData(item.venda_em)} sem internet; cupom emitido quando a conexão voltou.`;
@@ -1473,13 +1561,13 @@ async function processarFila(manual){
       if (['rejeitada','erro_envio','denegada'].includes(r.nota.status)) rej++; else ok++;
     }
   } finally { filaRodando = false; }
-  if (ok || rej) toast(`Internet de volta: ${ok} cupom(ns) emitido(s)${rej ? `, ${rej} com problema (veja em Notas → Com problema)` : ''}.`);
+  if (ok || rej) toast(`Internet de volta: ${ok} venda(s) enviada(s)${rej ? `, ${rej} com problema (veja em Notas → Com problema)` : ''}.`);
   render();
 }
 function bannerFila(){
   const f = lerFila(), off = !navigator.onLine;
   if (!f.length && !off) return '';
-  return `<div class="msg ${off ? 'err' : 'warn'}" style="margin-bottom:12px">${off ? '<b>Sem internet.</b> Pode continuar vendendo: as vendas ficam guardadas neste computador e viram cupom sozinhas quando a internet voltar. Não feche nem recarregue a página.' : ''}
+  return `<div class="msg ${off ? 'err' : 'warn'}" style="margin-bottom:12px">${off ? '<b>Sem internet.</b> Pode continuar vendendo: as vendas ficam guardadas neste computador e ' + (semNota() ? 'são registradas' : 'viram cupom') + ' sozinhas quando a internet voltar. Não feche nem recarregue a página.' : ''}
     ${f.length ? `${off ? '<br>' : ''}<b>${f.length} venda(s) aguardando emissão</b> (${brl(r2(f.reduce((a, x) => a + num(x.total), 0)))}).${f.some(x => x.erro) ? ' Uma ou mais deram erro: ' + esc(f.find(x => x.erro).erro) : ''}
       ${!off ? ' <button class="btn sm" data-act="filaEnviar">Emitir agora</button>' : ''} <button class="btn sm" data-act="filaVer">Ver</button>` : ''}</div>`;
 }
@@ -1493,7 +1581,35 @@ function verFila(){
 window.addEventListener('offline', () => { if (S.logado) render(); });
 setInterval(() => { if (navigator.onLine && lerFila().length) processarFila(); }, 30000);
 
+// venda sem nota (empresa com CPF): comprovante não fiscal, número próprio, baixa o estoque e entra no caixa/relatórios
+async function registrarVendaSemNota(){
+  const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), errs = [], docC = dig(S.cpf);
+  if (docC && !(docC.length === 11 ? cpfOk(docC) : docC.length === 14 ? cnpjOk(docC) : false)) errs.push('CPF do cliente inválido.');
+  if (!(T.nota > 0)) errs.push('O desconto não pode zerar a venda.');
+  if (!S.pags.length) errs.push('Escolha a forma de pagamento.');
+  else {
+    if (S.pags.some(p => !(numIn(p.valor) > 0))) errs.push('Há pagamento sem valor.');
+    if (pg.falta > 0) errs.push(`Falta receber ${brl(pg.falta)}.`);
+    if (pg.troco > 0 && pg.troco > pg.din) errs.push('Troco só pode sair de pagamento em dinheiro: confira os valores.');
+  }
+  L.forEach(l => { if (l.descItem >= l.c.bruto) errs.push(`Desconto maior que o valor em ${esc(l.p.descricao)}.`); });
+  if (!caixaAberto()) errs.push('Abra o caixa antes de vender (aba Caixa).');
+  if (errs.length) return $('#errV').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+  const agora = isoNow(), ref = `venda-${uid().slice(0, 10)}`;
+  const nota = { id:ref, ref, modelo:'99', serie:'', numero:e.prox_venda || 1, data:agora, total:T.nota, destNome:S.nomeCons.toUpperCase() || (docC ? 'CPF ' + fmtDoc(docC) : ''), destDoc:docC,
+    pags:S.pags.map(p => ({ forma:p.forma, valor:numIn(p.valor) })), troco:pg.troco, status:'autorizada', ambiente:ambAtual(), tot:T, emitida_por:S.meuId || null,
+    caixa:caixaAberto().id, caixa_nome:caixaAberto().pdv_nome || '', op:'venda', sem_nota:true,
+    itens:L.map(l => ({ pid:l.p.id, d:l.p.descricao, q:l.qtd, u:l.p.unidade || 'UN', v:l.preco, t:l.c.bruto, desc:l.c.desc })), venda_id:uid() };
+  const payload = { data_emissao:agora };
+  if (!navigator.onLine) return guardarNaFila(payload, nota, pg.troco, '99');
+  const res = await emitirServidor('99', payload, nota, {}, '#errV'); if (!res) return;
+  if (res.semRede) return guardarNaFila(payload, nota, pg.troco, '99');
+  S.cart = []; S.pags = []; S.descTotal = { tipo:'R$', v:'' }; S.cpf = ''; S.nomeCons = ''; S.busca = '';
+  render(); if (S.pdv) pdvConcluido(res.nota, pg.troco); else verNota(res.nota);
+  if (((emp() || {}).impressao || {}).auto) imprimirCupom(res.nota);
+}
 async function emitirNfce(){
+  if (semNota()) return registrarVendaSemNota();
   const e = emp(), L = cartLinhas(), T = totais(L), pg = pagResumo(T.nota), errs = [], lim = num(e.limite_cpf_nfce || 10000);
   const docC = dig(S.cpf);
   if (docC.length === 14) errs.push('NFC-e não pode ser emitida para CNPJ (Ajuste SINIEF 11/2025). Emita uma NF-e na aba NF-e.');
@@ -1661,7 +1777,24 @@ function qrSvg(texto, px = 132){
   } catch(_){ return '<div class="qr">QR Code indisponível</div>'; }
 }
 
+// comprovante da venda sem nota (empresa com CPF): mesmo formato do cupom, sem dados fiscais
+function comprovanteHtml(n, e){
+  const pags = n.pags || [], T = n.tot || {};
+  return `<div class="cupom"><div class="c"><b>${esc(e.fantasia || e.razao)}</b><br>${esc(e.logradouro || '')}${e.numero ? ', ' + esc(e.numero) : ''}${e.bairro ? ' - ' + esc(e.bairro) : ''}<br>${esc(e.municipio || '')}${e.uf ? '/' + esc(e.uf) : ''}${e.telefone ? '<br>' + esc(e.telefone) : ''}</div><hr>
+  <div class="c"><b>COMPROVANTE DE VENDA</b><br>NÃO É DOCUMENTO FISCAL</div><hr>
+  <table>${n.itens.map((i, k) => `<tr><td colspan="2">${String(k + 1).padStart(3, '0')} ${esc(i.d)}</td></tr><tr><td>${i.q} ${esc(i.u)} x ${brl(i.v)}${i.desc ? ` (desc. ${brl(i.desc)})` : ''}</td><td class="r">${brl(r2(i.t - (i.desc || 0)))}</td></tr>`).join('')}</table><hr>
+  <table><tr><td>Qtd. total de itens</td><td class="r">${n.itens.length}</td></tr>
+  ${T.desc ? `<tr><td>Valor total R$</td><td class="r">${brl(T.prod)}</td></tr><tr><td>Desconto R$</td><td class="r">−${brl(T.desc)}</td></tr>` : ''}
+  <tr><td><b>VALOR A PAGAR R$</b></td><td class="r"><b>${brl(n.total)}</b></td></tr>
+  <tr><td colspan="2">FORMA DE PAGAMENTO</td></tr>
+  ${pags.map(p => `<tr><td>${esc(PAG_NOME[p.forma] || p.forma)}</td><td class="r">${brl(p.valor)}</td></tr>`).join('')}${n.troco ? `<tr><td>Troco</td><td class="r">${brl(n.troco)}</td></tr>` : ''}</table><hr>
+  <div class="c">Venda nº ${n.numero} · ${fmtData(n.data)}${n.caixa_nome ? '<br>' + esc(n.caixa_nome) : ''}</div>
+  <div class="c">${n.destDoc ? 'CLIENTE ' + fmtDoc(n.destDoc) : ''}${n.destNome && !n.destNome.startsWith('CPF') ? (n.destDoc ? '<br>' : 'CLIENTE ') + esc(n.destNome) : ''}</div>
+  <div class="c">Obrigado pela preferência!</div>
+  ${n.status === 'cancelada' ? '<hr><div class="semvalor">VENDA CANCELADA</div>' : ''}</div>`;
+}
 function cupomHtml(n, e){
+  if (n.modelo === '99') return comprovanteHtml(n, e);
   const pags = n.pags || [{ forma:n.pag, valor:n.total + (n.troco || 0) }], T = n.tot || {};
   return `<div class="cupom"><div class="c"><b>${esc(e.fantasia || e.razao)}</b><br>${esc(e.razao)}<br>CNPJ ${fmtDoc(e.cnpj)} IE ${esc(e.ie)}<br>${esc(e.logradouro)}, ${esc(e.numero)} - ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)}</div><hr>
   <div class="c"><b>DANFE NFC-e — Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</b></div><hr>
@@ -1694,22 +1827,26 @@ function danfeHtml(n, e){
 
 /* ================== visualização da nota ================== */
 function formCancelar(id){
+  const n = S.notas.find(x => x.id === id);
+  if (n && n.modelo === '99') return openModal(`${mhead('Cancelar venda')}<p class="small">A venda fica cancelada, sai dos relatórios e os produtos voltam para o estoque.</p>
+  <label for="just">Motivo</label><textarea id="just" rows="2"></textarea><div id="errM"></div>
+  <div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn bad" data-act="confCancelar" data-id="${esc(id)}">Cancelar venda</button></div>`);
   openModal(`${mhead('Cancelar nota')}<p class="small">A justificativa precisa ter pelo menos 15 caracteres. Na emissão real, o prazo é de 30 minutos para NFC-e e 24 horas para NF-e.</p>
   <label for="just">Justificativa</label><textarea id="just" rows="3"></textarea><div id="errM"></div>
   <div class="actions"><button class="btn" data-act="fechar">Voltar</button><button class="btn bad" data-act="confCancelar" data-id="${esc(id)}">Cancelar nota</button></div>`);
 }
 
 /* ================== usuários e permissões ================== */
-// Papéis: gerente (tudo) e operador (emite notas e cadastra clientes). O dono do sistema é sempre gerente.
-const PERM_OPERADOR = ['emitir','cliente'];
+// Papéis: gerente (tudo) e operador = funcionário (vende, abre/fecha o caixa, cadastra produtos e clientes). O dono do sistema é sempre gerente.
+const PERM_OPERADOR = ['emitir','cliente','cadProduto','caixa'];
 function pode(acao){
   if (acao === 'usuarios') return !!S.isAdmin;
   if (acao === 'ncm') return !!S.adminPlat;
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
-  novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
+const ACT_PERM = { sgSalvar:'empresa', sgForm:'empresa', sgTrocar:'empresa', empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+  novoProd:'cadProduto', editProd:'cadProduto', salvarProd:'cadProduto', delProd:'produto', confDelProd:'produto', verEstoque:'produto', abrirFuncionarios:'empresa', fnNovo:'empresa', fnCriar:'empresa', fnSenha:'empresa', fnSalvarSenha:'empresa', fnRemover:'empresa', fnConfRemover:'empresa',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
   exportar:'backup', importarBackup:'backup', salvarBackup:'backup', aprovar:'usuarios', remUser:'usuarios', recusar:'usuarios' };
@@ -1732,7 +1869,7 @@ async function exportar(){
     const X = await loadXlsx(), wb = X.utils.book_new(), rows = (arr, cols) => arr.map(o => Object.fromEntries(cols.map(c => [c, o[c] ?? ''])));
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows(S.produtos, PROD_COLS), { header:PROD_COLS }), 'Produtos');
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet(rows(S.clientes, CLI_COLS), { header:CLI_COLS }), 'Clientes');
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet([...S.notas].sort((a, b) => (a.data || '').localeCompare(b.data || '')).map(n => ({ modelo:n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero,
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet([...S.notas].sort((a, b) => (a.data || '').localeCompare(b.data || '')).map(n => ({ modelo:n.modelo === '99' ? 'Venda sem nota' : n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero,
       data:fmtData(n.data), destinatario:n.destNome || '', documento:n.destDoc || '', total:n.total, status:n.status, ref:n.ref }))), 'Notas');
     const { difal_uf, ...ee } = e;
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet([ee]), 'Empresa');
@@ -2064,7 +2201,7 @@ async function delPdv(id){
   await safe(() => put('empresas', e), 'Caixa excluído.');
 }
 function resumoCaixa(cx){
-  const ns = S.notas.filter(n => n.caixa === cx.id && n.modelo === '65' && notaValida(n));
+  const ns = S.notas.filter(n => n.caixa === cx.id && (n.modelo === '65' || n.modelo === '99') && notaValida(n));
   const porForma = {}; let total = 0, troco = 0;
   ns.forEach(n => { total += n.total; troco += n.troco || 0; (n.pags || []).forEach(p => porForma[p.forma] = r2((porForma[p.forma] || 0) + p.valor)); });
   if (porForma['01'] !== undefined) porForma['01'] = r2(porForma['01'] - troco);
@@ -2201,10 +2338,10 @@ function vRelatorios(){
     ${R.vend.length ? `<div class="actions" style="margin:0"><button class="btn" data-act="imprimirRel">Imprimir / PDF</button><button class="btn" data-act="exportRel">Exportar planilha</button></div>` : ''}</div>
   <div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${R.ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${R.fim}"></div></div>` : ''}
-  <div class="seg" style="margin-bottom:12px">${[['todos','Cupom e NF-e'],['65','Só cupom'],['55','Só NF-e']].map(([k, l]) => `<button data-act="relMod" data-m="${k}" class="${R.mod === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <div class="card"><div class="small">${dBR(R.ini)} a ${dBR(R.fim)}${ambAtual() !== 'producao' ? ' · notas de teste (homologação)' : ''}</div>
+  ${semNota() ? '' : `<div class="seg" style="margin-bottom:12px">${[['todos','Cupom e NF-e'],['65','Só cupom'],['55','Só NF-e']].map(([k, l]) => `<button data-act="relMod" data-m="${k}" class="${R.mod === k ? 'on' : ''}">${l}</button>`).join('')}</div>`}
+  <div class="card"><div class="small">${dBR(R.ini)} a ${dBR(R.fim)}${ambAtual() !== 'producao' && !semNota() ? ' · notas de teste (homologação)' : ''}</div>
     <div class="stats"><div><b>${brl(R.fat)}</b>faturamento</div><div><b>${R.vend.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div></div>
-    ${R.mod === 'todos' ? linhaTot(`Cupons (${R.cupons.length})`, somaV(R.cupons), 'small') + linhaTot(`NF-e (${R.nfes.length})`, somaV(R.nfes), 'small') : ''}
+    ${R.mod === 'todos' && !semNota() ? linhaTot(`Cupons (${R.cupons.length})`, somaV(R.cupons), 'small') + linhaTot(`NF-e (${R.nfes.length})`, somaV(R.nfes), 'small') : ''}
     ${R.desc ? linhaTot('Descontos concedidos', -R.desc, 'small') : ''}
     ${R.devV ? linhaTot(`Devoluções (${R.dev.length})`, -R.devV, 'small') + linhaTot('Faturamento líquido', r2(R.fat - R.devV)) : ''}
     ${R.canc.length ? linhaTot(`Canceladas (${R.canc.length}, fora do total)`, somaV(R.canc), 'small') : ''}</div>
@@ -2220,7 +2357,7 @@ async function exportRel(){
   try {
     const X = await loadXlsx(), wb = X.utils.book_new();
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet([{ periodo:`${dBR(R.ini)} a ${dBR(R.fim)}`, faturamento:R.fat, vendas:R.vend.length, ticket_medio:R.vend.length ? r2(R.fat / R.vend.length) : 0, descontos:R.desc, devolucoes:R.devV, liquido:r2(R.fat - R.devV), canceladas:R.canc.length }]), 'Resumo');
-    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.vend.map(n => ({ data:fmtData(n.data), modelo:n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero, cliente:n.destNome || '', total:n.total }))), 'Vendas');
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.vend.map(n => ({ data:fmtData(n.data), modelo:n.modelo === '99' ? 'Venda sem nota' : n.modelo === '65' ? 'NFC-e' : 'NF-e', serie:n.serie, numero:n.numero, cliente:n.destNome || '', total:n.total }))), 'Vendas');
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet(R.prod.map(p => ({ produto:p.d, unidade:p.u, quantidade:p.q, valor:p.v }))), 'Produtos');
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.entries(R.forma).map(([f, v]) => ({ forma:nomeForma(f), valor:v }))), 'Pagamentos');
     X.utils.book_append_sheet(wb, X.utils.json_to_sheet(Object.entries(R.dia).sort().map(([d, v]) => ({ dia:dBR(d), valor:v }))), 'Por dia');
@@ -2233,7 +2370,7 @@ function imprimirRel(){
   const lin = (a, b) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`;
   const tab = (tit, cab, linhas, dir = [cab.length - 1]) => `<h2>${tit}</h2><table><tr>${cab.map((c, i) => `<th${dir.includes(i) ? ' class="r"' : ''}>${c}</th>`).join('')}</tr>${linhas.join('')}</table>`;
   const css = 'body{font:12px Arial,sans-serif;color:#111;margin:14mm}h1{font-size:17px;margin:0}h2{font-size:13px;margin:16px 0 4px;border-bottom:1px solid #999;padding-bottom:2px}table{width:100%;border-collapse:collapse}td,th{padding:3px 4px;border-bottom:1px solid #ddd;text-align:left}th{background:#f0f0f0}.r{text-align:right}.s{color:#555}@page{size:A4;margin:0}';
-  const corpo = `<h1>Relatório de vendas</h1><div class="s">${esc(e.razao || '')}${e.cnpj ? ' · CNPJ ' + fmtDoc(e.cnpj) : ''}<br>Período: ${dBR(R.ini)} a ${dBR(R.fim)} · ${R.mod === '65' ? 'só cupom' : R.mod === '55' ? 'só NF-e' : 'cupom e NF-e'} · emitido em ${fmtData(isoNow())}</div>
+  const corpo = `<h1>Relatório de vendas</h1><div class="s">${esc(e.razao || '')}${e.cnpj ? ' · CNPJ ' + fmtDoc(e.cnpj) : ''}<br>Período: ${dBR(R.ini)} a ${dBR(R.fim)}${semNota() ? '' : ' · ' + (R.mod === '65' ? 'só cupom' : R.mod === '55' ? 'só NF-e' : 'cupom e NF-e')} · emitido em ${fmtData(isoNow())}</div>
   ${tab('Resumo', ['', 'Valor'], [lin('Faturamento', brl(R.fat)), lin('Vendas', R.vend.length), lin('Ticket médio', brl(tk)), lin('Descontos concedidos', brl(R.desc)), lin('Devoluções', brl(R.devV)), lin('Faturamento líquido', brl(r2(R.fat - R.devV))), lin('Canceladas (fora do total)', R.canc.length)])}
   ${tab('Por forma de pagamento', ['Forma', 'Valor'], Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => lin(esc(nomeForma(f)), brl(v))))}
   ${Object.keys(R.dia).length > 1 ? tab('Por dia', ['Dia', 'Valor'], Object.entries(R.dia).sort().map(([d, v]) => lin(dBR(d), brl(v)))) : ''}
@@ -2580,7 +2717,7 @@ async function api(rota, body){
   return j;
 }
 async function emitirServidor(modelo, payload, nota, extras, alvo, reenviar){
-  $(alvo).innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
+  $(alvo).innerHTML = `<div class="msg info">${modelo === '99' ? 'Registrando a venda…' : 'Enviando para a SEFAZ…'}</div>`;
   try {
     const r = await api('emitir', { empresa_id:S.empId, modelo, payload, nota, extras, ...(reenviar ? { reenviar } : {}) });
     // rejeitada: o formulário continua preenchido e fica ligado a esta nota, para corrigir e reenviar com o mesmo número
@@ -2590,7 +2727,7 @@ async function emitirServidor(modelo, payload, nota, extras, alvo, reenviar){
       verNota(r.nota); return null;
     }
     $(alvo).innerHTML = ''; return r;
-  } catch(e){ if (e.semRede && modelo === '65' && !reenviar){ $(alvo).innerHTML = ''; return { semRede:true }; }
+  } catch(e){ if (e.semRede && (modelo === '65' || modelo === '99') && !reenviar){ $(alvo).innerHTML = ''; return { semRede:true }; }
     $(alvo).innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return null; }
 }
 function baixarArquivo({ filename, data }){
@@ -2621,14 +2758,14 @@ async function aoMudarSessao(session){
   S.carregando = false; S.meuId = uidAtual; S.meuEmail = uidAtual ? session.user.email : ''; S.logado = !!uidAtual;
   S.meuMeta = uidAtual ? (session.user.user_metadata || {}) : {}; // dados do cadastro feito no site (nome, telefone, empresa, cnpj)
   unsubs.forEach(u => u()); unsubs = []; if (S.unsubEmp){ S.unsubEmp(); S.unsubEmp = null; } if (db && db.fechar) db.fechar();
-  S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null;
-  if (!uidAtual){ db = null; render(); renderBadge(); return; }
+  S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null; S.papelEmp = undefined; S.fn = null;
+  if (!uidAtual){ perfilMarcar(''); db = null; render(); renderBadge(); return; }
   db = criarShim(SB); S.mode = 'db'; S.papel = 'gerente'; S.isAdmin = true;
   await SB.rpc('aceitar_convites');
   const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm;
   startDb(); carregarNcm(); render(); renderBadge();
   // cadastro feito pelo site: no primeiro acesso, abre o cadastro da empresa já com o CNPJ (a Receita preenche o resto)
-  if (S.meuMeta && dig(S.meuMeta.cnpj).length === 14) setTimeout(() => {
+  if (S.meuMeta && (dig(S.meuMeta.cnpj).length === 14 || (S.meuMeta.tipo === 'cpf' && dig(S.meuMeta.cpf).length === 11))) setTimeout(() => {
     if (S.meuId === uidAtual && S.logado && !S.empresas.length && !$('#mbox').innerHTML.trim()){ S.tab = 'empresa'; render(); formEmpresa(); }
   }, 2500);
 }
@@ -2698,11 +2835,13 @@ async function acaoLogin(a, t){
 
 // status das notas vindas da Focus
 function tagStatus(n){
+  if (n.modelo === '99') return n.status === 'autorizada' ? '<span class="tag">registrada</span>' : `<span class="tag w">${esc(n.status || '')}</span>`;
   return ({ autorizada:'<span class="tag">autorizada</span>', processando:'<span class="tag w">processando</span>', rejeitada:'<span class="tag b">rejeitada</span>',
     erro_envio:'<span class="tag b">não enviada</span>', denegada:'<span class="tag b">denegada</span>', simulada:'<span class="tag w">simulada</span>' })[n.status] || `<span class="tag w">${esc(n.status || '')}</span>`;
 }
 function statusMsg(n){
   const f = n.focus || {}, m = esc(f.mensagem_sefaz ? `${f.status_sefaz ? f.status_sefaz + ' — ' : ''}${f.mensagem_sefaz}` : (f.mensagem || ''));
+  if (n.modelo === '99') return n.status === 'cancelada' ? `<div class="msg err">Venda cancelada: ${esc(n.justificativa || '')}</div>` : '<div class="msg info">✓ Venda registrada (sem nota fiscal).</div>';
   switch (n.status){
     case 'autorizada': return `<div class="msg info">✓ Autorizada pela SEFAZ${n.ambiente !== 'producao' ? ' em homologação (sem valor fiscal)' : ''}${f.protocolo ? ' · protocolo ' + esc(f.protocolo) : ''}.</div>`;
     case 'processando': return '<div class="msg warn">Em processamento na SEFAZ. Toque em "Consultar situação" em alguns segundos.</div>';
@@ -2781,7 +2920,7 @@ function corrigirNota(id){
 }
 function verNota(n){
   if (!n) return; const e = emp(), ev = n.eventos || [], venda = (n.op || 'venda') === 'venda', aut = n.status === 'autorizada';
-  const tit = (n.op === 'dev_venda' ? 'Devolução de venda' : n.op === 'dev_compra' ? 'Devolução de compra' : n.modelo === '65' ? 'Cupom' : 'NF-e') + ' nº ' + n.numero;
+  const tit = (n.op === 'dev_venda' ? 'Devolução de venda' : n.op === 'dev_compra' ? 'Devolução de compra' : nomeModelo(n)) + ' nº ' + n.numero, sn = n.modelo === '99';
   const btn = (act, txt, cls = '') => `<button class="btn ${cls}" data-act="${act}" data-id="${esc(n.id)}">${txt}</button>`;
   const erros = (n.focus && Array.isArray(n.focus.erros)) ? n.focus.erros : [];
   S.notaAberta = n;
@@ -2797,12 +2936,13 @@ function verNota(n){
     ${['processando','erro_envio'].includes(n.status) ? btn('consultarNota', 'Consultar situação', podeCorrigir(n) ? '' : 'pri') : ''}
     ${linksFocus(n)}
     ${n.modelo === '55' && aut && pode('cce') ? btn('cce', 'Carta de correção') : ''}
-    ${venda && aut && pode('devolucao') ? btn('devolver', 'Fazer devolução') : ''}
-    ${aut && pode('cancelar') ? btn('cancelarNota', 'Cancelar nota', 'bad') : ''}
+    ${venda && aut && pode('devolucao') && !sn ? btn('devolver', 'Fazer devolução') : ''}
+    ${sn ? btn('pdvImprimir', 'Imprimir comprovante', 'pri') : ''}
+    ${aut && pode('cancelar') ? btn('cancelarNota', sn ? 'Cancelar venda' : 'Cancelar nota', 'bad') : ''}
   </div>
-  ${n.modelo === '65' ? cupomHtml(n, e) : danfePreview(n)}
+  ${n.modelo === '65' || sn ? cupomHtml(n, e) : danfePreview(n)}
   ${ev.length ? `<h3>Eventos</h3>${ev.map(x => `<div class="v ${x.tipo === 'cce' ? 'info' : 'erro'}"><b>${x.tipo === 'cce' ? `Carta de correção ${x.seq}ª` : 'Cancelamento'}</b> · ${fmtData(x.em)} — ${esc(x.texto)}${x.tipo === 'cce' ? botoesCce(n, x) : ''}</div>`).join('')}` : ''}
-  ${n.modelo === '65' && S.dl && !(n.focus || {}).caminho_danfe ? `<div class="actions">${btn('imprimir', 'Baixar prévia (80 mm)')}</div>` : ''}`);
+  ${n.modelo === '65' && !sn && S.dl && !(n.focus || {}).caminho_danfe ? `<div class="actions">${btn('imprimir', 'Baixar prévia (80 mm)')}</div>` : ''}`);
 }
 async function eventoServidor(body, ok){
   try {
@@ -2822,7 +2962,7 @@ async function acoesV5(a, t, id){
         ${temCaixa ? '<div class="msg warn">Seu caixa continua aberto. Se terminou o expediente, feche o caixa antes de sair.</div>' : ''}
         <div class="actions"><button class="btn" data-act="fechar">Continuar no sistema</button><button class="btn bad" data-act="sair">Sair</button></div>`);
       return true; }
-    case 'sair': closeModal(); await SB.auth.signOut(); S.tab = 'inicio'; return true;
+    case 'sair': closeModal(); perfilMarcar(''); await SB.auth.signOut(); S.tab = 'inicio'; return true;
     case 'consultarNota': { t.disabled = true; const r = await eventoServidor({ tipo:'consultar', ref:id }); t.disabled = false; if (r) verNota(r.nota); return true; }
     case 'convidar': {
       const email = val('cvEmail'), papel = val('cvPapel');
@@ -3653,7 +3793,7 @@ function titulosFin(){
   });
   // NF-e a prazo e Crédito loja → a receber (só notas válidas do ambiente atual)
   S.notas.filter(n => daAmb(n) && (n.op || 'venda') === 'venda' && (notaValida(n) || n.status === 'cancelada')).forEach(n => {
-    const dups = n.modelo === '55' ? ((n.payload || {}).duplicatas || n.dups || []) : [], dia = (n.data || '').slice(0, 10), nome = n.destNome || 'Consumidor', tipoN = n.modelo === '65' ? 'Cupom' : 'NF-e';
+    const dups = n.modelo === '55' ? ((n.payload || {}).duplicatas || n.dups || []) : [], dia = (n.data || '').slice(0, 10), nome = n.destNome || 'Consumidor', tipoN = nomeModelo(n);
     if (dups.length) dups.forEach((d, k) => add({ id:`nf_${n.id}_${k}`, tipo:'receber', auto:'nota', ref:n.id, cancelada:n.status === 'cancelada', descricao:`${tipoN} nº ${n.numero} · parcela ${k + 1}/${dups.length}`, pessoa:nome, categoria:'Vendas', valor:r2(num(d.valor)), venc:d.data_vencimento || d.venc || dia }));
     else {
       const cl = r2((n.pags || (n.pag === '05' ? [{ forma:'05', valor:n.total }] : [])).filter(p => p.forma === '05').reduce((a, p) => a + num(p.valor), 0));
@@ -4041,7 +4181,7 @@ function alertasInicio(){
   if (baixo) add('warn', `${baixo} produto(s) abaixo do estoque mínimo`, 'irPara', 'data-tab="produtos" data-fp="baixo"');
   if (pode('produto')){
     const err = P.filter(p => temErro(validarProduto(p, e))).length;
-    if (err) add('bad', `${err} produto(s) com erro fiscal no cadastro (podem dar rejeição)`, 'irPara', 'data-tab="produtos" data-fp="erro"');
+    if (err && !semNota()) add('bad', `${err} produto(s) com erro fiscal no cadastro (podem dar rejeição)`, 'irPara', 'data-tab="produtos" data-fp="erro"');
     const semPreco = P.filter(p => !(num(p.preco) > 0)).length;
     if (semPreco) add('warn', `${semPreco} produto(s) sem preço de venda`, 'irPara', 'data-tab="produtos"');
     const recP = S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave)).length;
@@ -4069,6 +4209,148 @@ function bannerCertificado(){
   else { cls = 'ok'; txt = `Certificado digital: faltam <b>${d} dias</b> para vencer (${dataBR(venc)}).`; }
   return `<div class="cert-ban ${cls}"><span class="cert-ico">${cls === 'ok' ? '✓' : '!'}</span><div class="cert-txt">${txt}</div>${extra}</div>`;
 }
+/* ---------- Tela "Quem vai usar o sistema?" (loja com funcionários) ---------- */
+// A loja entra com o e-mail e a senha da conta (do dono). Com funcionários cadastrados, cada pessoa escolhe o seu quadro
+// e digita a SUA senha: Gerente → senha do gerente (api/perfil.js); funcionário → senha do login dele (signInWithPassword).
+// O perfil aberto fica guardado só nesta aba do navegador (sessionStorage): fechou o navegador, pergunta de novo.
+const perfilAtual = () => { try { return sessionStorage.getItem('notaone.perfil') || ''; } catch(_){ return ''; } };
+const perfilMarcar = v => { try { v ? sessionStorage.setItem('notaone.perfil', v) : sessionStorage.removeItem('notaone.perfil'); } catch(_){} };
+function precisaPerfil(){
+  const e = emp(); if (!e || S.mode !== 'db' || !(e.funcionarios || []).length || !e.senha_gerente) return false;
+  if (S.trocandoPerfil) return true;
+  if (S.papelEmp === undefined) return 'carregando';
+  return S.papelEmp === 'dono' && perfilAtual() !== 'gerente';
+}
+function vQuemUsa(){
+  const e = emp(), fs = e.funcionarios || [], eu = S.meuId;
+  const card = (id, nome, sub, ic, atual) => `<button class="perfil-card" data-act="perfEscolher" data-id="${esc(id)}"><span class="perfil-ic">${ic}</span><b>${esc(nome)}</b><small>${sub}</small>${atual ? '<em>em uso agora</em>' : ''}</button>`;
+  return `<div class="perfil-tela"><img src="img/logo.png" alt="" class="perfil-logo"><h2>Quem vai usar o sistema?</h2><p class="small">${esc(e.fantasia || e.razao || '')} · toque no seu nome e digite a sua senha</p>
+    <div class="perfil-grade">${card('gerente', 'Gerente', 'acesso completo', '★', S.papelEmp === 'dono' && perfilAtual() === 'gerente')}
+      ${fs.map(f => card(f.user_id, f.nome || f.email, 'vendas e produtos', esc((f.nome || f.email || '?').trim()[0].toUpperCase()), f.user_id === eu)).join('')}</div>
+    <div class="actions" style="justify-content:center">${S.trocandoPerfil && (S.papelEmp !== 'dono' || perfilAtual() === 'gerente') ? '<button class="btn" data-act="perfVoltar">Voltar</button>' : ''}<button class="btn" data-act="pedirSair">Sair da conta da loja</button></div></div>`;
+}
+function formPerfilSenha(id){
+  const e = emp(), f = (e.funcionarios || []).find(x => x.user_id === id), nome = id === 'gerente' ? 'Gerente' : f ? f.nome || f.email : '';
+  openModal(`${mhead(esc(nome))}<label for="perfSenha">${id === 'gerente' ? 'Senha do gerente' : 'Sua senha'}</label>
+    <input id="perfSenha" type="password" autocomplete="current-password"><div id="errM"></div>
+    <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="perfEntrar" data-id="${esc(id)}">Entrar</button></div>`);
+  setTimeout(() => { const i = $('#perfSenha'); if (i){ i.focus(); i.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ const b = document.querySelector('[data-act=perfEntrar]'); if (b) b.click(); } }); } }, 50);
+}
+async function perfEntrar(id, t){
+  const senha = $('#perfSenha').value; if (!senha) return $('#errM').innerHTML = '<div class="msg err">Digite a senha.</div>';
+  t.disabled = true; $('#errM').innerHTML = '<div class="msg info">Conferindo…</div>';
+  try {
+    if (id === 'gerente'){
+      const r = await api('perfil', { empresa_id:S.empId, acao:'gerente', senha });
+      perfilMarcar('gerente');
+      if (r.token_hash){ // estava na conta da funcionária: entra na conta da loja (do dono)
+        let { error } = await SB.auth.verifyOtp({ token_hash:r.token_hash, type:'magiclink' });
+        if (error) ({ error } = await SB.auth.verifyOtp({ token_hash:r.token_hash, type:'email' }));
+        if (error) throw new Error('Não foi possível entrar como gerente. Tente de novo.');
+      }
+    } else {
+      const f = (emp().funcionarios || []).find(x => x.user_id === id); if (!f) throw new Error('Funcionário não encontrado.');
+      const { error } = await SB.auth.signInWithPassword({ email:f.email, password:senha });
+      if (error) throw new Error('Senha incorreta.');
+      perfilMarcar('func'); S.tab = 'venda';
+    }
+    S.trocandoPerfil = false; closeModal(); render();
+  } catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function cardSenhaGerente(e){
+  return e.senha_gerente
+    ? `<div class="it"><div class="grow"><div class="t">Senha do gerente</div><div class="s">Pedida no quadro <b>Gerente</b> da tela "Quem vai usar o sistema?". Não é a senha da loja.</div></div><button class="btn sm" data-act="sgForm" style="flex:0 0 auto">Trocar senha do gerente</button></div>`
+    : `<div class="msg warn"><b>Primeiro, crie a senha do gerente.</b> Com funcionários cadastrados, o sistema abre na tela "Quem vai usar o sistema?" e o gerente entra com esta senha — use uma diferente da senha da loja, que só você saiba.</div>
+      <div class="row">${fld('sgNova','Senha do gerente (mínimo 4)','','type="password" autocomplete="new-password"')}${fld('sgConf','Repita a senha','','type="password" autocomplete="new-password"')}</div>
+      <div class="actions"><button class="btn pri" data-act="sgSalvar">Criar senha do gerente</button></div>`;
+}
+
+/* ---------- Funcionários (acesso limitado: vender, caixa, produtos e clientes) ---------- */
+// o dono cria o login da funcionária (e-mail e senha) pelo servidor (api/equipe.js); ela entra com papel 'operador'
+function fnCarregar(){
+  if (S.mode !== 'db' || S.fnCarregando || (S.fn && S.fn.emp === S.empId)) return;
+  S.fnCarregando = true;
+  api('equipe', { empresa_id:S.empId, acao:'listar' }).then(r => { S.fn = { emp:S.empId, lista:r.funcionarios || [], limite:r.limite }; })
+    .catch(e => { S.fn = { emp:S.empId, lista:[], limite:null, erro:e.message }; }).finally(() => { S.fnCarregando = false; if (S.tab === 'empresa') render(); });
+}
+function cardFuncionarios(){
+  if (!S.isAdmin || S.mode !== 'db' || !emp()) return '';
+  const f = S.fn && S.fn.emp === S.empId ? S.fn : null; if (!f) setTimeout(fnCarregar, 0);
+  const lista = f ? f.lista : [], cheio = f && f.limite !== null && lista.length >= f.limite, e = emp();
+  return `<div class="card" id="cardFunc"><h3 style="margin-top:0">Funcionários</h3>
+    <p class="small">O funcionário entra pelo quadro com o nome dele e a senha dele e <b>só vende</b> (Caixa e PDV) e <b>cadastra produtos e clientes</b>. Ele não vê custo, financeiro, compras, relatórios nem os dados da empresa, e não cancela vendas.</p>
+    <p class="small">Com funcionários, ao entrar no sistema aparece a tela <b>"Quem vai usar o sistema?"</b>: cada um toca no seu nome e digita a sua senha.</p>
+    ${cardSenhaGerente(e)}
+    ${!f ? '<div class="small">Carregando…</div>' : f.erro ? `<div class="msg err">${esc(f.erro)}</div>`
+      : lista.length ? `<div class="list">${lista.map(x => `<div class="it"><div class="grow"><div class="t">${esc(x.nome || x.email)}</div><div class="s">${esc(x.email)}${x.ultimo_acesso ? ' · último acesso ' + fmtData(x.ultimo_acesso) : ' · ainda não entrou'}</div></div>
+        <button class="btn sm" data-act="fnSenha" data-id="${esc(x.user_id)}" style="flex:0 0 auto">Trocar senha</button><button class="btn sm bad" data-act="fnRemover" data-id="${esc(x.user_id)}" style="flex:0 0 auto">Remover</button></div>`).join('')}</div>`
+      : '<div class="empty" style="padding:8px 0">Nenhum funcionário cadastrado.</div>'}
+    ${f && !f.erro ? `<div class="actions">${cheio ? `<span class="small">Seu plano inclui ${f.limite} funcionário(s). Para liberar mais, <a href="${esc(linkSuporte('Quero liberar mais funcionários no NotaOne.'))}" target="_blank" rel="noopener">fale com o suporte</a>.</span>` : (e.senha_gerente ? '<button class="btn pri" data-act="fnNovo">+ Novo funcionário</button>' : '')}</div>` : ''}</div>`;
+}
+async function acoesLoja(a, t, id){
+  switch (a){
+    case 'perfEscolher': formPerfilSenha(id); return true;
+    case 'perfEntrar': await perfEntrar(id, t); return true;
+    case 'perfTrocar': S.trocandoPerfil = true; S.pdv = false; closeModal(); render(); return true;
+    case 'perfVoltar': S.trocandoPerfil = false; render(); return true;
+    case 'sgSalvar': {
+      const n = $('#sgNova').value, c = $('#sgConf').value;
+      if (n.length < 4) return toast('A senha do gerente precisa ter pelo menos 4 caracteres.'), true;
+      if (n !== c) return toast('As duas senhas não são iguais.'), true;
+      t.disabled = true;
+      try { await api('perfil', { empresa_id:S.empId, acao:'definir', senha:n }); perfilMarcar('gerente'); toast('Senha do gerente criada.'); }
+      catch(e){ toast(e.message); } t.disabled = false; return true; }
+    case 'sgForm':
+      openModal(`${mhead('Trocar senha do gerente')}${fld('sgAtual','Senha atual do gerente','','type="password" autocomplete="current-password"')}${fld('sgNova','Nova senha (mínimo 4)','','type="password" autocomplete="new-password"')}${fld('sgConf','Repita a nova senha','','type="password" autocomplete="new-password"')}
+        <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="sgTrocar">Salvar</button></div>`);
+      return true;
+    case 'sgTrocar': {
+      const n = $('#sgNova').value;
+      if (n.length < 4 || n !== $('#sgConf').value) return $('#errM').innerHTML = '<div class="msg err">A nova senha precisa ter pelo menos 4 caracteres e ser igual nas duas caixas.</div>', true;
+      t.disabled = true;
+      try { await api('perfil', { empresa_id:S.empId, acao:'definir', senha:n, atual:$('#sgAtual').value }); closeModal(); toast('Senha do gerente trocada.'); }
+      catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true; }
+    case 'empTipo': { // troca CPF ↔ CNPJ no cadastro da empresa, mantendo o que já foi digitado
+      const f = S.empForm || {}, e = { ...(f.e || {}) };
+      [['eRazao','razao'],['eFant','fantasia'],['eFone','telefone'],['eLog','logradouro'],['eNum','numero'],['eBai','bairro'],['eCep','cep'],['eMun','municipio'],['eUf','uf']].forEach(([i, k]) => { if ($('#' + i)) e[k] = val(i); });
+      if ($('#eCpf')) e.cpf = dig(val('eCpf')); if ($('#eCnpj')) e.cnpj = dig(val('eCnpj'));
+      formEmpresa(e, t.dataset.t); return true; }
+    case 'fnNovo':
+      openModal(`${mhead('Novo funcionário')}<p class="small">Ele entra tocando no próprio nome na tela "Quem vai usar o sistema?" e digitando esta senha. O e-mail serve de identificação (e para entrar de outro aparelho).</p>
+        ${fld('fnNome','Nome *','')}${fld('fnEmail','E-mail *','','type="email" autocomplete="off"')}${fld('fnSenha1','Senha (mínimo 8 caracteres) *','','type="password" autocomplete="new-password"')}
+        <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="fnCriar">Criar acesso</button></div>`);
+      return true;
+    case 'fnCriar': {
+      t.disabled = true; $('#errM').innerHTML = '<div class="msg info">Criando o acesso…</div>';
+      try { await api('equipe', { empresa_id:S.empId, acao:'criar', nome:val('fnNome'), email:val('fnEmail'), senha:$('#fnSenha1').value });
+        S.fn = null; closeModal(); toast('Funcionário criado. Ele já pode entrar com o e-mail e a senha.'); render(); }
+      catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true; }
+    case 'fnSenha': {
+      const x = ((S.fn || {}).lista || []).find(y => y.user_id === id);
+      openModal(`${mhead('Trocar senha')}<p>${esc(x ? x.nome || x.email : '')}</p>${fld('fnSenha2','Nova senha (mínimo 8 caracteres)','','type="password" autocomplete="new-password"')}
+        <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="fnSalvarSenha" data-id="${esc(id)}">Salvar senha</button></div>`);
+      return true; }
+    case 'fnSalvarSenha':
+      t.disabled = true;
+      try { await api('equipe', { empresa_id:S.empId, acao:'senha', user_id:id, senha:$('#fnSenha2').value }); closeModal(); toast('Senha trocada.'); }
+      catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true;
+    case 'fnRemover': {
+      const x = ((S.fn || {}).lista || []).find(y => y.user_id === id);
+      openModal(`${mhead('Remover funcionário')}<p>Remover o acesso de <b>${esc(x ? x.nome || x.email : '')}</b>? Ele não consegue mais entrar no sistema. As vendas que ele fez continuam.</p>
+        <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn bad" data-act="fnConfRemover" data-id="${esc(id)}">Remover</button></div>`);
+      return true; }
+    case 'fnConfRemover':
+      t.disabled = true;
+      try { await api('equipe', { empresa_id:S.empId, acao:'remover', user_id:id }); S.fn = null; closeModal(); toast('Acesso removido.'); render(); }
+      catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true;
+  }
+  return false;
+}
+
 /* ---------- Mensalidade do NotaOne (Asaas) ---------- */
 // empresa.assinatura é gravada só pelo servidor (api/asaas.js); a tela só mostra e pede para pagar
 const MS_ST = { PENDING:['Em aberto','w'], OVERDUE:['Vencida','b'], RECEIVED:['Paga','g'], CONFIRMED:['Paga','g'], RECEIVED_IN_CASH:['Paga','g'], DUNNING_RECEIVED:['Paga','g'], REFUNDED:['Estornada',''], AWAITING_RISK_ANALYSIS:['Em análise','w'] };
@@ -4202,12 +4484,12 @@ function vInicio(){
   const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
   const tk = H.v.length ? r2(H.total / H.v.length) : 0;
   return `${bannerCertificado()}${bannerAssinatura()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
-  <div class="ini-acoes">${pode('emitir') ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe" data-nfnova="1"><b>＋</b>Nova NF-e</button>' : ''}
+  <div class="ini-acoes">${pode('emitir') ? (semNota() ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Nova venda</button>' : '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe" data-nfnova="1"><b>＋</b>Nova NF-e</button>') : ''}
     ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
   <div class="grid2"><div>
     <div class="card"><div class="small">Vendas de hoje</div>
       <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><b class="num" style="font-size:30px">${brl(H.total)}</b>${variacao(H.total, O.total)}<span class="small">ontem ${brl(O.total)}</span></div>
-      <div class="stats"><div><b>${H.v.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div><div><b>${H.v.filter(n => n.modelo === '65').length}/${H.v.filter(n => n.modelo === '55').length}</b>cupons / NF-e</div></div>
+      <div class="stats"><div><b>${H.v.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div>${semNota() ? '' : `<div><b>${H.v.filter(n => n.modelo === '65').length}/${H.v.filter(n => n.modelo === '55').length}</b>cupons / NF-e</div>`}</div>
       <div class="ini-barras">${dias.map(x => `<div title="${dataBR(x.dd)}: ${brl(x.t)}"><span class="num">${x.t ? (x.t >= 1000 ? (x.t / 1000).toFixed(1).replace('.', ',') + 'k' : Math.round(x.t)) : ''}</span><i style="height:${Math.max(2, Math.round(x.t / max * 64))}px;${x.dd === hoje ? 'background:var(--brand)' : ''}"></i><small>${x.dd === hoje ? 'hoje' : DIAS_SEM[new Date(x.dd + 'T12:00:00').getDay()]}</small></div>`).join('')}</div>
       <div class="small" style="text-align:center">últimos 7 dias</div></div>
     <div class="card"><div class="small">Vendas do mês</div>
@@ -4348,7 +4630,7 @@ function imprimirCupom(n){
   const papel = ((emp() || {}).impressao || {}).papel === '58' ? '58' : '80', f = document.createElement('iframe');
   f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
   const d = f.contentDocument;
-  d.open(); d.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Cupom ${n.numero}</title><style>${cupomCss(papel)}</style></head><body>${cupomHtml(n, emp())}</body></html>`); d.close();
+  d.open(); d.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${n.modelo === '99' ? 'Venda' : 'Cupom'} ${n.numero}</title><style>${cupomCss(papel)}</style></head><body>${cupomHtml(n, emp())}</body></html>`); d.close();
   setTimeout(() => {
     try { // página do tamanho exato do cupom: a térmica corta logo depois do QR Code
       const mm = Math.ceil(d.body.scrollHeight * 25.4 / 96) + 4, st = d.createElement('style');
@@ -4489,12 +4771,13 @@ document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
   if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } if (t.dataset.tab === 'nfe') S.nfeForm = !!t.dataset.nfnova; S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); perguntarPdvSePreciso(); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
-  if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Essa ação é só para o gerente.'); return; }
+  if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Seu acesso não permite essa ação. Peça ao dono da loja.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
   if (await acoesEstoque(a, t, id)) return;
   if (await acoesFin(a, t, id)) return;
   if (await acoesV5(a, t, id)) return;
   if (await acoesMensal(a, t, id)) return;
+  if (await acoesLoja(a, t, id)) return;
   if (await acoesV4(a, t, id)) return;
   switch (a){
     case 'fechar': closeModal(); break;
@@ -4582,9 +4865,10 @@ document.addEventListener('click', async ev => {
     case 'verNota': verNota(S.notas.find(n => n.id === id)); break;
     case 'corrigirNota': corrigirNota(id); break;
     case 'cancelarNota': formCancelar(id); break;
-    case 'confCancelar': { const j = val('just'); if (j.length < 15) { $('#errM').innerHTML = '<div class="msg err">Mínimo de 15 caracteres.</div>'; break; }
-      t.disabled = true; $('#errM').innerHTML = '<div class="msg info">Enviando para a SEFAZ…</div>';
-      const n = S.notas.find(x => x.id === id), r = await eventoServidor({ tipo:'cancelar', ref:n.ref, justificativa:j }, 'Nota cancelada na SEFAZ.');
+    case 'confCancelar': { const j = val('just'), n = S.notas.find(x => x.id === id), sn = n && n.modelo === '99';
+      if (j.length < (sn ? 5 : 15)) { $('#errM').innerHTML = `<div class="msg err">${sn ? 'Escreva o motivo (pelo menos 5 letras).' : 'Mínimo de 15 caracteres.'}</div>`; break; }
+      t.disabled = true; $('#errM').innerHTML = `<div class="msg info">${sn ? 'Cancelando…' : 'Enviando para a SEFAZ…'}</div>`;
+      const r = await eventoServidor({ tipo:'cancelar', ref:n.ref, justificativa:j }, sn ? 'Venda cancelada. Os produtos voltaram ao estoque.' : 'Nota cancelada na SEFAZ.');
       t.disabled = false; if (r) verNota(r.nota); break; }
   }
 });
