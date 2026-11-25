@@ -257,7 +257,7 @@
     cols:['ac_alunos', 'ac_planos', 'ac_mensalidades', 'ac_checkins'],
     // [chave, rótulo, funcionário vê?]
     abas:[['ac_checkin', 'Check-in', true], ['ac_alunos', 'Alunos', true], ['ac_mensal', 'Mensalidades', true]],
-    esconder:['nfe', 'clientes'],
+    esconder:['nfe', 'clientes', 'venda', 'notas'], // academia não vende produtos (pedido do Lucas): sem Vender/Cupom e Vendas/Notas
     views:{ ac_checkin:vCheckin, ac_alunos:vAlunos, ac_mensal:vMensal },
     icones:{
       ac_checkin:'<path d="M4 12l5 5L20 6"/>',
