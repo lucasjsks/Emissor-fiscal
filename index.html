@@ -405,6 +405,10 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
 .perfil-card{width:190px;padding:22px 14px;border:1px solid #e3e8f0;border-radius:18px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;color:#0A1630;transition:transform .12s,box-shadow .12s}
 .perfil-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(10,22,48,.12)}.perfil-card b{font-size:17px}.perfil-card small{color:#6b778c}.perfil-card em{font-style:normal;font-size:11px;color:#1a7f37;background:#e7f6ec;border-radius:20px;padding:2px 8px}
 .perfil-ic{width:64px;height:64px;border-radius:50%;background:#0A1630;color:#C6F432;display:flex;align-items:center;justify-content:center;font:700 26px 'Space Grotesk',sans-serif}
+/* relatórios em tabela (Estoque, Vendedores e caixas, Financeiro) */
+.rel-tab{overflow-x:auto}.rel-tab table{width:100%;border-collapse:collapse;font-size:13px}.rel-tab th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#6b778c;text-align:left;padding:6px 8px;border-bottom:1px solid #e3e8f0;white-space:nowrap}
+.rel-tab td{padding:7px 8px;border-bottom:1px solid #f0f2f6}.rel-tab .r{text-align:right;white-space:nowrap}.rel-tab tr.tot td{font-weight:700;border-top:1px solid #cfd6e2;background:#f8f9fb}.rel-tab td.neg{color:#b42318}
+.rel-kpis{flex-wrap:wrap}.rel-kpis div{min-width:130px}.rel-abas{flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -2329,8 +2333,135 @@ function dadosRel(){
 }
 const dBR = d => d.split('-').reverse().join('/');
 const nomeForma = f => PAG_NOME[f] || (f === '90' ? 'Sem pagamento' : f);
+/* ---------- Relatórios: Estoque, Vendedores e caixas, Financeiro (DRE simples) ----------
+   Cada relatório devolve um "modelo" { titulo, sub, kpis:[[valor, rótulo, cor?]], secoes:[{ tit, nota, cols:[{t, f}], linhas:[[...]] }] }
+   que vira tela (relTelaHtml), impressão/PDF (relImprimir) e planilha (relPlanilha) do mesmo jeito.
+   f: 'brl' dinheiro, 'qtd' quantidade, 'pct' percentual, 'data' data, vazio = texto. */
+const RAB = [['vendas','Vendas'],['estoque','Estoque'],['equipe','Vendedores e caixas'],['fin','Financeiro']];
+const relFmt = (v, f) => v === null || v === undefined || v === '' ? '' : f === 'brl' ? brl(v) : f === 'qtd' ? qtdTxt(v) : f === 'pct' ? String(Math.round(v * 10) / 10).replace('.', ',') + '%' : f === 'data' ? (v ? dBR(String(v).slice(0, 10)) : '') : String(v);
+const custoDe = p => num((p || {}).custo_medio || (p || {}).custo || 0);
+function relPeriodo(){ return S.relPer === 'periodo' ? [S.relIni || isoNow().slice(0, 8) + '01', S.relFim || isoNow().slice(0, 10)].sort() : periodo(S.relPer); }
+function nomeVendedor(uid){
+  const f = ((emp() || {}).funcionarios || []).find(x => x.user_id === uid);
+  return f ? f.nome || 'Funcionário' : uid ? 'Gerente' : 'Sem identificação';
+}
+function relEstoque(){
+  const dias = S.relParado || 60, hoje = isoNow().slice(0, 10), corte = diaMais(hoje, -dias);
+  const ultVenda = {};
+  S.notas.filter(n => notaValida(n) && (n.op || 'venda') === 'venda' && daAmb(n)).forEach(n => (n.itens || []).forEach(i => { const d = (n.data || '').slice(0, 10); if (i.pid && (!ultVenda[i.pid] || d > ultVenda[i.pid])) ultVenda[i.pid] = d; }));
+  const P = [...S.produtos].sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')), com = P.filter(p => temSaldo(p) && p.estoque > 0);
+  const vCusto = r2(com.reduce((a, p) => a + p.estoque * custoDe(p), 0)), vVenda = r2(com.reduce((a, p) => a + p.estoque * num(p.preco), 0));
+  const baixo = P.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min));
+  const parados = com.filter(p => !ultVenda[p.id] || ultVenda[p.id] < corte).sort((a, b) => b.estoque * custoDe(b) - a.estoque * custoDe(a));
+  const neg = P.filter(p => temSaldo(p) && p.estoque < 0), semCusto = com.filter(p => !custoDe(p)).length;
+  return { titulo:'Relatório de estoque', sub:`Posição de ${dBR(hoje)}`,
+    kpis:[[brl(vCusto), 'em estoque (custo)'], [brl(vVenda), 'em estoque (preço de venda)'], [brl(r2(vVenda - vCusto)), 'lucro se vender tudo'], [baixo.length, 'abaixo do mínimo', baixo.length ? 'var(--warn)' : ''], [parados.length, `parados há +${dias} dias`, parados.length ? 'var(--warn)' : ''], [neg.length, 'negativos', neg.length ? 'var(--bad)' : '']],
+    secoes:[
+      { tit:'Abaixo do mínimo — sugestão de compra', nota:'Sugestão: comprar o suficiente para ficar com o dobro do estoque mínimo.', cols:[{ t:'Produto' }, { t:'Saldo', f:'qtd' }, { t:'Mínimo', f:'qtd' }, { t:'Comprar', f:'qtd' }, { t:'Custo médio', f:'brl' }, { t:'Valor estimado', f:'brl' }],
+        linhas:baixo.map(p => { const q = Math.max(0, Math.ceil(num(p.estoque_min) * 2 - p.estoque)); return [p.descricao, p.estoque, num(p.estoque_min), q, custoDe(p), r2(q * custoDe(p))]; }) },
+      { tit:`Parados (sem venda há mais de ${dias} dias)`, nota:'Produtos com saldo que não venderam no período: dinheiro parado na prateleira.', cols:[{ t:'Produto' }, { t:'Saldo', f:'qtd' }, { t:'Última venda', f:'data' }, { t:'Valor parado (custo)', f:'brl' }],
+        linhas:parados.map(p => [p.descricao, p.estoque, ultVenda[p.id] || 'nunca vendeu', r2(p.estoque * custoDe(p))]) },
+      ...(neg.length ? [{ tit:'Estoque negativo', nota:'Vendeu mais do que entrou: lance a compra ou faça o inventário do produto.', cols:[{ t:'Produto' }, { t:'Saldo', f:'qtd' }], linhas:neg.map(p => [p.descricao, p.estoque]) }] : []),
+      { tit:'Posição do estoque', nota:semCusto ? `${semCusto} produto(s) sem custo cadastrado (entram com custo zero). O custo vem das compras lançadas.` : '', cols:[{ t:'Produto' }, { t:'Saldo', f:'qtd' }, { t:'Custo médio', f:'brl' }, { t:'Valor (custo)', f:'brl' }, { t:'Preço de venda', f:'brl' }, { t:'Valor (venda)', f:'brl' }],
+        linhas:com.sort((a, b) => b.estoque * custoDe(b) - a.estoque * custoDe(a)).map(p => [p.descricao, p.estoque, custoDe(p), r2(p.estoque * custoDe(p)), num(p.preco), r2(p.estoque * num(p.preco))]) }
+    ] };
+}
+function relEquipe(){
+  const [ini, fim] = relPeriodo(), noPer = d => { d = String(d || '').slice(0, 10); return d >= ini && d <= fim; };
+  const ns = S.notas.filter(n => (n.op || 'venda') === 'venda' && daAmb(n) && noPer(n.data)), vend = ns.filter(notaValida), canc = ns.filter(n => n.status === 'cancelada');
+  const V = {}, C = {};
+  vend.forEach(n => { const k = nomeVendedor(n.emitida_por); V[k] = V[k] || { qtd:0, v:0, desc:0, canc:0 }; V[k].qtd++; V[k].v = r2(V[k].v + n.total); V[k].desc = r2(V[k].desc + num((n.tot || {}).desc));
+    const c = n.caixa_nome || (n.modelo === '55' ? 'NF-e (fora do caixa)' : 'Caixa'); C[c] = C[c] || { qtd:0, v:0 }; C[c].qtd++; C[c].v = r2(C[c].v + n.total); });
+  canc.forEach(n => { const k = nomeVendedor(n.emitida_por); V[k] = V[k] || { qtd:0, v:0, desc:0, canc:0 }; V[k].canc++; });
+  const fech = S.caixas.filter(c => c.fechado_em && noPer(c.fechado_em)).sort((a, b) => String(b.fechado_em).localeCompare(String(a.fechado_em)));
+  const fat = r2(vend.reduce((a, n) => a + n.total, 0)), difT = r2(fech.reduce((a, c) => a + num(c.diferenca), 0));
+  return { titulo:'Vendas por vendedor e por caixa', sub:`Período: ${dBR(ini)} a ${dBR(fim)}`,
+    kpis:[[brl(fat), 'faturamento'], [Object.keys(V).length, 'vendedores'], [fech.length, 'caixas fechados'], [difT ? (difT < 0 ? '−' : '+') + brl(Math.abs(difT)) : '✓', 'diferença nos caixas', difT < 0 ? 'var(--bad)' : difT > 0 ? 'var(--warn)' : '']],
+    secoes:[
+      { tit:'Por vendedor', cols:[{ t:'Vendedor' }, { t:'Vendas', f:'qtd' }, { t:'Faturamento', f:'brl' }, { t:'Ticket médio', f:'brl' }, { t:'% do total', f:'pct' }, { t:'Canceladas', f:'qtd' }],
+        linhas:Object.entries(V).sort((a, b) => b[1].v - a[1].v).map(([k, x]) => [k, x.qtd, x.v, x.qtd ? r2(x.v / x.qtd) : 0, fat ? x.v / fat * 100 : 0, x.canc]) },
+      { tit:'Por caixa', cols:[{ t:'Caixa' }, { t:'Vendas', f:'qtd' }, { t:'Faturamento', f:'brl' }, { t:'Ticket médio', f:'brl' }],
+        linhas:Object.entries(C).sort((a, b) => b[1].v - a[1].v).map(([k, x]) => [k, x.qtd, x.v, x.qtd ? r2(x.v / x.qtd) : 0]) },
+      { tit:'Fechamentos de caixa', nota:'Diferença = dinheiro contado na gaveta − dinheiro esperado (negativo = faltou).', cols:[{ t:'Caixa' }, { t:'Aberto em' }, { t:'Fechado em' }, { t:'Quem abriu' }, { t:'Vendido', f:'brl' }, { t:'Esperado na gaveta', f:'brl' }, { t:'Contado', f:'brl' }, { t:'Diferença', f:'brl' }],
+        linhas:fech.map(c => [c.pdv_nome || 'Caixa', fmtData(c.aberto_em), fmtData(c.fechado_em), nomeVendedor(c.aberto_por === 'local' ? '' : c.aberto_por), num((c.resumo || {}).total), num((c.resumo || {}).dinheiroEsperado), num(c.contado), num(c.diferenca)]) }
+    ] };
+}
+function relFinanceiro(){
+  const [ini, fim] = relPeriodo(), noPer = d => { d = String(d || '').slice(0, 10); return d >= ini && d <= fim; };
+  const prodPor = Object.fromEntries(S.produtos.map(p => [p.id, p]));
+  const ns = S.notas.filter(n => daAmb(n) && notaValida(n) && noPer(n.data));
+  const vend = ns.filter(n => (n.op || 'venda') === 'venda'), dev = ns.filter(n => n.op === 'dev_venda');
+  const bruto = r2(vend.reduce((a, n) => a + n.total, 0)), devV = r2(dev.reduce((a, n) => a + n.total, 0)), liq = r2(bruto - devV);
+  let cmv = 0, semCusto = 0;
+  vend.forEach(n => (n.itens || []).forEach(i => { const c = custoDe(prodPor[i.pid]); if (!c) semCusto++; cmv += num(i.q) * c; }));
+  dev.forEach(n => (n.itens || []).forEach(i => { cmv -= num(i.q) * custoDe(prodPor[i.pid]); }));
+  cmv = r2(cmv); const lb = r2(liq - cmv);
+  const T = titulosFin(), desp = T.filter(t => t.tipo === 'pagar' && !t.auto && noPer(t.venc));
+  const porCat = {}; desp.forEach(t => { const c = t.categoria || 'Outras despesas'; porCat[c] = r2((porCat[c] || 0) + num(t.valor)); });
+  const despT = r2(desp.reduce((a, t) => a + num(t.valor), 0)), res = r2(lb - despT), pc = v => liq ? v / liq * 100 : 0;
+  // dinheiro que entrou e saiu de verdade (regime de caixa)
+  const aVista = r2(vend.reduce((a, n) => a + (n.pags ? n.pags.filter(p => p.forma !== '05').reduce((s, p) => s + num(p.valor), 0) - num(n.troco) : (n.modelo === '55' ? 0 : n.total)), 0));
+  const rec = T.filter(t => t.tipo === 'receber' && t.pago_em && noPer(t.pago_em)), pag = T.filter(t => t.tipo === 'pagar' && t.pago_em && noPer(t.pago_em));
+  const recV = r2(rec.reduce((a, t) => a + num(t.valor_pago ?? t.valor), 0)), pagV = r2(pag.reduce((a, t) => a + num(t.valor_pago ?? t.valor), 0));
+  const comprasVista = S.compras.filter(c => c.status !== 'estornada' && !(c.duplicatas || []).length && noPer(c.data_emissao)), cvV = r2(comprasVista.reduce((a, c) => a + num(c.total_nota), 0));
+  const ent = r2(aVista + recV), sai = r2(pagV + cvV);
+  return { titulo:'Financeiro — resultado do período (DRE simples)', sub:`Período: ${dBR(ini)} a ${dBR(fim)}`,
+    kpis:[[brl(liq), 'receita de vendas'], [brl(lb), 'lucro bruto'], [brl(res), 'resultado', res < 0 ? 'var(--bad)' : 'var(--ok)'], [brl(r2(ent - sai)), 'saldo do dinheiro', ent - sai < 0 ? 'var(--bad)' : '']],
+    secoes:[
+      { tit:'Resultado (DRE simples)', nota:`Custo das mercadorias = quantidade vendida × custo médio atual do produto.${semCusto ? ` ${semCusto} item(ns) vendido(s) sem custo cadastrado entraram com custo zero (o lucro pode estar maior que o real).` : ''} Despesas = contas a pagar lançadas no Financeiro com vencimento no período (compras de mercadoria não entram aqui: viram custo quando o produto é vendido).`,
+        cols:[{ t:'' }, { t:'Valor', f:'brl' }, { t:'% da receita', f:'pct' }],
+        linhas:[['Receita bruta de vendas', bruto, pc(bruto)], ...(devV ? [['(−) Devoluções', -devV, pc(-devV)]] : []), ['= Receita líquida', liq, 100], ['(−) Custo das mercadorias vendidas', -cmv, pc(-cmv)], ['= Lucro bruto', lb, pc(lb)],
+          ...Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => ['(−) ' + c, -v, pc(-v)]), ['= Resultado do período', res, pc(res)]] },
+      { tit:'Dinheiro que entrou e saiu', nota:'Regime de caixa: o que foi recebido e pago de verdade no período.', cols:[{ t:'' }, { t:'Valor', f:'brl' }],
+        linhas:[['Vendas recebidas na hora (dinheiro, PIX, cartão)', aVista], ['Contas a receber recebidas (crédito loja, duplicatas)', recV], ['= Entradas', ent], ['Contas pagas (fornecedores e despesas)', -pagV], ...(cvV ? [['Compras à vista', -cvV]] : []), ['= Saídas', -sai], ['Saldo do período', r2(ent - sai)]] },
+      { tit:'Despesas por categoria', cols:[{ t:'Categoria' }, { t:'Valor', f:'brl' }, { t:'% das despesas', f:'pct' }],
+        linhas:Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => [c, v, despT ? v / despT * 100 : 0]) }
+    ] };
+}
+function relModelo(){ return S.relAba === 'estoque' ? relEstoque() : S.relAba === 'equipe' ? relEquipe() : relFinanceiro(); }
+function relTelaHtml(M){
+  const tab = s => `<div class="card"><h3 style="margin-top:0">${esc(s.tit)}</h3>${s.nota ? `<p class="small" style="margin-top:-4px">${esc(s.nota)}</p>` : ''}
+    ${s.linhas.length ? `<div class="rel-tab"><table><tr>${s.cols.map(c => `<th class="${c.f && c.f !== 'data' ? 'r' : ''}">${esc(c.t)}</th>`).join('')}</tr>
+      ${s.linhas.slice(0, S.relTudo ? 9999 : 50).map(l => `<tr class="${String(l[0]).startsWith('=') || String(l[0]).startsWith('Saldo') ? 'tot' : ''}">${l.map((v, i) => { const f = s.cols[i].f; return `<td class="${f && f !== 'data' ? 'r num' : ''}${f === 'brl' && v < 0 ? ' neg' : ''}">${esc(relFmt(v, f))}</td>`; }).join('')}</tr>`).join('')}</table></div>
+      ${s.linhas.length > 50 && !S.relTudo ? `<div class="actions"><button class="btn sm" data-act="relTudo">Ver todas as ${s.linhas.length} linhas</button></div>` : ''}` : '<div class="empty" style="padding:8px 0">Nada por aqui.</div>'}</div>`;
+  return `<div class="card"><div class="small">${esc(M.sub)}</div><div class="stats rel-kpis">${M.kpis.map(([v, l, c]) => `<div><b style="${c ? 'color:' + c : ''}">${esc(String(v))}</b>${esc(l)}</div>`).join('')}</div></div>${M.secoes.map(tab).join('')}`;
+}
+function relImprimir(){
+  const M = relModelo(), e = emp() || {};
+  const css = 'body{font:11px Arial,sans-serif;color:#111;margin:12mm}h1{font-size:16px;margin:0}h2{font-size:12px;margin:14px 0 3px;border-bottom:1px solid #999;padding-bottom:2px}.s{color:#555;margin:2px 0 8px}table{width:100%;border-collapse:collapse}td,th{padding:3px 4px;border-bottom:1px solid #ddd;text-align:left}th{background:#f1f3f6}.r{text-align:right}tr.tot td{font-weight:bold;border-top:1px solid #999}.k{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.k div{border:1px solid #ccc;border-radius:6px;padding:4px 8px}.k b{display:block;font-size:13px}.n{color:#555;font-size:10px;margin:0 0 4px}';
+  const corpo = `<h1>${esc(M.titulo)}</h1><div class="s">${esc(e.fantasia || e.razao || '')}${e.cnpj ? ' · CNPJ ' + fmtDoc(e.cnpj) : ''} · ${esc(M.sub)} · emitido em ${fmtData(isoNow())}</div>
+  <div class="k">${M.kpis.map(([v, l]) => `<div><b>${esc(String(v))}</b>${esc(l)}</div>`).join('')}</div>
+  ${M.secoes.map(s => `<h2>${esc(s.tit)}</h2>${s.nota ? `<p class="n">${esc(s.nota)}</p>` : ''}${s.linhas.length ? `<table><tr>${s.cols.map(c => `<th class="${c.f && c.f !== 'data' ? 'r' : ''}">${esc(c.t)}</th>`).join('')}</tr>${s.linhas.map(l => `<tr class="${String(l[0]).startsWith('=') || String(l[0]).startsWith('Saldo') ? 'tot' : ''}">${l.map((v, i) => `<td class="${s.cols[i].f && s.cols[i].f !== 'data' ? 'r' : ''}">${esc(relFmt(v, s.cols[i].f))}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="n">Nada no período.</p>'}`).join('')}`;
+  imprimirDoc(M.titulo, css, corpo);
+}
+async function relPlanilha(){
+  const M = relModelo();
+  try {
+    const X = await loadXlsx(), wb = X.utils.book_new(), usados = new Set();
+    X.utils.book_append_sheet(wb, X.utils.json_to_sheet(M.kpis.map(([v, l]) => ({ indicador:l, valor:v }))), 'Resumo');
+    M.secoes.forEach(s => {
+      let nome = s.tit.replace(/[\\/?*[\]:]/g, '').slice(0, 28); while (usados.has(nome)) nome = nome.slice(0, 26) + '_' + usados.size; usados.add(nome);
+      X.utils.book_append_sheet(wb, X.utils.json_to_sheet(s.linhas.map(l => Object.fromEntries(l.map((v, i) => [s.cols[i].t || 'Item', s.cols[i].f === 'pct' ? Math.round(v * 10) / 10 : v])))), nome);
+    });
+    await salvarArquivo(`${(S.relAba || 'rel')}-${isoNow().slice(0, 10)}.xlsx`, new Blob([X.write(wb, { bookType:'xlsx', type:'array' })]));
+  } catch(err){ toast(err.message || 'Não foi possível gerar a planilha.'); }
+}
 function vRelatorios(){
   if (!pode('relatorio')) return '<h2>Relatórios</h2><div class="card empty">Seu acesso não inclui relatórios.</div>';
+  const aba = S.relAba || 'vendas', segAbas = `<div class="seg rel-abas" style="margin-bottom:12px">${RAB.map(([k, l]) => `<button data-act="relAba" data-a="${k}" class="${aba === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  if (aba !== 'vendas') return segAbas + vRelOutros(aba);
+  return segAbas + vRelVendas();
+}
+function vRelOutros(aba){
+  const M = relModelo(), R = { ini:relPeriodo()[0], fim:relPeriodo()[1] };
+  return `<div class="row" style="align-items:center"><h2 style="flex:1;min-width:240px">${esc(M.titulo)}</h2>
+    <div class="actions" style="margin:0"><button class="btn" data-act="relImprimir">Imprimir / PDF</button><button class="btn" data-act="relPlanilha">Exportar planilha</button></div></div>
+  ${aba === 'estoque' ? `<div class="seg" style="margin-bottom:12px"><span class="small" style="align-self:center;margin-right:6px">Parado há mais de</span>${[30, 60, 90, 180].map(d => `<button data-act="relParado" data-d="${d}" class="${(S.relParado || 60) === d ? 'on' : ''}">${d} dias</button>`).join('')}</div>`
+    : `<div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${R.ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${R.fim}"></div></div>` : ''}`}
+  ${relTelaHtml(M)}`;
+}
+function vRelVendas(){
   const R = dadosRel(), maxDia = Math.max(1, ...Object.values(R.dia)), tk = R.vend.length ? r2(R.fat / R.vend.length) : 0;
   const somaV = a => r2(a.reduce((s, n) => s + n.total, 0)), totF = Object.values(R.forma).reduce((a, v) => a + v, 0) || 1;
   const lim = S.relLim || 30, nProd = S.relTodos ? R.prod.length : 10;
@@ -2613,6 +2744,11 @@ async function acoesV4(a, t, id){
     case 'confFechar': confFechar(); return true;
     case 'verCaixa': verCaixa(id); return true;
     case 'relPer': S.relPer = t.dataset.p; S.relLim = 30; render(); return true;
+    case 'relAba': S.relAba = t.dataset.a; S.relTudo = false; render(); return true;
+    case 'relParado': S.relParado = +t.dataset.d; render(); return true;
+    case 'relTudo': S.relTudo = true; render(); return true;
+    case 'relImprimir': relImprimir(); return true;
+    case 'relPlanilha': relPlanilha(); return true;
     case 'relMod': S.relMod = t.dataset.m; S.relLim = 30; render(); return true;
     case 'relTodos': S.relTodos = !S.relTodos; render(); return true;
     case 'relMais': S.relLim = (S.relLim || 30) + 50; render(); return true;
