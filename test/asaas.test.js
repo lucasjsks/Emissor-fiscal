@@ -6,6 +6,7 @@ process.env.SUPABASE_URL = 'https://sb.test';
 process.env.SUPABASE_ANON_KEY = 'anon';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
 process.env.ASAAS_API_KEY = 'chave-teste';
+process.env.ASAAS_ATIVO = 'sim';
 process.env.ASAAS_WEBHOOK_TOKEN = 'segredo-webhook';
 delete process.env.ASAAS_AMBIENTE;
 
@@ -78,6 +79,12 @@ test('assinar de novo é recusado e operador não mexe na mensalidade', async ()
   assert.equal(r.code, 400); assert.match(r.body.erro, /já tem/);
   const o = await tela('t3', { empresa_id:'E1', acao:'situacao' });
   assert.equal(o.code, 403);
+});
+
+test('interruptor: sem ASAAS_ATIVO=sim a mensalidade fica desligada', async () => {
+  delete process.env.ASAAS_ATIVO;
+  try { const r = await tela('t1', { empresa_id:'E1', acao:'assinar' }); assert.equal(r.code, 503); assert.ok(!chamadas.some(c => c.host === 'api-sandbox.asaas.com')); }
+  finally { process.env.ASAAS_ATIVO = 'sim'; }
 });
 
 test('pix: devolve QR Code só de mensalidade da própria assinatura', async () => {

@@ -5,7 +5,7 @@
 //   acao 'pix'      {empresa_id, pagamento_id}  → QR Code e "copia e cola" do PIX de uma mensalidade
 //   acao 'boleto'   {empresa_id, pagamento_id}  → linha digitável, código de barras e PDF do boleto de uma mensalidade
 // POST do Asaas (webhook, cabeçalho asaas-access-token = ASAAS_WEBHOOK_TOKEN) → atualiza a empresa dona da assinatura.
-// Variáveis na Vercel: ASAAS_API_KEY, ASAAS_AMBIENTE ('producao' ou vazio = sandbox), ASAAS_WEBHOOK_TOKEN, ASAAS_VALOR (opcional, padrão 89,99).
+// Variáveis na Vercel: ASAAS_ATIVO ('sim' liga a mensalidade na tela; sem ele fica desligada), ASAAS_API_KEY, ASAAS_AMBIENTE ('producao' ou vazio = sandbox), ASAAS_WEBHOOK_TOKEN, ASAAS_VALOR (opcional, padrão 89,99).
 // empresa.assinatura só é gravada aqui no servidor (a tela não consegue mudar: gatilho proteger_assinatura).
 import { timingSafeEqual } from 'node:crypto';
 import { rota, Falha, env, usuario, papelDe, getDoc, rpc, sb, isoBR } from './_lib.js';
@@ -88,7 +88,7 @@ const rotaTela = rota(async (req, b) => {
   const { empresa_id, acao } = b;
   if (!empresa_id) throw new Falha('Requisição incompleta.');
   if (!['dono', 'gerente'].includes(await papelDe(empresa_id, u.id))) throw new Falha('Só o dono da empresa cuida da mensalidade.', 403);
-  if (!process.env.ASAAS_API_KEY) throw new Falha('A cobrança da mensalidade ainda não foi ligada. Fale com o suporte.', 503);
+  if (!process.env.ASAAS_API_KEY || process.env.ASAAS_ATIVO !== 'sim') throw new Falha('A cobrança da mensalidade ainda não foi ligada. Fale com o suporte.', 503);
   const e = await getDoc('empresas/' + empresa_id);
   if (!e) throw new Falha('Empresa não encontrada.', 404);
 
