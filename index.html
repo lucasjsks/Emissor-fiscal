@@ -1289,11 +1289,11 @@ function vProdutos(){
   const cor = p => !temSaldo(p) ? 'var(--muted)' : p.estoque < 0 ? 'var(--bad)' : baixo(p) ? 'var(--warn)' : 'var(--ink)';
   const m = S.ncmMeta || {};
   const sn = semNota(), vc = verCusto();
-  const chips = [['todos','Todos', V.length], ['baixo','Estoque baixo', P.filter(baixo).length], ['neg','Negativos', P.filter(neg).length], ['sem','Sem entrada', P.filter(p => !temSaldo(p)).length],
+  const chips = [['todos','Todos', V.length], ['baixo','No alerta de estoque', P.filter(baixo).length], ['neg','Negativos', P.filter(neg).length], ['sem','Sem entrada', P.filter(p => !temSaldo(p)).length],
     ['fav','Atalhos do cupom', P.filter(p => p.favorito).length], ...(sn ? [] : [['erro','Erro fiscal', nErr], ['aviso','Aviso fiscal', nAv]])];
   return `<div class="row" style="align-items:center"><h2 style="flex:1">Produtos e estoque</h2>${pode('cadProduto') ? '<button class="btn pri" data-act="novoProd" style="flex:0 0 auto">+ Produto</button>' : ''}</div>
   ${sn || !pode('produto') ? '' : segProd()}
-  <div class="stats"><div><b>${V.length}</b>produtos</div>${vc ? `<div><b>${brl(valor)}</b>em estoque (custo)</div>` : ''}<div><b style="color:var(--warn)">${P.filter(baixo).length}</b>abaixo do mínimo</div>${sn ? '' : `<div><b style="color:var(--bad)">${nErr}</b>com erro fiscal</div>`}</div>
+  <div class="stats"><div><b>${V.length}</b>produtos</div>${vc ? `<div><b>${brl(valor)}</b>em estoque (custo)</div>` : ''}<div><b style="color:var(--warn)">${P.filter(baixo).length}</b>no alerta de estoque</div>${sn ? '' : `<div><b style="color:var(--bad)">${nErr}</b>com erro fiscal</div>`}</div>
   <div class="card"><input id="estBusca" placeholder="Buscar por nome, código ou código de barras…" value="${esc(S.estBusca || '')}" autocomplete="off">
     <div class="seg" style="margin-top:8px">${chips.filter(([k, , n]) => k === 'todos' || n || f === k).map(([k, l, n]) => `<button data-act="filtroProd" data-f="${k}" class="${f === k ? 'on' : ''}">${l}${k !== 'todos' ? ` (${n})` : ''}</button>`).join('')}</div></div>
   <div class="card">${lista.length ? `<div class="fin-lista">${lista.map(({ p, v }) => `<div class="fin-l nt-l prod-l" data-act="editProd" data-id="${esc(p.id)}">
@@ -1437,6 +1437,8 @@ async function salvarEmpCpf(id){
   if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
 }
 
+// alerta de estoque = estoque mínimo (estoque_min): chegou nessa quantidade, entra em "Mercadorias para comprar"
+const fldAlerta = p => fld('pEstMin', 'Alerta de estoque', num(p.estoque_min) > 0 ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal" placeholder="ex.: 5"');
 // loja com CPF (sem nota fiscal): o produto não leva nenhuma informação fiscal (NCM, CFOP, CST, impostos)
 const CAMPOS_FISCAIS_PROD = () => [...Object.keys(TAXMAP), 'ncm', 'cest', 'origem', 'perfil_id'];
 function formProduto(p){
@@ -1455,10 +1457,11 @@ function formProduto(p){
   ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
   <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p></div>`}
   <h3>Estoque</h3>
-  ${pode('produto') ? `<div class="row">${fld('pEst', 'Estoque atual', temSaldo(p) ? String(p.estoque).replace('.', ',') : '', `inputmode="decimal" placeholder="0" data-orig="${temSaldo(p) ? esc(String(p.estoque)) : ''}"`)}</div>
+  ${pode('produto') ? `<div class="row">${fld('pEst', 'Estoque atual', temSaldo(p) ? String(p.estoque).replace('.', ',') : '', `inputmode="decimal" placeholder="0" data-orig="${temSaldo(p) ? esc(String(p.estoque)) : ''}"`)}${fldAlerta(p)}</div>
   <p class="small">Digite a quantidade que tem na loja agora${p.custo_medio && verCusto() ? ` (custo médio ${brl(p.custo_medio)})` : ''}. Depois, as vendas tiram e as compras lançadas somam sozinhas; se mudar o número aqui, fica registrado no histórico como ajuste.</p>`
-  : `<div class="row"><div><label>Estoque atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b></div></div></div>
+  : `<div class="row"><div><label>Estoque atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b></div></div>${fldAlerta(p)}</div>
   <p class="small">O estoque muda pelas vendas e pelas compras. Para corrigir, peça ao gerente.</p>`}
+  <p class="small"><b>Alerta de estoque:</b> quando o estoque chegar nessa quantidade (ou menos), o produto vai para <b>Relatórios → Estoque → Mercadorias para comprar</b> e aparece o aviso no Início. Deixe em branco para não avisar.</p>
   ${p.id && pode('produto') ? `<button class="btn" data-act="verEstoque" data-id="${esc(p.id)}">📦 Histórico e inventário</button>` : ''}
   ${semNota(e) ? '' : `<h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>`}
   <div id="errM"></div>
@@ -1467,8 +1470,8 @@ function formProduto(p){
 }
 async function salvarProd(id, force){
   const o = { descricao:val('pDesc').toUpperCase(), codigo:val('pCod'), gtin:val('pGtin') || 'SEM GTIN', preco:numIn(val('pPreco')), unidade:(val('pUn') || 'UN').toUpperCase(),
-    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), favorito:!!($('#pFav') && $('#pFav').checked) };
-  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn','estoque','custo_medio','estoque_min'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
+    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), estoque_min:numIn(val('pEstMin')) || 0, favorito:!!($('#pFav') && $('#pFav').checked) };
+  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn','estoque','custo_medio'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
   const pf = S.perfis.find(f => f.id === o.perfil_id);
   if (pf && Object.entries(taxOf(pf)).some(([k, v]) => String(v) !== String(o[k]))) o.perfil_id = '';
   if (o.gtin.toUpperCase() === 'SEM GTIN') o.gtin = 'SEM GTIN'; else o.gtin = dig(o.gtin);
@@ -2351,7 +2354,7 @@ const nomeForma = f => PAG_NOME[f] || (f === '90' ? 'Sem pagamento' : f);
    que vira tela (relTelaHtml), impressão/PDF (relImprimir) e planilha (relPlanilha) do mesmo jeito.
    f: 'brl' dinheiro, 'qtd' quantidade, 'pct' percentual, 'data' data, vazio = texto. */
 const RAB = [['vendas','Vendas'],['estoque','Estoque'],['equipe','Vendedores e caixas'],['fin','Financeiro']];
-const relFmt = (v, f) => v === null || v === undefined || v === '' ? '' : f === 'brl' ? brl(v) : f === 'qtd' ? qtdTxt(v) : f === 'pct' ? String(Math.round(v * 10) / 10).replace('.', ',') + '%' : f === 'data' ? (v ? dBR(String(v).slice(0, 10)) : '') : String(v);
+const relFmt = (v, f) => v === null || v === undefined || v === '' ? '' : f === 'brl' ? brl(v) : f === 'qtd' ? qtdTxt(v) : f === 'pct' ? String(Math.round(v * 10) / 10).replace('.', ',') + '%' : f === 'data' ? (/^\d{4}-\d{2}-\d{2}/.test(String(v)) ? dBR(String(v).slice(0, 10)) : String(v)) : String(v);
 const custoDe = p => num((p || {}).custo_medio || (p || {}).custo || 0);
 function relPeriodo(){ return S.relPer === 'periodo' ? [S.relIni || isoNow().slice(0, 8) + '01', S.relFim || isoNow().slice(0, 10)].sort() : periodo(S.relPer); }
 function nomeVendedor(uid){
@@ -2368,9 +2371,9 @@ function relEstoque(){
   const parados = com.filter(p => !ultVenda[p.id] || ultVenda[p.id] < corte).sort((a, b) => b.estoque * custoDe(b) - a.estoque * custoDe(a));
   const neg = P.filter(p => temSaldo(p) && p.estoque < 0), semCusto = com.filter(p => !custoDe(p)).length;
   return { titulo:'Relatório de estoque', sub:`Posição de ${dBR(hoje)}`,
-    kpis:[[brl(vCusto), 'em estoque (custo)'], [brl(vVenda), 'em estoque (preço de venda)'], [brl(r2(vVenda - vCusto)), 'lucro se vender tudo'], [baixo.length, 'abaixo do mínimo', baixo.length ? 'var(--warn)' : ''], [parados.length, `parados há +${dias} dias`, parados.length ? 'var(--warn)' : ''], [neg.length, 'negativos', neg.length ? 'var(--bad)' : '']],
+    kpis:[[brl(vCusto), 'em estoque (custo)'], [brl(vVenda), 'em estoque (preço de venda)'], [brl(r2(vVenda - vCusto)), 'lucro se vender tudo'], [baixo.length, 'para comprar', baixo.length ? 'var(--warn)' : ''], [parados.length, `parados há +${dias} dias`, parados.length ? 'var(--warn)' : ''], [neg.length, 'negativos', neg.length ? 'var(--bad)' : '']],
     secoes:[
-      { tit:'Abaixo do mínimo — sugestão de compra', nota:'Sugestão: comprar o suficiente para ficar com o dobro do estoque mínimo.', cols:[{ t:'Produto' }, { t:'Saldo', f:'qtd' }, { t:'Mínimo', f:'qtd' }, { t:'Comprar', f:'qtd' }, { t:'Custo médio', f:'brl' }, { t:'Valor estimado', f:'brl' }],
+      { tit:'Mercadorias para comprar', nota:'Produtos que chegaram no alerta de estoque do cadastro. Sugestão: comprar o suficiente para ficar com o dobro do alerta.', cols:[{ t:'Produto' }, { t:'Estoque', f:'qtd' }, { t:'Alerta', f:'qtd' }, { t:'Sugestão de compra', f:'qtd' }, { t:'Custo médio', f:'brl' }, { t:'Valor estimado', f:'brl' }],
         linhas:baixo.map(p => { const q = Math.max(0, Math.ceil(num(p.estoque_min) * 2 - p.estoque)); return [p.descricao, p.estoque, num(p.estoque_min), q, custoDe(p), r2(q * custoDe(p))]; }) },
       { tit:`Parados (sem venda há mais de ${dias} dias)`, nota:'Produtos com saldo que não venderam no período: dinheiro parado na prateleira.', cols:[{ t:'Produto' }, { t:'Saldo', f:'qtd' }, { t:'Última venda', f:'data' }, { t:'Valor parado (custo)', f:'brl' }],
         linhas:parados.map(p => [p.descricao, p.estoque, ultVenda[p.id] || 'nunca vendeu', r2(p.estoque * custoDe(p))]) },
@@ -4327,7 +4330,7 @@ function alertasInicio(){
   else if (cx && String(cx.aberto_em || '').slice(0, 10) < hoje) add('warn', `Seu caixa está aberto desde ${dataBR(cx.aberto_em)}. Feche o caixa do dia anterior.`, 'irPara', 'data-tab="caixa"');
   const neg = P.filter(p => temSaldo(p) && p.estoque < 0).length, baixo = P.filter(p => temSaldo(p) && num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min) && p.estoque >= 0).length;
   if (neg) add('bad', `${neg} produto(s) com estoque negativo`, 'irPara', 'data-tab="produtos" data-fp="neg"');
-  if (baixo) add('warn', `${baixo} produto(s) abaixo do estoque mínimo`, 'irPara', 'data-tab="produtos" data-fp="baixo"');
+  if (baixo) add('warn', `${baixo} produto(s) chegaram no alerta de estoque: ver mercadorias para comprar`, 'irPara', pode('relatorio') ? 'data-tab="relatorios" data-ra="estoque"' : 'data-tab="produtos" data-fp="baixo"');
   if (pode('produto')){
     const err = P.filter(p => temErro(validarProduto(p, e))).length;
     if (err && !semNota()) add('bad', `${err} produto(s) com erro fiscal no cadastro (podem dar rejeição)`, 'irPara', 'data-tab="produtos" data-fp="erro"');
@@ -4918,7 +4921,7 @@ let cliqueNoFundo = false;
 document.addEventListener('pointerdown', ev => { cliqueNoFundo = ev.target.id === 'modal'; });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-act],[data-tab]'); if (!t) { if (ev.target.id === 'modal' && cliqueNoFundo) closeModal(); return; }
-  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } if (t.dataset.tab === 'nfe') S.nfeForm = !!t.dataset.nfnova; S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); perguntarPdvSePreciso(); return; }
+  if (t.dataset.tab){ if (t.dataset.fin){ S.finTipo = t.dataset.fin; S.finSit = 'abertos'; } if (t.dataset.fn) S.filtroNotas = t.dataset.fn; if (t.dataset.cv) S.cpView = t.dataset.cv; if (t.dataset.ra) S.relAba = t.dataset.ra; if (t.dataset.fp){ S.filtroProd = t.dataset.fp; S.prodView = 'produtos'; } if (t.dataset.tab === 'nfe') S.nfeForm = !!t.dataset.nfnova; S.tab = t.dataset.tab; if ($('#modal').classList.contains('on')) closeModal(); render(); window.scrollTo(0, 0); perguntarPdvSePreciso(); return; }
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Seu acesso não permite essa ação. Peça ao dono da loja.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
