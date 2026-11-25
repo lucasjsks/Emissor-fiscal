@@ -80,8 +80,7 @@
     const a = alunos().find(x => x.id === id); if (!a) return;
     const p = planoAc(a.plano_id), M = mensais().filter(m => m.aluno_id === id).sort((x, y) => String(y.pago_em).localeCompare(String(x.pago_em)));
     const C = (S.ac_checkins || []).filter(c => c.aluno_id === id).sort((x, y) => String(y.em).localeCompare(String(x.em)));
-    const s = situacao(a), tel = fone(a.telefone);
-    const msg = encodeURIComponent(`Olá ${a.nome.split(' ')[0]}! Aqui é da ${(emp() || {}).fantasia || 'academia'}. ${s.k === 'atrasado' ? `Sua mensalidade está em atraso desde ${dataBR(a.valido_ate)}.` : `Sua mensalidade vence em ${dataBR(a.valido_ate)}.`} Qualquer dúvida estamos à disposição. 💪`);
+    const s = situacao(a), tel = fone(a.telefone), msg = encodeURIComponent(msgAviso(a));
     openModal(`${mhead(esc(a.nome))}
       <p>${tagSit(a)} ${p ? `· plano <b>${esc(p.nome)}</b> (${brl(p.valor)})` : ''} · pago até <b>${a.valido_ate ? dataBR(a.valido_ate) : '—'}</b></p>
       <p class="small">${a.cpf ? 'CPF ' + fmtDoc(a.cpf) + ' · ' : ''}${a.telefone ? 'WhatsApp ' + esc(a.telefone) + ' · ' : ''}aluno desde ${dataBR(a.inicio)}${a.nascimento ? ' · nascimento ' + dataBR(a.nascimento) : ''}</p>
@@ -92,6 +91,13 @@
       <h3>Pagamentos</h3>${M.length ? M.slice(0, 12).map(m => `<div class="total"><span>${dataBR(m.pago_em)} · ${esc(PAG_NOME[m.forma] || 'Outros')} · ${dataBR(m.de)} a ${dataBR(m.ate)}</span><span class="num">${brl(m.valor)}${pode('empresa') ? ` <button class="btn sm" data-act="acEstornar" data-id="${esc(m.id)}" title="Desfazer este pagamento">desfazer</button>` : ''}</span></div>`).join('') : '<p class="small">Nenhum pagamento registrado.</p>'}
       <h3>Últimos treinos</h3>${C.length ? `<p class="small">${C.slice(0, 10).map(c => dataBR(c.em) + ' ' + c.em.slice(11, 16)).join(' · ')}</p><p class="small">${C.filter(c => c.em.slice(0, 7) === hojeISO().slice(0, 7)).length} treino(s) este mês.</p>` : '<p class="small">Nenhum check-in ainda.</p>'}`);
   }
+
+  // aviso de vencimento / cobrança pelo WhatsApp (abre a conversa com a mensagem pronta)
+  function msgAviso(a){
+    const s = situacao(a), nome = (a.nome || '').split(' ')[0], loja = (emp() || {}).fantasia || 'academia';
+    return `Olá ${nome}! Aqui é da ${loja}. ${s.k === 'atrasado' ? `Sua mensalidade está em atraso desde ${dataBR(a.valido_ate)}.` : s.dias === 0 ? 'Sua mensalidade vence hoje.' : `Sua mensalidade vence em ${dataBR(a.valido_ate)}.`} Qualquer dúvida estamos à disposição. 💪`;
+  }
+  const linkZap = (a, cls = '') => { const t = fone(a.telefone); return t ? `<a class="btn ${cls}" target="_blank" rel="noopener" href="https://wa.me/${t}?text=${encodeURIComponent(msgAviso(a))}" title="Abrir o WhatsApp com a mensagem pronta" onclick="event.stopPropagation()">${situacao(a).k === 'atrasado' ? 'Cobrar' : 'Avisar'}</a>` : ''; };
 
   /* ---------------- Receber mensalidade ---------------- */
   function formReceber(id, aNovo){
@@ -174,7 +180,7 @@
       <div class="card"><h3 style="margin-top:0">A receber — atrasados e vencendo em 7 dias</h3>${pend.length ? `<div class="fin-lista">${pend.map(a => `
         <div class="fin-l nt-l ${situacao(a).k === 'atrasado' ? 'vencido' : 'hoje'}" data-act="acVerAluno" data-id="${esc(a.id)}"><div class="fin-v">${a.valido_ate ? a.valido_ate.slice(8, 10) + '/' + a.valido_ate.slice(5, 7) : '—'}<small>venc.</small></div>
           <div class="fin-d"><b>${esc(a.nome)}</b><span>${esc((planoAc(a.plano_id) || {}).nome || 'sem plano')} · ${brl((planoAc(a.plano_id) || {}).valor)}</span></div>
-          <div class="fin-r">${tagSit(a)}${pode('caixa') ? `<button class="btn sm pri" data-act="acReceber" data-id="${esc(a.id)}">Receber</button>` : ''}</div></div>`).join('')}</div>` : '<p class="small">Ninguém atrasado nem vencendo. 🎉</p>'}</div>
+          <div class="fin-r">${tagSit(a)}${linkZap(a, 'sm')}${pode('caixa') ? `<button class="btn sm pri" data-act="acReceber" data-id="${esc(a.id)}">Receber</button>` : ''}</div></div>`).join('')}</div>` : '<p class="small">Ninguém atrasado nem vencendo. 🎉</p>'}</div>
       <div class="card"><div class="row" style="align-items:center"><h3 style="margin:0;flex:1">Recebidas</h3><select id="acMesSel" style="flex:0 0 auto;width:auto">${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${m.slice(5)}/${m.slice(0, 4)}</option>`).join('')}</select></div>
         ${M.length ? `<div class="fin-lista">${M.map(m => `<div class="fin-l pago"><div class="fin-v">${m.pago_em.slice(8, 10)}/${m.pago_em.slice(5, 7)}<small>${m.pago_em.slice(11, 16)}</small></div>
           <div class="fin-d" data-act="acVerAluno" data-id="${esc(m.aluno_id)}"><b>${esc(m.aluno_nome)}</b><span>${esc(m.plano_nome || '')} · ${esc(PAG_NOME[m.forma] || 'Outros')} · até ${dataBR(m.ate)}</span></div>
@@ -210,6 +216,92 @@
       ${!planosAc().length && pode('empresa') ? '<div class="msg info">Primeiro passo: cadastre os planos da academia em <b>Mensalidades</b>.</div>' : ''}</div>`;
   }
 
+  /* ---------------- Relatórios de serviço (no lugar dos relatórios de venda) ----------------
+     Usam o modelo dos relatórios do núcleo: { titulo, sub, kpis, secoes } → tela, imprimir/PDF e planilha. */
+  const RAB_AC = [['receb', 'Recebimentos'], ['inad', 'Inadimplência'], ['alunos', 'Alunos e frequência'], ['fin', 'Financeiro']];
+  const noPer = (d, ini, fim) => { d = String(d || '').slice(0, 10); return d >= ini && d <= fim; };
+  const mensalEquiv = p => p ? r2(num(p.valor) / (num(p.meses) || 1)) : 0;
+  const DSEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  function relModelo(){
+    const aba = S.acRelAba || 'receb', [ini, fim] = relPeriodo(), sub = aba === 'inad' ? `Situação em ${dataBR(hojeISO())}` : `Período: ${dataBR(ini)} a ${dataBR(fim)}`;
+    const M = mensais().filter(m => noPer(m.pago_em, ini, fim)), P = planosAc(), L = alunos(), hoje = hojeISO();
+    if (aba === 'receb'){
+      const tot = r2(M.reduce((s, m) => s + num(m.valor), 0)), porF = {}, porP = {}, porD = {};
+      M.forEach(m => { const v = num(m.valor), f = PAG_NOME[m.forma] || 'Outros', pl = m.plano_nome || 'Sem plano', d = m.pago_em.slice(0, 10);
+        porF[f] = porF[f] || [0, 0]; porF[f][0]++; porF[f][1] = r2(porF[f][1] + v);
+        porP[pl] = porP[pl] || [0, 0]; porP[pl][0]++; porP[pl][1] = r2(porP[pl][1] + v);
+        porD[d] = porD[d] || [0, 0]; porD[d][0]++; porD[d][1] = r2(porD[d][1] + v); });
+      return { titulo:'Recebimentos de mensalidades', sub,
+        kpis:[[brl(tot), 'recebido'], [M.length, 'pagamentos'], [brl(M.length ? r2(tot / M.length) : 0), 'ticket médio'], [new Set(M.map(m => m.aluno_id)).size, 'alunos que pagaram']],
+        secoes:[
+          { tit:'Por forma de pagamento', cols:[{ t:'Forma' }, { t:'Pagamentos', f:'qtd' }, { t:'Valor', f:'brl' }, { t:'%', f:'pct' }], linhas:Object.entries(porF).sort((a, b) => b[1][1] - a[1][1]).map(([k, [q, v]]) => [k, q, v, tot ? v / tot * 100 : 0]) },
+          { tit:'Por plano', cols:[{ t:'Plano' }, { t:'Pagamentos', f:'qtd' }, { t:'Valor', f:'brl' }], linhas:Object.entries(porP).sort((a, b) => b[1][1] - a[1][1]).map(([k, [q, v]]) => [k, q, v]) },
+          { tit:'Por dia', cols:[{ t:'Data', f:'data' }, { t:'Pagamentos', f:'qtd' }, { t:'Valor', f:'brl' }], linhas:Object.entries(porD).sort().map(([k, [q, v]]) => [k, q, v]) },
+          { tit:'Pagamentos', cols:[{ t:'Data', f:'data' }, { t:'Aluno' }, { t:'Plano' }, { t:'Forma' }, { t:'Pago até', f:'data' }, { t:'Valor', f:'brl' }], linhas:M.slice().sort((a, b) => a.pago_em.localeCompare(b.pago_em)).map(m => [m.pago_em, m.aluno_nome, m.plano_nome || '', PAG_NOME[m.forma] || 'Outros', m.ate, num(m.valor)]) }] };
+    }
+    if (aba === 'inad'){
+      const ativos = L.filter(a => !a.inativo), at = ativos.filter(a => situacao(a).k === 'atrasado');
+      const devido = a => { const p = planoAc(a.plano_id); if (!p) return 0; const d = situacao(a).dias || 0; return r2(num(p.valor) * Math.max(1, Math.ceil(d / (30 * (num(p.meses) || 1))))); };
+      const totAt = r2(at.reduce((s, a) => s + devido(a), 0)), em15 = diaMais(hoje, 15);
+      const ven = ativos.filter(a => a.valido_ate && a.valido_ate >= hoje && a.valido_ate <= em15).sort((a, b) => a.valido_ate.localeCompare(b.valido_ate));
+      return { titulo:'Inadimplência e vencimentos', sub,
+        kpis:[[at.length, 'alunos atrasados', at.length ? 'var(--bad)' : ''], [brl(totAt), 'em atraso (estimado)'], [ativos.length ? String(Math.round(at.length / ativos.length * 1000) / 10).replace('.', ',') + '%' : '0%', 'dos alunos ativos'], [ven.length, 'vencem em 15 dias']],
+        secoes:[
+          { tit:'Atrasados', nota:'Valor estimado = valor do plano × períodos em atraso.', cols:[{ t:'Aluno' }, { t:'WhatsApp' }, { t:'Plano' }, { t:'Venceu em', f:'data' }, { t:'Dias', f:'qtd' }, { t:'Valor', f:'brl' }],
+            linhas:at.sort((a, b) => String(a.valido_ate).localeCompare(String(b.valido_ate))).map(a => [a.nome, a.telefone || '', (planoAc(a.plano_id) || {}).nome || '', a.valido_ate || '', situacao(a).dias || 0, devido(a)]) },
+          { tit:'Vencem nos próximos 15 dias', cols:[{ t:'Aluno' }, { t:'WhatsApp' }, { t:'Plano' }, { t:'Vence em', f:'data' }, { t:'Valor', f:'brl' }],
+            linhas:ven.map(a => [a.nome, a.telefone || '', (planoAc(a.plano_id) || {}).nome || '', a.valido_ate, num((planoAc(a.plano_id) || {}).valor)]) }] };
+    }
+    if (aba === 'alunos'){
+      const ativos = L.filter(a => !a.inativo), novos = L.filter(a => noPer(a.inicio, ini, fim)), C = (S.ac_checkins || []).filter(c => noPer(c.em, ini, fim));
+      const freq = {}, dsem = [0, 0, 0, 0, 0, 0, 0], hora = {};
+      C.forEach(c => { freq[c.aluno_id] = (freq[c.aluno_id] || 0) + 1; dsem[new Date(c.em.slice(0, 10) + 'T12:00:00').getDay()]++; const h = c.em.slice(11, 13); hora[h] = (hora[h] || 0) + 1; });
+      const sumidos = ativos.filter(a => situacao(a).k !== 'atrasado' && (!a.ultimo_checkin || dias(a.ultimo_checkin.slice(0, 10), hoje) >= 15)).sort((a, b) => String(a.ultimo_checkin || '').localeCompare(String(b.ultimo_checkin || '')));
+      const mesAtual = hoje.slice(5, 7), aniv = ativos.filter(a => (a.nascimento || '').slice(5, 7) === mesAtual).sort((a, b) => a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)));
+      const mrr = r2(ativos.filter(a => situacao(a).k !== 'atrasado').reduce((s, a) => s + mensalEquiv(planoAc(a.plano_id)), 0));
+      return { titulo:'Alunos e frequência', sub,
+        kpis:[[ativos.length, 'alunos ativos'], [novos.length, 'novos no período'], [L.filter(a => a.inativo).length, 'inativos'], [C.length, 'treinos no período'], [brl(mrr), 'receita mensal recorrente']],
+        secoes:[
+          { tit:'Alunos por plano', nota:'Receita mensal = valor do plano dividido pelos meses (ex.: trimestral ÷ 3), só de quem está em dia.', cols:[{ t:'Plano' }, { t:'Ativos', f:'qtd' }, { t:'Receita mensal', f:'brl' }],
+            linhas:P.map(p => { const at = ativos.filter(a => a.plano_id === p.id); return [p.nome, at.length, r2(at.filter(a => situacao(a).k !== 'atrasado').length * mensalEquiv(p))]; }) },
+          { tit:'Novos alunos no período', cols:[{ t:'Aluno' }, { t:'Início', f:'data' }, { t:'Plano' }], linhas:novos.sort((a, b) => String(a.inicio).localeCompare(String(b.inicio))).map(a => [a.nome, a.inicio, (planoAc(a.plano_id) || {}).nome || '']) },
+          { tit:'Sem treinar há 15 dias ou mais (em dia com a mensalidade)', nota:'Bom para chamar de volta antes de o aluno desistir.', cols:[{ t:'Aluno' }, { t:'WhatsApp' }, { t:'Último treino', f:'data' }, { t:'Dias', f:'qtd' }],
+            linhas:sumidos.map(a => [a.nome, a.telefone || '', a.ultimo_checkin ? a.ultimo_checkin.slice(0, 10) : 'nunca', a.ultimo_checkin ? dias(a.ultimo_checkin.slice(0, 10), hoje) : '']) },
+          { tit:'Mais frequentes no período', cols:[{ t:'Aluno' }, { t:'Treinos', f:'qtd' }], linhas:Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([id, q]) => [(L.find(a => a.id === id) || {}).nome || '—', q]) },
+          { tit:'Treinos por dia da semana', cols:[{ t:'Dia' }, { t:'Treinos', f:'qtd' }], linhas:dsem.map((q, i) => [DSEM[i], q]) },
+          { tit:'Horários de maior movimento', cols:[{ t:'Hora' }, { t:'Treinos', f:'qtd' }], linhas:Object.entries(hora).sort().map(([h, q]) => [h + 'h', q]) },
+          { tit:'Aniversariantes do mês', cols:[{ t:'Aluno' }, { t:'Dia' }, { t:'WhatsApp' }], linhas:aniv.map(a => [a.nome, a.nascimento.slice(8, 10) + '/' + mesAtual, a.telefone || '']) }] };
+    }
+    // financeiro da academia: o que entrou e saiu no período e a previsão dos próximos 30 dias
+    const T = titulosFin(), outrasRec = T.filter(t => t.tipo === 'receber' && t.auto !== 'academia' && t.pago_em && noPer(t.pago_em, ini, fim));
+    const pagas = T.filter(t => t.tipo === 'pagar' && t.pago_em && noPer(t.pago_em, ini, fim));
+    const recM = r2(M.reduce((s, m) => s + num(m.valor), 0)), recO = r2(outrasRec.reduce((s, t) => s + num(t.valor_pago ?? t.valor), 0));
+    const porCat = {}; pagas.forEach(t => { const c = t.categoria || 'Outras despesas'; porCat[c] = r2((porCat[c] || 0) + num(t.valor_pago ?? t.valor)); });
+    const desp = r2(Object.values(porCat).reduce((s, v) => s + v, 0)), ent = r2(recM + recO), res = r2(ent - desp);
+    const em30 = diaMais(hoje, 30), prevRec = L.filter(a => !a.inativo && a.valido_ate && a.valido_ate <= em30).reduce((s, a) => s + num((planoAc(a.plano_id) || {}).valor), 0);
+    const prevPag = T.filter(t => t.tipo === 'pagar' && !t.pago_em && t.venc <= em30).reduce((s, t) => s + num(t.valor), 0);
+    return { titulo:'Financeiro da academia', sub,
+      kpis:[[brl(ent), 'entrou'], [brl(desp), 'saiu'], [brl(res), 'resultado', res < 0 ? 'var(--bad)' : 'var(--ok)'], [brl(r2(prevRec - prevPag)), 'saldo previsto em 30 dias']],
+      secoes:[
+        { tit:'Resultado do período', cols:[{ t:'Conta' }, { t:'Valor', f:'brl' }, { t:'% das entradas', f:'pct' }],
+          linhas:[['Mensalidades recebidas', recM, ent ? recM / ent * 100 : 0], ['Outras receitas recebidas', recO, ent ? recO / ent * 100 : 0], ['= Total de entradas', ent, 100],
+            ...Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => ['(−) ' + c, -v, ent ? v / ent * 100 : 0]), ['= Resultado', res, ent ? res / ent * 100 : 0]] },
+        { tit:'Previsão dos próximos 30 dias', nota:'A receber = mensalidades de alunos ativos que vencem (ou já venceram) até daqui a 30 dias. A pagar = contas lançadas no Financeiro.', cols:[{ t:'Item' }, { t:'Valor', f:'brl' }],
+          linhas:[['Mensalidades a receber', r2(prevRec)], ['Contas a pagar', -r2(prevPag)], ['Saldo previsto', r2(prevRec - prevPag)]] },
+        { tit:'Despesas pagas por categoria', cols:[{ t:'Categoria' }, { t:'Valor', f:'brl' }], linhas:Object.entries(porCat).sort((a, b) => b[1] - a[1]) }] };
+  }
+  function vRelAcademia(){
+    if (!pode('relatorio')) return '<h2>Relatórios</h2><div class="card empty">Seu acesso não inclui relatórios.</div>';
+    if (!S.acRelIni){ S.acRelIni = true; if (!S.relPer || S.relPer === 'hoje') S.relPer = 'mes'; } // academia abre no mês
+    const aba = S.acRelAba || 'receb', M = relModelo(), [ini, fim] = relPeriodo();
+    return `<div class="seg rel-abas" style="margin-bottom:12px">${RAB_AC.map(([k, l]) => `<button data-act="acRelAba" data-a="${k}" class="${aba === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="row" style="align-items:center"><h2 style="flex:1;min-width:240px">${esc(M.titulo)}</h2>
+      <div class="actions" style="margin:0"><button class="btn" data-act="relImprimir">Imprimir / PDF</button><button class="btn" data-act="relPlanilha">Exportar planilha</button></div></div>
+    ${aba === 'inad' ? '' : `<div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${fim}"></div></div>` : ''}`}
+    ${relTelaHtml(M)}`;
+  }
+
   // entradas no Financeiro (contas recebidas) e no fechamento do caixa
   const titulosFin = () => mensais().map(m => ({ id:'ac_' + m.id, tipo:'receber', auto:'academia', ref:m.id, descricao:`Mensalidade · ${m.plano_nome || ''}`, pessoa:m.aluno_nome, categoria:'Mensalidades', valor:r2(num(m.valor)), venc:(m.pago_em || '').slice(0, 10), pago_em:(m.pago_em || '').slice(0, 10), valor_pago:r2(num(m.valor)), forma:m.forma }));
   const caixaExtras = cx => mensais().filter(m => m.caixa === cx.id).map(m => ({ rot:'Mensalidades', forma:m.forma, valor:m.valor }));
@@ -234,6 +326,7 @@
       case 'acSalvarAluno': await salvarAluno(id); return true;
       case 'acVerAluno': verAluno(id); return true;
       case 'acDelAluno': if (confirm('Excluir este aluno? Os pagamentos e treinos dele continuam registrados.')){ if (await safe(() => del('ac_alunos', id), 'Aluno excluído.')) closeModal(); } return true;
+      case 'acRelAba': S.acRelAba = t.dataset.a; S.relAba = 'ac_' + t.dataset.a; S.relTudo = false; render(); return true;
       case 'acFiltro': S.acFiltro = t.dataset.f; if (t.dataset.ir) S.tab = 'ac_alunos'; render(); return true;
       case 'acReceber': formReceber(id); return true;
       case 'acSalvarReceb': await salvarReceb(); return true;
@@ -257,8 +350,9 @@
     cols:['ac_alunos', 'ac_planos', 'ac_mensalidades', 'ac_checkins'],
     // [chave, rótulo, funcionário vê?]
     abas:[['ac_checkin', 'Check-in', true], ['ac_alunos', 'Alunos', true], ['ac_mensal', 'Mensalidades', true]],
-    esconder:['nfe', 'clientes', 'venda', 'notas'], // academia não vende produtos (pedido do Lucas): sem Vender/Cupom e Vendas/Notas
-    views:{ ac_checkin:vCheckin, ac_alunos:vAlunos, ac_mensal:vMensal },
+    // academia não vende produtos (pedido do Lucas): sem NF-e, Clientes, Vender/Cupom, Vendas/Notas, Compras e Produtos
+    esconder:['nfe', 'clientes', 'venda', 'notas', 'compras', 'produtos'],
+    views:{ ac_checkin:vCheckin, ac_alunos:vAlunos, ac_mensal:vMensal, relatorios:vRelAcademia }, // Relatórios: os de serviço, no lugar dos de venda
     icones:{
       ac_checkin:'<path d="M4 12l5 5L20 6"/>',
       ac_alunos:'<circle cx="9" cy="8" r="3.5"/><path d="M2 21c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M19 15.8c1.6.9 2.6 2.6 3 5.2"/>',
@@ -266,8 +360,8 @@
     },
     // permissões: funcionário cadastra aluno, faz check-in e recebe; planos, exclusões e desfazer pagamento só gerente/dono
     perm:{ acNovoAluno:'cliente', acEditAluno:'cliente', acSalvarAluno:'cliente', acReceber:'caixa', acSalvarReceb:'caixa', acCheck:'caixa',
-      acDelAluno:'empresa', acEstornar:'empresa', acNovoPlano:'empresa', acEditPlano:'empresa', acSalvarPlano:'empresa', acDelPlano:'empresa', acPlanosPadrao:'empresa' },
-    acoes, inicioHtml, titulosFin, caixaExtras,
+      acRelAba:'relatorio', acDelAluno:'empresa', acEstornar:'empresa', acNovoPlano:'empresa', acEditPlano:'empresa', acSalvarPlano:'empresa', acDelPlano:'empresa', acPlanosPadrao:'empresa' },
+    acoes, inicioHtml, titulosFin, caixaExtras, relModelo,
     _teste:{ maisMeses, situacao } // usado pelos testes automáticos
   };
 });
