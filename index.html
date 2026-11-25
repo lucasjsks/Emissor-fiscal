@@ -1295,6 +1295,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardAssinatura()}
   ${cardCaixas()}
   ${cardContador()}
   ${cardImpressao()}
@@ -1707,7 +1708,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -2605,7 +2606,7 @@ async function iniciarProducao(){
   try {
     const r = await fetch('/api/config'), cfg = await r.json();
     if (!r.ok || !cfg.supabaseUrl) throw new Error(cfg.erro || 'configuração ausente');
-    S.ambiente = cfg.ambiente;
+    S.ambiente = cfg.ambiente; S.mensal = cfg.mensalidade || null;
     const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
     SB = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   } catch(e){ S.falha = 'Não foi possível iniciar o sistema: ' + e.message; S.carregando = false; render(); return; }
@@ -4068,6 +4069,94 @@ function bannerCertificado(){
   else { cls = 'ok'; txt = `Certificado digital: faltam <b>${d} dias</b> para vencer (${dataBR(venc)}).`; }
   return `<div class="cert-ban ${cls}"><span class="cert-ico">${cls === 'ok' ? '✓' : '!'}</span><div class="cert-txt">${txt}</div>${extra}</div>`;
 }
+/* ---------- Mensalidade do NotaOne (Asaas) ---------- */
+// empresa.assinatura é gravada só pelo servidor (api/asaas.js); a tela só mostra e pede para pagar
+const MS_ST = { PENDING:['Em aberto','w'], OVERDUE:['Vencida','b'], RECEIVED:['Paga','g'], CONFIRMED:['Paga','g'], RECEIVED_IN_CASH:['Paga','g'], DUNNING_RECEIVED:['Paga','g'], REFUNDED:['Estornada',''], AWAITING_RISK_ANALYSIS:['Em análise','w'] };
+const msAss = () => { const a = (emp() || {}).assinatura; return a && a.id && (a.ambiente || 'sandbox') === (S.mensal && S.mensal.teste ? 'sandbox' : 'producao') ? a : null; };
+function msAtualizarSePreciso(){
+  const a = msAss(); if (!a || S.msAuto === S.empId || S.mode !== 'db') return;
+  S.msAuto = S.empId; // uma vez por abertura do sistema, se a última conferência tiver mais de 6 h
+  if (Date.now() - Date.parse(a.atualizado_em || 0) > 6 * 3600e3) api('asaas', { empresa_id:S.empId, acao:'situacao' }).catch(() => {});
+}
+function bannerAssinatura(){
+  if (!S.mensal || !pode('empresa')) return '';
+  const a = msAss(); if (!a) return ''; setTimeout(msAtualizarSePreciso, 0);
+  const ab = a.aberta; if (!ab || a.situacao === 'cancelada') return '';
+  const hoje = isoNow().slice(0, 10), d = Math.round((Date.parse(ab.venc + 'T12:00:00Z') - Date.parse(hoje + 'T12:00:00Z')) / 864e5);
+  if (d > 3) return '';
+  const vencida = ab.status === 'OVERDUE' || d < 0;
+  const txt = vencida ? `<b>Sua mensalidade do NotaOne venceu em ${dataBR(ab.venc)}</b> (${brl(ab.valor)}). Pague agora para continuar usando sem interrupção.`
+    : `<b>Sua mensalidade do NotaOne ${d === 0 ? 'vence hoje' : d === 1 ? 'vence amanhã' : `vence em ${dataBR(ab.venc)}`}</b> (${brl(ab.valor)}).`;
+  return `<div class="cert-ban ${vencida ? 'bad' : 'warn'}"><span class="cert-ico">$</span><div class="cert-txt">${txt}</div><button class="btn pri" data-act="msPix" data-id="${esc(ab.id)}">Pagar agora</button></div>`;
+}
+function cardAssinatura(){
+  if (!S.mensal || !pode('empresa')) return '';
+  const a = msAss(), teste = S.mensal.teste ? ' <span class="tag w">modo de teste</span>' : '';
+  if (!a) return `<div class="card" id="cardMensal"><h3 style="margin-top:0">Mensalidade do NotaOne${teste}</h3>
+    <p>Plano NotaOne: <b>${brl(S.mensal.valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
+    <p class="small">A primeira mensalidade vence hoje; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
+    <div class="actions"><button class="btn pri" data-act="msAssinar">Assinar agora</button></div><div id="msMsg"></div></div>`;
+  setTimeout(msAtualizarSePreciso, 0);
+  const sit = { em_dia:['Em dia','g'], atrasada:['Atrasada','b'], cancelada:['Cancelada',''] }[a.situacao] || ['—',''], ab = a.aberta;
+  const hist = (a.mensalidades || []).slice(0, 6).map(m => { const [t, c] = MS_ST[m.status] || [m.status, ''];
+    return `<div class="it"><div class="grow">Vencimento ${dataBR(m.venc)}${m.pago_em ? `<div class="small">paga em ${dataBR(m.pago_em)}</div>` : ''}</div><b class="num">${brl(m.valor)}</b> <span class="tag ${c}">${t}</span>
+      ${['PENDING','OVERDUE'].includes(m.status) ? `<button class="btn" data-act="msPix" data-id="${esc(m.id)}" style="flex:0 0 auto">Pagar</button>` : ''}</div>`; }).join('');
+  return `<div class="card" id="cardMensal"><div class="row" style="align-items:center"><h3 style="margin:0;flex:1">Mensalidade do NotaOne${teste}</h3><span class="tag ${sit[1]}" style="flex:0 0 auto">${sit[0]}</span></div>
+    <p>${brl(a.valor)} por mês${a.dia ? ` · vence todo dia <b>${a.dia}</b>` : ''}.${a.ultimo_pagamento ? ` <span class="small">Último pagamento: ${dataBR(a.ultimo_pagamento.pago_em || a.ultimo_pagamento.venc)}.</span>` : ''}</p>
+    ${a.situacao === 'cancelada' ? `<div class="msg err">Sua assinatura está cancelada. <a href="${esc(linkSuporte('Quero reativar a mensalidade do NotaOne.'))}" target="_blank" rel="noopener">Fale com o suporte</a> para reativar.</div>`
+      : ab ? `<div class="msg ${ab.status === 'OVERDUE' ? 'err' : 'info'}"><b>Mensalidade de ${dataBR(ab.venc)}: ${brl(ab.valor)}</b>${ab.status === 'OVERDUE' ? ' — vencida' : ''}</div>
+        <div class="actions"><button class="btn pri" data-act="msPix" data-id="${esc(ab.id)}">Pagar com PIX</button>${ab.link ? `<a class="btn" href="${esc(ab.link)}" target="_blank" rel="noopener">Boleto ou cartão</a>` : ''}</div>`
+      : '<div class="msg ok">Tudo pago. Obrigado!</div>'}
+    ${hist ? `<h4 style="margin:14px 0 6px">Últimas mensalidades</h4><div class="list">${hist}</div>` : ''}
+    <div class="actions" style="margin-top:10px"><button class="btn" data-act="msAtualizar">Atualizar situação</button></div><div id="msMsg"></div>
+    <p class="small">Atualizado em ${fmtData(a.atualizado_em)}.</p></div>`;
+}
+async function msPix(pid){
+  openModal(`${mhead('Pagar mensalidade com PIX')}<div id="msPixBox"><div class="msg info">Gerando o PIX…</div></div>`);
+  let r;
+  try { r = await api('asaas', { empresa_id:S.empId, acao:'pix', pagamento_id:pid }); }
+  catch(e){ $('#msPixBox').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
+  const box = $('#msPixBox'); if (!box) return;
+  if (r.paga){ box.innerHTML = '<div class="msg ok">Esta mensalidade já está paga. Obrigado!</div>'; return; }
+  if (r.semPix){ box.innerHTML = `<div class="msg err">Não foi possível gerar o PIX agora.</div>${r.link ? `<div class="actions"><a class="btn pri" href="${esc(r.link)}" target="_blank" rel="noopener">Pagar por boleto, cartão ou PIX na página de pagamento</a></div>` : ''}`; return; }
+  box.innerHTML = `<p style="text-align:center">Valor: <b>${brl(r.valor)}</b> · vencimento ${dataBR(r.venc)}</p>
+    <div style="text-align:center"><img src="data:image/png;base64,${esc(r.imagem)}" alt="QR Code PIX" style="width:230px;max-width:80%;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff"></div>
+    <p class="small" style="text-align:center">Abra o app do seu banco, escolha <b>Pagar com PIX</b> e aponte a câmera para o QR Code. Ou copie o código abaixo (PIX copia e cola).</p>
+    <textarea id="msCopia" readonly rows="3" style="width:100%;font-size:12px">${esc(r.copia)}</textarea>
+    <div class="actions"><button class="btn pri" data-act="msCopiar">Copiar código PIX</button>${r.link ? `<a class="btn" href="${esc(r.link)}" target="_blank" rel="noopener">Boleto ou cartão</a>` : ''}</div>
+    <div id="msPixSt" class="small" style="margin-top:8px">Aguardando o pagamento… esta tela confirma sozinha assim que o PIX cair.</div>`;
+  // confere sozinho por até 10 minutos enquanto a janela estiver aberta
+  const tok = S.msPixTok = Date.now();
+  for (let k = 0; k < 60; k++){
+    await new Promise(ok => setTimeout(ok, 10000));
+    if (S.msPixTok !== tok || !$('#msPixSt')) return;
+    try {
+      const x = await api('asaas', { empresa_id:S.empId, acao:'situacao' });
+      const m = ((x.assinatura || {}).mensalidades || []).find(y => y.id === pid);
+      if (m && MS_ST[m.status] && MS_ST[m.status][1] === 'g'){ $('#msPixBox').innerHTML = '<div class="msg ok" style="font-size:17px;text-align:center"><b>Pagamento recebido!</b><br>Obrigado por usar o NotaOne.</div>'; render(); return; }
+    } catch(_){}
+  }
+}
+async function acoesMensal(a, t, id){
+  switch (a){
+    case 'msAssinar':
+      t.disabled = true; $('#msMsg').innerHTML = '<div class="msg info">Criando sua assinatura…</div>';
+      try { const r = await api('asaas', { empresa_id:S.empId, acao:'assinar' }); $('#msMsg').innerHTML = ''; toast('Assinatura criada.'); render();
+        const ab = (r.assinatura || {}).aberta; if (ab) msPix(ab.id); }
+      catch(e){ t.disabled = false; $('#msMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true;
+    case 'msAtualizar':
+      t.disabled = true;
+      try { await api('asaas', { empresa_id:S.empId, acao:'situacao' }); toast('Situação atualizada.'); render(); }
+      catch(e){ t.disabled = false; $('#msMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true;
+    case 'msPix': msPix(id); return true;
+    case 'msCopiar': { const c = $('#msCopia'); if (!c) return true;
+      try { await navigator.clipboard.writeText(c.value); } catch(_){ c.select(); document.execCommand('copy'); }
+      toast('Código PIX copiado. Cole no app do banco.'); return true; }
+  }
+  return false;
+}
 function vInicio(){
   const hoje = isoNow().slice(0, 10), ontem = diaMais(hoje, -1), mesIni = hoje.slice(0, 8) + '01';
   const H = vendasDe(hoje, hoje), O = vendasDe(ontem, ontem), M = vendasDe(mesIni, hoje);
@@ -4081,7 +4170,7 @@ function vInicio(){
   const A = alertasInicio(), hora = +isoNow().slice(11, 13), saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
   const tk = H.v.length ? r2(H.total / H.v.length) : 0;
-  return `${bannerCertificado()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
+  return `${bannerCertificado()}${bannerAssinatura()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
   <div class="ini-acoes">${pode('emitir') ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe" data-nfnova="1"><b>＋</b>Nova NF-e</button>' : ''}
     ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
   <div class="grid2"><div>
@@ -4374,6 +4463,7 @@ document.addEventListener('click', async ev => {
   if (await acoesEstoque(a, t, id)) return;
   if (await acoesFin(a, t, id)) return;
   if (await acoesV5(a, t, id)) return;
+  if (await acoesMensal(a, t, id)) return;
   if (await acoesV4(a, t, id)) return;
   switch (a){
     case 'fechar': closeModal(); break;
