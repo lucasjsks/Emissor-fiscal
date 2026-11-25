@@ -53,7 +53,30 @@ export async function buscarNotas(empresa_id, emp, userId){
     if (lista.length < 100) break;
   }
   await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['mde'], valor:{ versao, sinc_em:isoBR(), ambiente:amb } });
-  return { ok:true, gravadas, ambiente:amb };
+  const ciencias = await cienciaAutomatica(empresa_id, emp, amb);
+  return { ok:true, gravadas, ambiente:amb, ciencias };
+}
+
+// Ciência automática (pedido do Lucas): assim que a nota do fornecedor aparece, o sistema avisa a SEFAZ (ciência),
+// para a nota completa já estar liberada quando o cliente clicar em Aceitar. A ciência não é resposta final:
+// depois dá para confirmar (ao lançar a compra) ou recusar. Desliga em Empresa → "Notas de fornecedores" (ciencia_auto = false).
+export const CIENCIA_MAX = 20, CIENCIA_DIAS = 30;
+export const precisaCiencia = (r, agora = Date.now()) => !!r && r.chave && (r.manifestacao || 'nulo') === 'nulo' && !r.manifestado_em
+  && r.situacao !== 'cancelada' && !r.compra_id
+  && !(r.data_emissao && agora - new Date(r.data_emissao) > CIENCIA_DIAS * 864e5) // nota antiga: deixa para o cliente decidir
+  && !(r.ciencia_erro_em && agora - new Date(r.ciencia_erro_em) < 6 * 3600e3);   // deu erro: tenta de novo em 6 h
+export async function cienciaAutomatica(empresa_id, emp, amb){
+  if (emp.ciencia_auto === false) return 0;
+  const rows = await sb(`/rest/v1/docs?select=path,data&empresa_id=eq.${encodeURIComponent(empresa_id)}&col=eq.${encodeURIComponent('empresas/' + empresa_id + '/recebidas')}&data->>manifestacao=eq.nulo&limit=300`) || [];
+  const fila = rows.filter(r => precisaCiencia(r.data)).slice(0, CIENCIA_MAX); let feitas = 0;
+  for (const row of fila){
+    const r = await focus('POST', `/v2/nfes_recebidas/${row.data.chave}/manifesto`, { tipo:'ciencia' }, { amb }), m = mensagemFocus(r.body);
+    const certo = ok(r.status) && !(r.body && r.body.status && !/registrado|autorizado|duplic/i.test(r.body.status + ' ' + m));
+    await putDoc(row.path, certo ? { ...row.data, manifestacao:'ciencia', manifestado_em:isoBR(), ciencia_auto:true }
+      : { ...row.data, ciencia_erro_em:isoBR(), ciencia_erro:m || `HTTP ${r.status}` }, null);
+    if (certo) feitas++;
+  }
+  return feitas;
 }
 
 // empresas que já buscaram notas alguma vez ou ligaram a Manifestação pelo sistema

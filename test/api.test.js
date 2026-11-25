@@ -28,6 +28,8 @@ beforeEach(() => {
         const p = u.searchParams.get('path');
         if (p && p.startsWith('in.(')){ const ps = p.slice(4, -1).split(',').map(x => x.replace(/^"|"$/g, '')); return json(ps.filter(x => docs[x]).map(x => ({ path:x, data:docs[x] }))); }
         if (p) { const d = docs[p.slice(3)]; return json(d ? [{ data:d }] : []); }
+        const col = u.searchParams.get('col'), mf = u.searchParams.get('data->>manifestacao');
+        if (col) return json(Object.entries(docs).filter(([k, v]) => k.replace(/\/[^/]+$/, '') === col.slice(3) && (!mf || (v.manifestacao || 'nulo') === mf.slice(3))).map(([path, data]) => ({ path, data })));
         const ch = u.searchParams.get('data->>chave'); const hit = Object.entries(docs).find(([, v]) => v.chave === (ch || '').slice(3));
         return json(hit ? [{ path:hit[0], data:hit[1] }] : []);
       }
@@ -119,7 +121,7 @@ test('notas recebidas: operador não acessa', async () => {
 });
 
 test('notas recebidas: busca a partir da última versão, grava todas de uma vez e guarda a versão', async () => {
-  docs['empresas/E1'].mde = undefined; docs['empresas/E1'].mde_versao = 5;
+  docs['empresas/E1'].mde = undefined; docs['empresas/E1'].mde_versao = 5; docs['empresas/E1'].ciencia_auto = false;
   focusResp = { status:200, body:[rec(1, 6), rec(2, 9, { situacao:'cancelada' })] };
   const lotes = []; const fetchOrig = globalThis.fetch;
   globalThis.fetch = async (url, opt = {}) => { if (String(url).includes('/rest/v1/docs?on_conflict') && opt.body) lotes.push(JSON.parse(opt.body)); return fetchOrig(url, opt); };
@@ -283,7 +285,7 @@ test('a mesma venda (venda_id) não vira duas notas quando a tela tenta de novo'
 });
 
 test('notas recebidas: a mesma nota repetida na lista não derruba a gravação e a manifestação feita aqui é mantida', async () => {
-  docs['empresas/E1'].mde_versao = 0;
+  docs['empresas/E1'].mde_versao = 0; docs['empresas/E1'].ciencia_auto = false;
   const c1 = rec(1, 1).chave_nfe;
   docs['empresas/E1/recebidas/' + c1] = { chave:c1, manifestacao:'ciencia', manifestado_em:'2026-11-18T08:00:00-03:00', justificativa:'x', compra_id:'C9' };
   focusResp = { status:200, body:[rec(1, 3), rec(1, 4, { manifestacao_destinatario:'nulo' }), rec(2, 5)] };
@@ -294,6 +296,32 @@ test('notas recebidas: a mesma nota repetida na lista não derruba a gravação 
   assert.equal(r.code, 200); assert.equal(lotes[0].length, 2, 'sem caminho repetido no lote');
   const d = docs['empresas/E1/recebidas/' + c1];
   assert.equal(d.versao, 4); assert.equal(d.manifestacao, 'ciencia'); assert.equal(d.compra_id, 'C9');
+});
+
+test('notas recebidas: ciência automática logo depois de buscar (só notas novas, recentes e sem resposta)', async () => {
+  const { precisaCiencia } = await import('../api/recebidas.js');
+  const hoje = new Date().toISOString(), velha = new Date(Date.now() - 40 * 864e5).toISOString();
+  docs['empresas/E1'].mde_versao = 0;
+  const c3 = rec(3, 1).chave_nfe;
+  docs['empresas/E1/recebidas/' + c3] = { chave:c3, manifestacao:'desconhecimento', manifestado_em:hoje };
+  focusResp = m => m === 'POST' ? { status:200, body:{ status:'evento_registrado' } }
+    : { status:200, body:[rec(1, 1, { data_emissao:hoje }), rec(2, 2, { data_emissao:velha }), rec(4, 3, { data_emissao:hoje, situacao:'cancelada' })] };
+  const r = await chamar(recebidas, 't2', { empresa_id:'E1', acao:'buscar' });
+  assert.equal(r.code, 200); assert.equal(r.body.ciencias, 1);
+  const envios = chamadas.filter(c => c.method === 'POST' && c.url.endsWith('/manifesto'));
+  assert.equal(envios.length, 1); assert.equal(envios[0].url, `/v2/nfes_recebidas/${rec(1, 1).chave_nfe}/manifesto`); assert.deepEqual(envios[0].body, { tipo:'ciencia' });
+  const d = docs['empresas/E1/recebidas/' + rec(1, 1).chave_nfe];
+  assert.equal(d.manifestacao, 'ciencia'); assert.equal(d.ciencia_auto, true); assert.ok(d.manifestado_em);
+  assert.equal(docs['empresas/E1/recebidas/' + rec(2, 2).chave_nfe].manifestacao, 'nulo', 'nota de mais de 30 dias fica para o cliente');
+  assert.equal(docs['empresas/E1/recebidas/' + c3].manifestacao, 'desconhecimento');
+  // desligada na empresa: não manda nada
+  docs['empresas/E1'].ciencia_auto = false; chamadas.length = 0;
+  docs['empresas/E1/recebidas/' + rec(5, 1).chave_nfe] = { chave:rec(5, 1).chave_nfe, manifestacao:'nulo', data_emissao:hoje, situacao:'autorizada' };
+  const r2 = await chamar(recebidas, 't2', { empresa_id:'E1', acao:'buscar' });
+  assert.equal(r2.body.ciencias, 0); assert.equal(chamadas.filter(c => c.url.endsWith('/manifesto')).length, 0);
+  // erro da SEFAZ: guarda o erro e só tenta de novo depois de 6 h
+  assert.equal(precisaCiencia({ chave:'x', manifestacao:'nulo', ciencia_erro_em:hoje }), false);
+  assert.equal(precisaCiencia({ chave:'x', manifestacao:'nulo', ciencia_erro_em:new Date(Date.now() - 7 * 3600e3).toISOString() }), true);
 });
 
 test('notas recebidas: busca automática (cron) só com CRON_SECRET e só empresas com Manifestação', async () => {
