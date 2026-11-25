@@ -4094,7 +4094,7 @@ function cardAssinatura(){
   const a = msAss(), teste = S.mensal.teste ? ' <span class="tag w">modo de teste</span>' : '';
   if (!a) return `<div class="card" id="cardMensal"><h3 style="margin-top:0">Mensalidade do NotaOne${teste}</h3>
     <p>Plano NotaOne: <b>${brl(S.mensal.valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
-    <p class="small">A primeira mensalidade vence hoje; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
+    <p class="small">A primeira mensalidade vence <b>30 dias depois</b> de assinar; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
     <div class="actions"><button class="btn pri" data-act="msAssinar">Assinar agora</button></div><div id="msMsg"></div></div>`;
   setTimeout(msAtualizarSePreciso, 0);
   const sit = { em_dia:['Em dia','g'], atrasada:['Atrasada','b'], cancelada:['Cancelada',''] }[a.situacao] || ['—',''], ab = a.aberta;
@@ -4141,8 +4141,8 @@ async function acoesMensal(a, t, id){
   switch (a){
     case 'msAssinar':
       t.disabled = true; $('#msMsg').innerHTML = '<div class="msg info">Criando sua assinatura…</div>';
-      try { const r = await api('asaas', { empresa_id:S.empId, acao:'assinar' }); $('#msMsg').innerHTML = ''; toast('Assinatura criada.'); render();
-        const ab = (r.assinatura || {}).aberta; if (ab) msPix(ab.id); }
+      try { const r = await api('asaas', { empresa_id:S.empId, acao:'assinar' }); const ab = (r.assinatura || {}).aberta;
+        toast(ab ? `Assinatura criada. A primeira mensalidade vence em ${dataBR(ab.venc)}.` : 'Assinatura criada.'); render(); }
       catch(e){ t.disabled = false; $('#msMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
       return true;
     case 'msAtualizar':

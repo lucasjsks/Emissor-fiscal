@@ -1,6 +1,6 @@
 // /api/asaas — mensalidade do NotaOne cobrada pelo Asaas.
 // POST com login (dono ou gerente):
-//   acao 'assinar'  {empresa_id}                → cria o cliente e a assinatura mensal no Asaas (1ª vence hoje, depois todo mês no mesmo dia)
+//   acao 'assinar'  {empresa_id}                → cria o cliente e a assinatura mensal no Asaas (1ª vence 30 dias depois, depois todo mês no mesmo dia)
 //   acao 'situacao' {empresa_id}                → busca no Asaas as mensalidades e grava em empresa.assinatura
 //   acao 'pix'      {empresa_id, pagamento_id}  → QR Code e "copia e cola" do PIX de uma mensalidade
 // POST do Asaas (webhook, cabeçalho asaas-access-token = ASAAS_WEBHOOK_TOKEN) → atualiza a empresa dona da assinatura.
@@ -33,6 +33,9 @@ export async function asaas(method, path, body){
 
 // data de hoje em Brasília (AAAA-MM-DD)
 const hojeBR = () => isoBR().slice(0, 10);
+// primeira mensalidade: 30 dias depois de assinar
+export const DIAS_PRIMEIRA = 30;
+export const primeiroVenc = (hoje = hojeBR()) => new Date(Date.parse(hoje + 'T12:00:00Z') + DIAS_PRIMEIRA * 864e5).toISOString().slice(0, 10);
 export function resumoMensalidade(p){
   return { id:p.id, valor:Number(p.value) || 0, venc:p.dueDate || '', status:p.status || '', pago_em:p.clientPaymentDate || p.paymentDate || p.confirmedDate || null,
     forma:p.billingType || '', link:p.invoiceUrl || '', boleto:p.bankSlipUrl || '' };
@@ -73,7 +76,7 @@ async function assinar(empresa_id, e, u){
       mobilePhone:fone.length >= 10 ? fone : undefined, externalReference:empresa_id, company:e.fantasia || undefined });
   }
   const sub = await asaas('POST', '/subscriptions', { customer:cli.id, billingType:'UNDEFINED', value:valorMensal(), cycle:'MONTHLY',
-    nextDueDate:hojeBR(), description:'Mensalidade NotaOne — Emissão Inteligente', externalReference:empresa_id });
+    nextDueDate:primeiroVenc(), description:'Mensalidade NotaOne — Emissão Inteligente', externalReference:empresa_id });
   const novo = { id:sub.id, cliente:cli.id, ambiente:ambienteAsaas(), criada_em:isoBR(), criada_por:u.id };
   await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['assinatura'], valor:novo });
   return atualizar(empresa_id, { ...e, assinatura:novo });
