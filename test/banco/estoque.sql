@@ -111,3 +111,9 @@ reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.c
 select public.definir_custo(:'e', 'P1', 4.25);
 select data->>'custo' as custo_425, data->>'custo_medio' as cm_425 from docs where path='empresas/'||:'e'||'/produtos/P1';
 reset role;
+
+-- módulo Academia: funcionário grava aluno; plano da academia só gerente/dono
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com');
+select public.pode_gravar('empresas/'||:'e'||'/ac_planos', :'e') as dono_grava_plano_academia_t;
+reset role;
+

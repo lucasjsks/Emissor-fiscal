@@ -431,6 +431,8 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
 <div id="modal"><div class="box" id="mbox"></div></div>
 <div class="toast" id="toast"></div>
 
+<!-- módulos de serviço: cada tipo de serviço em um arquivo próprio (ver MÓDULOS no código) -->
+<script src="modulos/servico/academia.js"></script>
 <script>
 /* ================== utilidades ================== */
 const $ = s => document.querySelector(s);
@@ -470,15 +472,30 @@ const LS = 'emissor-fiscal-v1';
 S.nfe = nfeVazia();
 function lsLoad(){ try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch(e){ return {}; } }
 function lsSave(){ try { localStorage.setItem(LS, JSON.stringify(local)); } catch(e){} }
+/* ================== MÓDULOS (ramo da empresa) ==================
+   comercio    = comércio com CNPJ (emite NF-e/NFC-e)  — o núcleo deste arquivo
+   comercio_pf = comércio com CPF (vende sem nota)       — o núcleo com semNota()
+   servico     = serviços; cada tipo de serviço é um arquivo próprio em modulos/servico/<tipo>.js
+   Um módulo de serviço se registra com registrarModulo({ id, nome, cols, abas, views, acoes, perm, esconder, renomear, inicioHtml, titulosFin, caixaExtras }).
+   Mudança pedida "só no módulo X" vai no arquivo do módulo; mudança no núcleo vale para todos. */
+const MODULOS = {};
+function registrarModulo(m){ MODULOS[m.id] = m; Object.assign(ACT_PERM, m.perm || {}); Object.assign(ICON, m.icones || {}); }
+const ramoDe = e => !e ? 'comercio' : e.modulo === 'servico' ? 'servico' : e.doc_tipo === 'cpf' ? 'comercio_pf' : 'comercio';
+const SERVICOS = [['academia','Academia']]; // tipos de serviço disponíveis (cada um com seu arquivo)
+const modServ = (e = emp()) => e && e.modulo === 'servico' ? (MODULOS[e.servico] || null) : null;
+// chama um "gancho" do módulo de serviço da empresa (se houver); devolve o valor padrão se não houver
+function gancho(nome, padrao, ...args){ const m = modServ(); if (!m || typeof m[nome] !== 'function') return padrao; try { return m[nome](...args); } catch(err){ console.error('módulo', m.id, nome, err); return padrao; } }
 const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes','fornecedores','compras','vinculos','recebidas','financeiro'];
 // compras_xml (XML original das notas de compra) é lido só sob demanda
 const colOf = k => k === 'empresas' ? 'empresas' : `empresas/${S.empId}/${k}`;
 const emp = () => S.empresas.find(e => e.id === S.empId) || null;
 
+// coleções próprias do módulo de serviço da empresa atual (ex.: ac_alunos)
+const colsModulo = () => ((modServ() || {}).cols || []);
 function refreshFromLocal(){
   S.empresas = Object.values(local['empresas'] || {});
   if (!S.empId) S.empId = (local.config && local.config.empresaAtual) || (S.empresas[0] && S.empresas[0].id) || null;
-  SUBCOLS.forEach(k => S[k] = S.empId ? Object.values(local[colOf(k)] || {}) : []);
+  [...SUBCOLS, ...colsModulo()].forEach(k => S[k] = S.empId ? Object.values(local[colOf(k)] || {}) : []);
 }
 async function put(k, obj){
   obj = clone(obj);
@@ -498,8 +515,9 @@ async function del(k, id){
 }
 function setEmp(id, persist = true){
   S.empId = id; unsubs.forEach(u => u()); unsubs = []; SUBCOLS.forEach(k => S[k] = []); S.cart = []; S.pags = []; S.nfe = nfeVazia();
+  const mcols = colsModulo(); mcols.forEach(k => S[k] = []); S.modCols = mcols.join(',');
   if (db && id){
-    SUBCOLS.forEach(k => {
+    [...SUBCOLS, ...mcols].forEach(k => {
       unsubs.push(db.collection(`empresas/${id}/${k}`).onSnapshot(snap => { S[k] = snap.docs.map(d => d.data()); render(); }, () => {}));
     });
   } else if (!db) refreshFromLocal();
@@ -885,20 +903,25 @@ const ICON = {
 };
 const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['financeiro','Financeiro'],['relatorios','Relatórios'],['empresa','Empresa']];
 const NAV_SEC = { venda:'Vendas', compras:'Gestão', empresa:'Configuração' };
+const navSec = () => { const m = modServ(); if (!m || !(m.abas || []).length) return NAV_SEC; const sec = { ...NAV_SEC }; sec[abas().find(([k]) => (m.abas || []).some(a => a[0] === k))?.[0]] = m.nome; return sec; };
 // empresa cadastrada com CPF: não emite nota fiscal (vende com comprovante não fiscal, modelo '99')
 const semNota = (e = emp()) => !!e && e.doc_tipo === 'cpf';
 // funcionário (operador): só vendas, caixa, produtos e clientes
 const ABAS_OPERADOR = ['venda','nfe','notas','caixa','produtos','clientes'];
 function abas(){
-  const sn = semNota(), op = S.papel === 'operador';
-  return TABS.filter(([k]) => !(sn && k === 'nfe') && (!op || ABAS_OPERADOR.includes(k)) && !(op && k === 'nfe' && !pode('emitir')))
-    .map(([k, l]) => [k, sn && k === 'venda' ? 'Vender' : sn && k === 'notas' ? 'Vendas' : l]);
+  const sn = semNota(), op = S.papel === 'operador', m = modServ(), esc_ = (m && m.esconder) || [], ren = (m && m.renomear) || {};
+  // abas do módulo de serviço entram logo depois do Início: [chave, rótulo, operador vê?]
+  const extra = m ? (m.abas || []).filter(([, , vOp]) => !op || vOp).map(([k, l]) => [k, l]) : [];
+  const base = TABS.filter(([k]) => !(sn && k === 'nfe') && !esc_.includes(k) && (!op || ABAS_OPERADOR.includes(k)) && !(op && k === 'nfe' && !pode('emitir')))
+    .map(([k, l]) => [k, ren[k] || (sn && k === 'venda' ? 'Vender' : sn && k === 'notas' ? 'Vendas' : l)]);
+  const i = base[0] && base[0][0] === 'inicio' ? 1 : 0; // funcionário não tem Início: as abas do módulo vêm primeiro
+  return [...base.slice(0, i), ...extra, ...base.slice(i)];
 }
 const nomeModelo = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '99' ? 'Venda' : n.modelo === '65' ? 'Cupom' : 'NF-e';
 const verCusto = () => S.papel !== 'operador';
 function renderNav(){
   $('#nav').innerHTML = `<div class="nav-brand"><img src="img/logo.png" alt=""><span>Nota<b>One</b></span></div>`
-    + abas().map(([k, l]) => `${NAV_SEC[k] ? `<div class="nav-sec">${NAV_SEC[k]}</div>` : ''}<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" aria-label="${l}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${l}</span></button>`).join('');
+    + abas().map(([k, l]) => `${(navSec()[k]) ? `<div class="nav-sec">${navSec()[k]}</div>` : ''}<button class="${S.tab === k ? 'on' : ''}" data-tab="${k}" aria-label="${l}"><svg viewBox="0 0 24 24">${ICON[k]}</svg><span>${l}</span></button>`).join('');
 }
 function renderHeader(){
   const sel = $('#empSel'), tb = abas().find(([k]) => k === S.tab);
@@ -912,6 +935,7 @@ function renderHeader(){
 
 /* ================== render principal ================== */
 function render(){
+  if (S.empId && S.modCols !== undefined && S.modCols !== colsModulo().join(',')) return setEmp(S.empId, false); // ramo da empresa mudou: ouvir as coleções do novo módulo
   const ae = document.activeElement, aid = ae && ae.id, sel = ae && ae.selectionStart, val = ae && ae.value;
   renderNav(); renderHeader(); botaoSuporte();
   const m = $('#main');
@@ -930,6 +954,7 @@ function render(){
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
   } else if (S.pdv && S.tab === 'venda') m.innerHTML = vPdv();
+  else if (modServ() && (modServ().views || {})[S.tab]) m.innerHTML = modServ().views[S.tab]();
   else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfeTab, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, financeiro:vFinanceiro, empresa:vEmpresa })[S.tab]();
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
@@ -1375,9 +1400,12 @@ function formEmpresa(e, tipo){
   const plOk = id => planosDoc(tipo).some(p => p.id === id) ? id : null;
   S.empForm = { e, tipo, plano:escolheAgora ? (plOk(ant) || plOk(meta.plano) || planosDoc(tipo)[0].id) : null };
   const blocoPlano = escolheAgora ? `<h3>Plano</h3>${planosHtml(tipo, S.empForm.plano, 'empPlano')}<p class="small">A primeira mensalidade só vence 30 dias depois. Dá para mudar de plano quando quiser, em Empresa → Plano.</p>` : '';
+  const ramoAtual = e.modulo === 'servico' ? 'servico:' + (e.servico || SERVICOS[0][0]) : 'comercio';
+  const ramo = sel('eRamo', 'Ramo de atividade', ramoAtual, [['comercio','Comércio (loja, mercado, distribuidora…)'], ...SERVICOS.map(([k, l]) => ['servico:' + k, 'Serviço — ' + l])]);
   const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   if (tipo === 'cpf'){
     openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
+    ${ramo}
     <p class="small">Para quem ainda não tem CNPJ: vende no caixa e no PDV com <b>comprovante de venda (não é documento fiscal)</b>, controla estoque, financeiro e relatórios. Quando abrir o CNPJ, é só trocar aqui para <b>CNPJ</b> — nada se perde.</p>
     <div class="row">${fld('eRazao','Nome do dono *',e.razao)}${fld('eFant','Nome da loja *',e.fantasia)}</div>
     <div class="row">${fld('eCpf','CPF do dono *',fmtDoc(e.cpf),'inputmode="numeric" autocomplete="off"')}${fld('eFone','Telefone',e.telefone,'inputmode="tel"')}</div>
@@ -1390,6 +1418,7 @@ function formEmpresa(e, tipo){
     return;
   }
   openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
+  ${ramo}
   ${e.doc_tipo === 'cpf' ? '<div class="msg info">Abriu o CNPJ? Preencha os dados abaixo e salve: a loja passa a emitir nota fiscal. As vendas, o estoque e o financeiro continuam.</div>' : ''}
   <div class="row">${fld('eRazao','Razão social *',e.razao)}${fld('eFant','Nome fantasia',e.fantasia)}</div>
   <div class="row">${fld('eCnpj','CNPJ * (preenche o resto sozinho)',fmtDoc(e.cnpj),'inputmode="numeric" autocomplete="off"')}${fld('eIe','Inscrição estadual *',e.ie,'inputmode="numeric"')}</div>
@@ -1410,12 +1439,17 @@ function formEmpresa(e, tipo){
   ${e.id ? `<div style="margin-top:18px">${cardAmbiente()}${cardCertificado()}</div>` : ''}`);
   if (doSite) setTimeout(() => { const c = $('#eCnpj'); if (c) autoPreencher(c); }, 50); // busca razão social e endereço na Receita
 }
+// ramo escolhido no cadastro da empresa: comércio ou serviço (com o tipo de serviço)
+function ramoDoForm(){
+  const v = $('#eRamo') ? val('eRamo') : 'comercio';
+  return v.startsWith('servico:') ? { modulo:'servico', servico:v.slice(8) } : { modulo:'comercio', servico:null };
+}
 async function salvarEmp(id){
   if ((S.empForm || {}).tipo === 'cpf') return salvarEmpCpf(id);
   const o = { id:id || undefined, razao:val('eRazao'), fantasia:val('eFant'), cnpj:dig(val('eCnpj')), ie:dig(val('eIe')), regime:val('eReg'), telefone:val('eFone'),
     logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), cod_municipio:dig(val('eCodMun')), uf:val('eUf'),
     serie_nfce:dig(val('eSNfce')) || '1', prox_nfce:parseInt(dig(val('ePNfce'))) || 1, serie_nfe:dig(val('eSNfe')) || '1', prox_nfe:parseInt(dig(val('ePNfe'))) || 1,
-    csc_id:dig(val('eCsc')), limite_cpf_nfce:numIn(val('eLim')) || 10000 };
+    csc_id:dig(val('eCsc')), limite_cpf_nfce:numIn(val('eLim')) || 10000, ...ramoDoForm() };
   const antigo = id ? S.empresas.find(x => x.id === id) : null;
   if (antigo) Object.keys(antigo).forEach(k => { if (o[k] === undefined && k !== 'id') o[k] = clone(antigo[k]); });
   const errs = [];
@@ -1433,7 +1467,7 @@ async function salvarEmp(id){
 }
 async function salvarEmpCpf(id){
   const o = { id:id || undefined, doc_tipo:'cpf', razao:val('eRazao').toUpperCase(), fantasia:val('eFant'), cpf:dig(val('eCpf')), cnpj:'', telefone:val('eFone'),
-    logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), uf:val('eUf') };
+    logradouro:val('eLog'), numero:val('eNum'), bairro:val('eBai'), cep:dig(val('eCep')), municipio:val('eMun'), uf:val('eUf'), ...ramoDoForm() };
   const antigo = id ? S.empresas.find(x => x.id === id) : null;
   if (antigo){
     if (antigo.doc_tipo !== 'cpf' && S.notas.some(n => n.modelo !== '99')) return $('#errM').innerHTML = '<div class="msg err">Esta empresa já emitiu notas fiscais com CNPJ: não dá para voltar para CPF.</div>';
@@ -2283,15 +2317,18 @@ function resumoCaixa(cx){
   const porForma = {}; let total = 0, troco = 0;
   ns.forEach(n => { total += n.total; troco += n.troco || 0; (n.pags || []).forEach(p => porForma[p.forma] = r2((porForma[p.forma] || 0) + p.valor)); });
   if (porForma['01'] !== undefined) porForma['01'] = r2(porForma['01'] - troco);
+  const extras = gancho('caixaExtras', [], cx); // [{ rot, forma, valor }]
+  extras.forEach(x => porForma[x.forma] = r2((porForma[x.forma] || 0) + num(x.valor)));
   const soma = t => r2((cx.movs || []).filter(m => m.tipo === t).reduce((a, m) => a + m.valor, 0));
   const canc = S.notas.filter(n => n.caixa === cx.id && n.status === 'cancelada');
   const sup = soma('suprimento'), sang = soma('sangria');
-  return { qtd:ns.length, total:r2(total), porForma, sup, sang, inicial:num(cx.inicial), dinheiroEsperado:r2(num(cx.inicial) + (porForma['01'] || 0) + sup - sang),
+  return { qtd:ns.length, total:r2(total), extras, porForma, sup, sang, inicial:num(cx.inicial), dinheiroEsperado:r2(num(cx.inicial) + (porForma['01'] || 0) + sup - sang),
     canc:canc.length, cancValor:r2(canc.reduce((a, n) => a + n.total, 0)) };
 }
 const difTag = d => !d ? '<span class="tag">✓ bateu</span>' : `<span class="tag ${d < 0 ? 'b' : 'w'}">${d < 0 ? 'falta ' : 'sobra '}${brl(Math.abs(d))}</span>`;
 function resumoCaixaHtml(r){
   return `<div class="stats"><div><b>${r.qtd}</b>vendas</div><div><b>${brl(r.total)}</b>vendido</div><div><b>${brl(r.dinheiroEsperado)}</b>dinheiro na gaveta</div></div>
+    ${(r.extras || []).length ? Object.entries(r.extras.reduce((o, x) => (o[x.rot] = r2((o[x.rot] || 0) + num(x.valor)), o), {})).map(([k, v]) => linhaTot(esc(k), v)).join('') : ''}
     <h3>Por forma de pagamento</h3>${Object.keys(r.porForma).length ? Object.entries(r.porForma).map(([f, v]) => linhaTot(esc(PAG_NOME[f] || f), v)).join('') : '<p class="small">Nenhuma venda ainda.</p>'}
     ${linhaTot('Troco inicial', r.inicial, 'small')}${r.sup ? linhaTot('Suprimentos', r.sup, 'small') : ''}${r.sang ? linhaTot('Sangrias', -r.sang, 'small') : ''}${r.canc ? linhaTot(`Canceladas (${r.canc})`, r.cancValor, 'small') : ''}`;
 }
@@ -4026,6 +4063,7 @@ function titulosFin(){
   // nota cancelada sem baixa some; com baixa continua (para estornar o dinheiro)
   const auto = T.filter(t => !t.cancelada || t.pago_em);
   const manuais = (S.financeiro || []).filter(f => !f.origem_auto).map(f => ({ ...f, auto:null }));
+  gancho('titulosFin', []).forEach(t => auto.push(t)); // ex.: mensalidades recebidas na academia
   return [...auto, ...manuais].map(t => ({ ...t, situacao:t.pago_em ? 'pago' : t.venc < hoje ? 'vencido' : t.venc === hoje ? 'hoje' : 'aberto' }));
 }
 function vFinanceiro(){
@@ -4550,6 +4588,7 @@ async function acoesLoja(a, t, id){
       const f = S.empForm || {}, e = { ...(f.e || {}) };
       [['eRazao','razao'],['eFant','fantasia'],['eFone','telefone'],['eLog','logradouro'],['eNum','numero'],['eBai','bairro'],['eCep','cep'],['eMun','municipio'],['eUf','uf']].forEach(([i, k]) => { if ($('#' + i)) e[k] = val(i); });
       if ($('#eCpf')) e.cpf = dig(val('eCpf')); if ($('#eCnpj')) e.cnpj = dig(val('eCnpj'));
+      if ($('#eRamo')) Object.assign(e, ramoDoForm());
       formEmpresa(e, t.dataset.t); return true; }
     case 'fnNovo':
       openModal(`${mhead('Novo funcionário')}<p class="small">Ele entra tocando no próprio nome na tela "Quem vai usar o sistema?" e digitando esta senha.</p>
@@ -4719,6 +4758,7 @@ function vInicio(){
   const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
   const tk = H.v.length ? r2(H.total / H.v.length) : 0;
   return `${bannerCertificado()}${bannerAssinatura()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
+  ${gancho('inicioHtml', '')}
   <div class="ini-acoes">${pode('emitir') ? (semNota() ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Nova venda</button>' : '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe" data-nfnova="1"><b>＋</b>Nova NF-e</button>') : ''}
     ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
   <div class="grid2"><div>
@@ -5019,6 +5059,7 @@ document.addEventListener('click', async ev => {
   const a = t.dataset.act, id = t.dataset.id; if (t.type !== 'checkbox') ev.preventDefault();
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Seu acesso não permite essa ação. Peça ao dono da loja.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
+  { const m = modServ(); if (m && m.acoes && await m.acoes(a, t, id)) return; }
   if (await acoesEstoque(a, t, id)) return;
   if (await acoesFin(a, t, id)) return;
   if (await acoesV5(a, t, id)) return;
@@ -5215,6 +5256,8 @@ document.addEventListener('keydown', ev => {
   }
   if (teclaCupom(ev)) return;
 });
+// módulos de serviço (arquivos em modulos/servico/) se registram aqui antes de o sistema abrir
+(window.NOTAONE_MODULOS || []).forEach(f => { try { registrarModulo(f()); } catch(err){ console.error('módulo', err); } });
 init();
 </script>
 </body>
