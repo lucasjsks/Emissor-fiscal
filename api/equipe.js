@@ -1,14 +1,16 @@
 // POST /api/equipe — funcionários da empresa (só o dono). O funcionário entra com o próprio e-mail e senha e tem papel
 // 'operador': vende (Cupom/PDV/Caixa) e cadastra produtos e clientes; não vê custo, financeiro, relatórios nem cancela.
 //   acao 'listar'  {empresa_id}
-//   acao 'criar'   {empresa_id, nome, email, senha}   → cria o login (já confirmado) e dá o acesso
+//   acao 'criar'   {empresa_id, nome, senha}          → cria o login (já confirmado) e dá o acesso. Sem e-mail (pedido do Lucas):
+//                                                       o servidor gera um e-mail interno (domínio reservado example.com, nunca recebe nada)
 //   acao 'senha'   {empresa_id, user_id, senha}       → troca a senha do funcionário
 //   acao 'remover' {empresa_id, user_id}              → tira o acesso (e apaga o login, se ele não tiver outro acesso)
 // Limite do plano: empresa.limite_funcionarios (padrão 2; só o suporte muda — definir_limite_funcionarios no banco).
+import { randomBytes } from 'node:crypto';
 import { rota, Falha, env, usuario, papelDe, getDoc, sb, rpc } from './_lib.js';
 
 export const LIMITE_PADRAO = 2;
-const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
+export const emailInterno = empresa_id => `func-${String(empresa_id).replace(/[^a-z0-9]/gi, '').slice(0, 8).toLowerCase()}-${randomBytes(5).toString('hex')}@funcionarios.notaone.example.com`;
 
 async function authAdmin(method, path, body){
   const key = env('SUPABASE_SERVICE_ROLE_KEY');
@@ -49,9 +51,9 @@ export default rota(async (req, b) => {
   }
 
   if (acao === 'criar'){
-    const nome = String(b.nome || '').replace(/\s+/g, ' ').trim().slice(0, 80), email = String(b.email || '').trim().toLowerCase(), senha = String(b.senha || '');
+    const nome = String(b.nome || '').replace(/\s+/g, ' ').trim().slice(0, 80), email = emailInterno(empresa_id), senha = String(b.senha || '');
     if (nome.length < 2) throw new Falha('Informe o nome do funcionário.');
-    if (!emailOk(email)) throw new Falha('E-mail inválido.');
+    if ((e.funcionarios || []).some(x => (x.nome || '').toLowerCase() === nome.toLowerCase())) throw new Falha('Já existe um funcionário com este nome. Use um nome diferente (ex.: com o sobrenome).');
     if (senha.length < 8) throw new Falha('A senha precisa ter pelo menos 8 caracteres.');
     if (!e.senha_gerente) throw new Falha('Antes de cadastrar funcionários, crie a senha do gerente (logo acima, no quadro Funcionários).');
     const atuais = await operadores(empresa_id) || [];
@@ -59,7 +61,6 @@ export default rota(async (req, b) => {
     const r = await authAdmin('POST', '/users', { email, password:senha, email_confirm:true, user_metadata:{ nome, funcionario:true } });
     if (!r.ok){
       const m = String(r.body.msg || r.body.message || r.body.error_description || r.body.error || '');
-      if (r.status === 422 || /already|registered|exists/i.test(m)) throw new Falha('Este e-mail já tem uma conta no NotaOne. Use outro e-mail para o funcionário.');
       if (/password/i.test(m)) throw new Falha('Senha fraca: use pelo menos 8 caracteres, misturando letras e números.');
       throw new Falha('Não foi possível criar o acesso: ' + (m || 'HTTP ' + r.status), 502);
     }
