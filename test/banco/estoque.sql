@@ -99,3 +99,10 @@ select count(*) as segredo_visivel_0 from docs where col='empresas/'||:'e'||'/se
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/segredos/g2','empresas/'||:'e'||'/segredos',:'e','{}'); -- deve falhar (RLS)
 update docs set data = data || '{"senha_gerente":true,"funcionarios":[{"email":"x"}]}' where path='empresas/'||:'e' returning data->>'senha_gerente' as senha_ger_nulo, data->>'funcionarios' as func_nulo;
 reset role;
+-- preço de compra informado no cadastro: só gerente/dono; vira custo e custo médio
+reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;
+select public.definir_custo(:'e', 'P1', 1.5); -- funcionário: deve falhar
+reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+select public.definir_custo(:'e', 'P1', 4.25);
+select data->>'custo' as custo_425, data->>'custo_medio' as cm_425 from docs where path='empresas/'||:'e'||'/produtos/P1';
+reset role;

@@ -1439,6 +1439,8 @@ async function salvarEmpCpf(id){
 
 // alerta de estoque = estoque mínimo (estoque_min): chegou nessa quantidade, entra em "Mercadorias para comprar"
 const fldAlerta = p => fld('pEstMin', 'Alerta de estoque', num(p.estoque_min) > 0 ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal" placeholder="ex.: 5"');
+// preço de compra (opcional, só gerente/dono): vira o custo do produto (função definir_custo no banco)
+const fldCompra = p => { const c = num(p.custo_medio || p.custo || 0); return fld('pCompra', 'Preço de compra (opcional)', c > 0 ? fmtRS(c) : '', `data-rs inputmode="decimal" placeholder="não informado" data-orig="${c > 0 ? c : ''}"`); };
 // loja com CPF (sem nota fiscal): o produto não leva nenhuma informação fiscal (NCM, CFOP, CST, impostos)
 const CAMPOS_FISCAIS_PROD = () => [...Object.keys(TAXMAP), 'ncm', 'cest', 'origem', 'perfil_id'];
 function formProduto(p){
@@ -1457,8 +1459,9 @@ function formProduto(p){
   ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
   <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p></div>`}
   <h3>Estoque</h3>
-  ${pode('produto') ? `<div class="row">${fld('pEst', 'Estoque atual', temSaldo(p) ? String(p.estoque).replace('.', ',') : '', `inputmode="decimal" placeholder="0" data-orig="${temSaldo(p) ? esc(String(p.estoque)) : ''}"`)}${fldAlerta(p)}</div>
-  <p class="small">Digite a quantidade que tem na loja agora${p.custo_medio && verCusto() ? ` (custo médio ${brl(p.custo_medio)})` : ''}. Depois, as vendas tiram e as compras lançadas somam sozinhas; se mudar o número aqui, fica registrado no histórico como ajuste.</p>`
+  ${pode('produto') ? `<div class="row">${fld('pEst', 'Estoque atual', temSaldo(p) ? String(p.estoque).replace('.', ',') : '', `inputmode="decimal" placeholder="0" data-orig="${temSaldo(p) ? esc(String(p.estoque)) : ''}"`)}${fldAlerta(p)}${fldCompra(p)}</div>
+  <p class="small">Digite a quantidade que tem na loja agora. Depois, as vendas tiram e as compras lançadas somam sozinhas; se mudar o número aqui, fica registrado no histórico como ajuste.</p>
+  <p class="small"><b>Preço de compra:</b> preencha só se quiser. Ele é usado para calcular o lucro nos relatórios; quando você lançar uma compra desse produto, o sistema atualiza o custo sozinho.</p>`
   : `<div class="row"><div><label>Estoque atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b></div></div>${fldAlerta(p)}</div>
   <p class="small">O estoque muda pelas vendas e pelas compras. Para corrigir, peça ao gerente.</p>`}
   <p class="small"><b>Alerta de estoque:</b> quando o estoque chegar nessa quantidade (ou menos), o produto vai para <b>Relatórios → Estoque → Mercadorias para comprar</b> e aparece o aviso no Início. Deixe em branco para não avisar.</p>
@@ -1498,10 +1501,16 @@ async function gravarProduto(o){
   const el = $('#pEst'), v = el ? el.value.trim() : '', orig = el ? el.dataset.orig : '';
   if (v !== '' && !(numIn(v) >= 0)) return $('#errM').innerHTML = '<div class="msg err">Estoque atual inválido: digite a quantidade (0 ou mais).</div>', false;
   let salvo; if (!await safe(async () => { salvo = await put('produtos', o); })) return false;
-  const muda = el && v !== '' && pode('produto') && (orig === '' || numIn(v) !== num(orig));
+  const ec = $('#pCompra'), vc = ec ? ec.value.trim() : '';
+  if (vc !== '' && !(numIn(vc) >= 0)) return $('#errM').innerHTML = '<div class="msg err">Preço de compra inválido.</div>', false;
+  const muda = el && v !== '' && pode('produto') && (orig === '' || numIn(v) !== Number(orig));
   if (muda && SB){
     const { error } = await SB.rpc('ajustar_estoque', { e:S.empId, pid:salvo.id, novo_saldo:numIn(v), motivo:o.id ? 'Ajuste no cadastro do produto' : 'Estoque inicial (cadastro do produto)' });
     if (error){ toast('Produto salvo, mas o estoque não foi ajustado: ' + error.message); return true; }
+  }
+  if (ec && vc !== '' && pode('produto') && numIn(vc) > 0 && numIn(vc) !== Number(ec.dataset.orig || 0) && SB){
+    const { error } = await SB.rpc('definir_custo', { e:S.empId, pid:salvo.id, p_custo:numIn(vc) });
+    if (error){ toast('Produto salvo, mas o preço de compra não foi gravado: ' + error.message); return true; }
   }
   toast('Produto salvo.'); return true;
 }
