@@ -4094,7 +4094,7 @@ function cardAssinatura(){
   const a = msAss(), teste = S.mensal.teste ? ' <span class="tag w">modo de teste</span>' : '';
   if (!a) return `<div class="card" id="cardMensal"><h3 style="margin-top:0">Mensalidade do NotaOne${teste}</h3>
     <p>Plano NotaOne: <b>${brl(S.mensal.valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
-    <p class="small">A primeira mensalidade vence hoje; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
+    <p class="small">A primeira mensalidade vence <b>30 dias depois</b> de assinar; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
     <div class="actions"><button class="btn pri" data-act="msAssinar">Assinar agora</button></div><div id="msMsg"></div></div>`;
   setTimeout(msAtualizarSePreciso, 0);
   const sit = { em_dia:['Em dia','g'], atrasada:['Atrasada','b'], cancelada:['Cancelada',''] }[a.situacao] || ['—',''], ab = a.aberta;
@@ -4118,7 +4118,7 @@ async function msPix(pid){
   catch(e){ $('#msPixBox').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
   const box = $('#msPixBox'); if (!box) return;
   if (r.paga){ box.innerHTML = '<div class="msg ok">Esta mensalidade já está paga. Obrigado!</div>'; return; }
-  if (r.semPix){ box.innerHTML = `<div class="msg err">Não foi possível gerar o PIX agora.</div>${r.link ? `<div class="actions"><a class="btn pri" href="${esc(r.link)}" target="_blank" rel="noopener">Pagar por boleto, cartão ou PIX na página de pagamento</a></div>` : ''}`; return; }
+  if (r.semPix){ box.innerHTML = `<div class="msg err">Não foi possível gerar o PIX agora.${r.erro ? `<div class="small" style="margin-top:4px">${esc(r.erro)}</div>` : ''}</div>${r.link ? `<div class="actions"><a class="btn pri" href="${esc(r.link)}" target="_blank" rel="noopener">Pagar por boleto, cartão ou PIX na página de pagamento</a></div>` : ''}`; return; }
   box.innerHTML = `<p style="text-align:center">Valor: <b>${brl(r.valor)}</b> · vencimento ${dataBR(r.venc)}</p>
     <div style="text-align:center"><img src="data:image/png;base64,${esc(r.imagem)}" alt="QR Code PIX" style="width:230px;max-width:80%;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff"></div>
     <p class="small" style="text-align:center">Abra o app do seu banco, escolha <b>Pagar com PIX</b> e aponte a câmera para o QR Code. Ou copie o código abaixo (PIX copia e cola).</p>
@@ -4141,8 +4141,8 @@ async function acoesMensal(a, t, id){
   switch (a){
     case 'msAssinar':
       t.disabled = true; $('#msMsg').innerHTML = '<div class="msg info">Criando sua assinatura…</div>';
-      try { const r = await api('asaas', { empresa_id:S.empId, acao:'assinar' }); $('#msMsg').innerHTML = ''; toast('Assinatura criada.'); render();
-        const ab = (r.assinatura || {}).aberta; if (ab) msPix(ab.id); }
+      try { const r = await api('asaas', { empresa_id:S.empId, acao:'assinar' }); const ab = (r.assinatura || {}).aberta;
+        toast(ab ? `Assinatura criada. A primeira mensalidade vence em ${dataBR(ab.venc)}.` : 'Assinatura criada.'); render(); }
       catch(e){ t.disabled = false; $('#msMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
       return true;
     case 'msAtualizar':

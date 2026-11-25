@@ -9,7 +9,7 @@ process.env.ASAAS_API_KEY = 'chave-teste';
 process.env.ASAAS_WEBHOOK_TOKEN = 'segredo-webhook';
 delete process.env.ASAAS_AMBIENTE;
 
-const { default: handler, montarSituacao } = await import('../api/asaas.js');
+const { default: handler, montarSituacao, primeiroVenc } = await import('../api/asaas.js');
 
 let docs, membros, chamadas, pagamentos, assinaturas, clientes;
 beforeEach(() => {
@@ -63,7 +63,8 @@ test('assinar: cria cliente e assinatura mensal no Asaas e grava a situação na
   const cli = chamadas.find(c => c.url === '/v3/customers' && c.method === 'POST').body;
   assert.equal(cli.cpfCnpj, '11222333000181'); assert.equal(cli.email, 'dono@x.com'); assert.equal(cli.externalReference, 'E1'); assert.equal(cli.mobilePhone, '86981931921');
   const sub = chamadas.find(c => c.url === '/v3/subscriptions' && c.method === 'POST').body;
-  assert.equal(sub.value, 89.99); assert.equal(sub.cycle, 'MONTHLY'); assert.equal(sub.billingType, 'UNDEFINED');
+  assert.equal(sub.value, 89.99); assert.equal(sub.nextDueDate, primeiroVenc());
+  assert.equal(primeiroVenc('2026-11-24'), '2026-12-24'); assert.equal(primeiroVenc('2026-01-31'), '2026-03-02'); assert.equal(sub.cycle, 'MONTHLY'); assert.equal(sub.billingType, 'UNDEFINED');
   const a = docs['empresas/E1'].assinatura;
   assert.equal(a.id, 'sub_1'); assert.equal(a.ambiente, 'sandbox'); assert.equal(a.situacao, 'em_dia');
   assert.equal(a.aberta.id, 'pay_1'); assert.equal(a.aberta.link, 'https://asaas/i/1');
