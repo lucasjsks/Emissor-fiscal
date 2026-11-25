@@ -1708,7 +1708,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'produto', editProd:'produto', salvarProd:'produto', delProd:'produto', confDelProd:'produto',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -4105,7 +4105,7 @@ function cardAssinatura(){
     <p>${brl(a.valor)} por mês${a.dia ? ` · vence todo dia <b>${a.dia}</b>` : ''}.${a.ultimo_pagamento ? ` <span class="small">Último pagamento: ${dataBR(a.ultimo_pagamento.pago_em || a.ultimo_pagamento.venc)}.</span>` : ''}</p>
     ${a.situacao === 'cancelada' ? `<div class="msg err">Sua assinatura está cancelada. <a href="${esc(linkSuporte('Quero reativar a mensalidade do NotaOne.'))}" target="_blank" rel="noopener">Fale com o suporte</a> para reativar.</div>`
       : ab ? `<div class="msg ${ab.status === 'OVERDUE' ? 'err' : 'info'}"><b>Mensalidade de ${dataBR(ab.venc)}: ${brl(ab.valor)}</b>${ab.status === 'OVERDUE' ? ' — vencida' : ''}</div>
-        <div class="actions"><button class="btn pri" data-act="msPix" data-id="${esc(ab.id)}">Pagar com PIX</button>${ab.link ? `<a class="btn" href="${esc(ab.link)}" target="_blank" rel="noopener">Boleto ou cartão</a>` : ''}</div>`
+        <div class="actions"><button class="btn pri" data-act="msPix" data-id="${esc(ab.id)}">Pagar com PIX</button><button class="btn" data-act="msBoleto" data-id="${esc(ab.id)}">Gerar boleto</button>${ab.link ? `<a class="btn" href="${esc(ab.link)}" target="_blank" rel="noopener">Cartão de crédito</a>` : ''}</div>`
       : '<div class="msg ok">Tudo pago. Obrigado!</div>'}
     ${hist ? `<h4 style="margin:14px 0 6px">Últimas mensalidades</h4><div class="list">${hist}</div>` : ''}
     <div class="actions" style="margin-top:10px"><button class="btn" data-act="msAtualizar">Atualizar situação</button></div><div id="msMsg"></div>
@@ -4123,7 +4123,7 @@ async function msPix(pid){
     <div style="text-align:center"><img src="data:image/png;base64,${esc(r.imagem)}" alt="QR Code PIX" style="width:230px;max-width:80%;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff"></div>
     <p class="small" style="text-align:center">Abra o app do seu banco, escolha <b>Pagar com PIX</b> e aponte a câmera para o QR Code. Ou copie o código abaixo (PIX copia e cola).</p>
     <textarea id="msCopia" readonly rows="3" style="width:100%;font-size:12px">${esc(r.copia)}</textarea>
-    <div class="actions"><button class="btn pri" data-act="msCopiar">Copiar código PIX</button>${r.link ? `<a class="btn" href="${esc(r.link)}" target="_blank" rel="noopener">Boleto ou cartão</a>` : ''}</div>
+    <div class="actions"><button class="btn pri" data-act="msCopiar">Copiar código PIX</button><button class="btn" data-act="msBoleto" data-id="${esc(pid)}">Prefiro boleto</button></div>
     <div id="msPixSt" class="small" style="margin-top:8px">Aguardando o pagamento… esta tela confirma sozinha assim que o PIX cair.</div>`;
   // confere sozinho por até 10 minutos enquanto a janela estiver aberta
   const tok = S.msPixTok = Date.now();
@@ -4136,6 +4136,33 @@ async function msPix(pid){
       if (m && MS_ST[m.status] && MS_ST[m.status][1] === 'g'){ $('#msPixBox').innerHTML = '<div class="msg ok" style="font-size:17px;text-align:center"><b>Pagamento recebido!</b><br>Obrigado por usar o NotaOne.</div>'; render(); return; }
     } catch(_){}
   }
+}
+// código de barras do boleto (padrão Intercalado 2 de 5, 44 números)
+function itfSvg(cod){
+  cod = String(cod || '').replace(/\D/g, ''); if (!cod || cod.length % 2) return '';
+  const P = ['nnwwn','wnnnw','nwnnw','wwnnn','nnwnw','wnwnn','nwwnn','nnnww','wnnwn','nwnwn'], N = 1, W = 3;
+  const seq = ['n','n','n','n']; // início: barra, espaço, barra, espaço finos
+  for (let i = 0; i < cod.length; i += 2){ const a = P[+cod[i]], b = P[+cod[i + 1]]; for (let k = 0; k < 5; k++) seq.push(a[k], b[k]); }
+  seq.push('w','n','n'); // fim: barra larga, espaço fino, barra fina
+  let x = 10, r = '';
+  seq.forEach((m, i) => { const w = m === 'w' ? W : N; if (i % 2 === 0) r += `<rect x="${x}" y="0" width="${w}" height="50"/>`; x += w; });
+  return `<svg viewBox="0 0 ${x + 10} 50" preserveAspectRatio="none" style="width:100%;max-width:420px;height:56px;background:#fff" xmlns="http://www.w3.org/2000/svg" fill="#000">${r}</svg>`;
+}
+async function msBoleto(pid){
+  S.msPixTok = 0; // para a conferência do PIX, se estava aberta
+  openModal(`${mhead('Boleto da mensalidade')}<div id="msBolBox"><div class="msg info">Gerando o boleto…</div></div>`);
+  let r;
+  try { r = await api('asaas', { empresa_id:S.empId, acao:'boleto', pagamento_id:pid }); }
+  catch(e){ $('#msBolBox').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
+  const box = $('#msBolBox'); if (!box) return;
+  if (r.paga){ box.innerHTML = '<div class="msg ok">Esta mensalidade já está paga. Obrigado!</div>'; return; }
+  if (r.semBoleto){ box.innerHTML = `<div class="msg err">Não foi possível gerar o boleto agora.${r.erro ? `<div class="small" style="margin-top:4px">${esc(r.erro)}</div>` : ''}</div>${r.link ? `<div class="actions"><a class="btn pri" href="${esc(r.link)}" target="_blank" rel="noopener">Abrir a página de pagamento</a></div>` : ''}`; return; }
+  box.innerHTML = `<div class="row"><div><label>Valor</label><b style="font-size:20px">${brl(r.valor)}</b></div><div><label>Vencimento</label><b style="font-size:20px">${dataBR(r.venc)}</b></div></div>
+    <label style="margin-top:12px">Linha digitável</label>
+    <input id="msLinha" readonly value="${esc(r.linha)}" style="font-family:monospace;font-size:15px;letter-spacing:.5px">
+    <div style="text-align:center;margin:14px 0 6px">${itfSvg(r.barras)}</div>
+    <p class="small" style="text-align:center">Pague no app do banco (copie a linha digitável ou leia o código de barras), em lotérica ou agência. O pagamento por boleto leva até 3 dias úteis para ser confirmado.</p>
+    <div class="actions"><button class="btn pri" data-act="msCopiarLinha">Copiar linha digitável</button>${r.pdf ? `<a class="btn" href="${esc(r.pdf)}" target="_blank" rel="noopener">Imprimir / salvar PDF</a>` : ''}</div>`;
 }
 async function acoesMensal(a, t, id){
   switch (a){
@@ -4151,6 +4178,10 @@ async function acoesMensal(a, t, id){
       catch(e){ t.disabled = false; $('#msMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
       return true;
     case 'msPix': msPix(id); return true;
+    case 'msBoleto': msBoleto(id); return true;
+    case 'msCopiarLinha': { const c = $('#msLinha'); if (!c) return true;
+      try { await navigator.clipboard.writeText(c.value.replace(/\D/g, '')); } catch(_){ c.select(); document.execCommand('copy'); }
+      toast('Linha digitável copiada. Cole no app do banco.'); return true; }
     case 'msCopiar': { const c = $('#msCopia'); if (!c) return true;
       try { await navigator.clipboard.writeText(c.value); } catch(_){ c.select(); document.execCommand('copy'); }
       toast('Código PIX copiado. Cole no app do banco.'); return true; }

@@ -3,6 +3,7 @@
 //   acao 'assinar'  {empresa_id}                → cria o cliente e a assinatura mensal no Asaas (1ª vence 30 dias depois, depois todo mês no mesmo dia)
 //   acao 'situacao' {empresa_id}                → busca no Asaas as mensalidades e grava em empresa.assinatura
 //   acao 'pix'      {empresa_id, pagamento_id}  → QR Code e "copia e cola" do PIX de uma mensalidade
+//   acao 'boleto'   {empresa_id, pagamento_id}  → linha digitável, código de barras e PDF do boleto de uma mensalidade
 // POST do Asaas (webhook, cabeçalho asaas-access-token = ASAAS_WEBHOOK_TOKEN) → atualiza a empresa dona da assinatura.
 // Variáveis na Vercel: ASAAS_API_KEY, ASAAS_AMBIENTE ('producao' ou vazio = sandbox), ASAAS_WEBHOOK_TOKEN, ASAAS_VALOR (opcional, padrão 89,99).
 // empresa.assinatura só é gravada aqui no servidor (a tela não consegue mudar: gatilho proteger_assinatura).
@@ -93,12 +94,19 @@ const rotaTela = rota(async (req, b) => {
 
   if (acao === 'assinar') return { ok:true, assinatura:await assinar(empresa_id, e, u) };
   if (acao === 'situacao') return { ok:true, assinatura:await atualizar(empresa_id, e) };
-  if (acao === 'pix'){
+  if (acao === 'pix' || acao === 'boleto'){
     const a = e.assinatura || {}, pid = String(b.pagamento_id || '');
     if (!a.id) throw new Falha('Esta empresa ainda não tem assinatura.');
     const p = await asaas('GET', `/payments/${encodeURIComponent(pid)}`);
     if (p.subscription !== a.id) throw new Falha('Mensalidade não encontrada.', 404); // só cobranças da própria assinatura
     if (PAGO.includes(p.status)) return { ok:true, paga:true };
+    if (acao === 'boleto'){
+      let f;
+      try { f = await asaas('GET', `/payments/${encodeURIComponent(pid)}/identificationField`); }
+      catch(err){ return { ok:true, semBoleto:true, link:p.invoiceUrl || '', erro:err.message }; }
+      return { ok:true, linha:f.identificationField || '', barras:dig(f.barCode), nosso_numero:f.nossoNumero || '', pdf:p.bankSlipUrl || '',
+        valor:Number(p.value) || 0, venc:p.dueDate || '', link:p.invoiceUrl || '' };
+    }
     let q;
     try { q = await asaas('GET', `/payments/${encodeURIComponent(pid)}/pixQrCode`); }
     catch(err){ return { ok:true, semPix:true, link:p.invoiceUrl || '', erro:err.message }; }
