@@ -3346,18 +3346,31 @@ async function manifestar(chave, tipo, justificativa){
 }
 async function xmlRecebida(chave){
   const r = S.recebidas.find(x => x.chave === chave);
-  if (r && (r.manifestacao || 'nulo') === 'nulo') await manifestar(chave, 'ciencia');
+  if (r && (r.manifestacao || 'nulo') === 'nulo'){ await manifestar(chave, 'ciencia'); r.manifestacao = 'ciencia'; }
   const x = await api('recebidas', { empresa_id:S.empId, acao:'xml', chave });
-  if (!x.ok) throw new Error(x.mensagem);
+  if (!x.ok){ const er = new Error(x.mensagem); er.pendente = !!x.pendente; throw er; }
   return x.xml;
 }
+// Aceitar: dá ciência e baixa a nota completa. Logo depois da ciência a SEFAZ ainda não liberou a nota completa:
+// a janela avisa que a ciência foi registrada e tenta de novo sozinha a cada 30 s por até 10 min (enquanto estiver aberta).
 async function recAceitar(chave, btn){
   btn.disabled = true; $('#errM').innerHTML = '<div class="msg info">Avisando a SEFAZ e baixando a nota completa…</div>';
-  try {
-    const xml = await xmlRecebida(chave); closeModal();
-    S.confirmarAoLancar = chave;
-    importarXmls([{ name:`NFe${chave}.xml`, text:async () => xml }]);
-  } catch(e){ btn.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+  const tok = S.recEspera = Date.now();
+  for (let k = 0; ; k++){
+    try {
+      const xml = await xmlRecebida(chave); if (S.recEspera !== tok) return; closeModal();
+      S.confirmarAoLancar = chave;
+      importarXmls([{ name:`NFe${chave}.xml`, text:async () => xml }]); return;
+    } catch(e){
+      if (S.recEspera !== tok || !$('#errM')) return;
+      if (!e.pendente || k >= 20){ btn.disabled = false;
+        $('#errM').innerHTML = e.pendente ? `<div class="msg warn"><b>Ciência registrada na SEFAZ ✓</b><br>A SEFAZ ainda não liberou a nota completa (em algumas notas demora mais de meia hora). Pode fechar esta janela: depois é só abrir a nota de novo e tocar em <b>Aceitar e dar entrada no estoque</b>.</div>`
+          : `<div class="msg err">${esc(e.message)}</div>`; return; }
+      $('#errM').innerHTML = `<div class="msg info"><b>Ciência registrada na SEFAZ ✓</b><br>Agora a SEFAZ libera a nota completa, o que leva alguns minutos. O sistema está tentando sozinho a cada 30 segundos (tentativa ${k + 1}) — pode deixar esta janela aberta.
+        <div class="actions" style="margin-top:6px"><button class="btn sm" data-act="recTentar" data-id="${esc(chave)}">Tentar agora</button></div></div>`;
+      await new Promise(ok => { S.recAgora = ok; setTimeout(ok, 30000); });
+    }
+  }
 }
 // depois de lançar a compra vinda de uma nota recebida, confirma a operação na SEFAZ
 async function confirmarRecebidaLancada(chave){
@@ -4147,6 +4160,7 @@ async function acoesEstoque(a, t, id){
     case 'recFiltro': S.recFiltro = t.dataset.f; S.recLim = 30; render(); return true;
     case 'verRecebida': verRecebida(id); return true;
     case 'recAceitar': await recAceitar(id, t); return true;
+    case 'recTentar': if (S.recAgora) S.recAgora(); t.disabled = true; return true;
     case 'recRecusar': formRecusar(id, t.dataset.t); return true;
     case 'recManif': await recManif(id, t.dataset.t, t); return true;
     case 'recDanfe': await recDanfe(id, t); return true;

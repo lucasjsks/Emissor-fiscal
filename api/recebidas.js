@@ -115,7 +115,8 @@ const pedido = rota(async (req, b) => {
   if (acao === 'xml'){
     const r = await focus('GET', `/v2/nfes_recebidas/${chave}.xml`, undefined, { amb, texto:true });
     if (ok(r.status) && /<infNFe/.test(r.texto || '')) return { ok:true, xml:r.texto };
-    return { ok:false, mensagem:'A nota completa ainda não foi liberada pela SEFAZ. Dê ciência e tente de novo em alguns minutos.' };
+    // depois da ciência a SEFAZ leva alguns minutos (às vezes mais) para liberar a nota completa: a tela espera e tenta de novo
+    return { ok:false, pendente:true, mensagem:'A SEFAZ ainda não liberou a nota completa.' };
   }
 
   throw new Falha('Ação desconhecida.');
