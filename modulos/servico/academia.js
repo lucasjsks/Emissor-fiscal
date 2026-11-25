@@ -19,6 +19,8 @@
   const dias = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5);
   const alunos = () => S.ac_alunos || [], planosAc = () => (S.ac_planos || []).slice().sort((a, b) => num(a.meses) - num(b.meses) || num(a.valor) - num(b.valor));
   const planoAc = id => planosAc().find(p => p.id === id) || null;
+  // check-in excluído (selecionou o aluno errado) fica marcado e não conta em lugar nenhum
+  const checkins = () => (S.ac_checkins || []).filter(c => !c.excluido);
   const mensais = () => (S.ac_mensalidades || []).filter(m => !m.estornada);
   // valor da mensalidade: cada aluno tem o seu (cadastro do aluno); vem preenchido com o valor do plano escolhido
   const MAX_PLANOS = 4; // pedido do Lucas: a academia cria até 4 planos (descrição + valor), em Empresa → Mensalidade da academia
@@ -88,7 +90,7 @@
   function verAluno(id){
     const a = alunos().find(x => x.id === id); if (!a) return;
     const p = planoAc(a.plano_id), M = mensais().filter(m => m.aluno_id === id).sort((x, y) => String(y.pago_em).localeCompare(String(x.pago_em)));
-    const C = (S.ac_checkins || []).filter(c => c.aluno_id === id).sort((x, y) => String(y.em).localeCompare(String(x.em)));
+    const C = checkins().filter(c => c.aluno_id === id).sort((x, y) => String(y.em).localeCompare(String(x.em)));
     const s = situacao(a), tel = fone(a.telefone), msg = encodeURIComponent(msgAviso(a));
     openModal(`${mhead(esc(a.nome))}
       <p>${tagSit(a)} · mensalidade <b>${brl(mensalEquivA(a))}</b>${p ? ` · plano <b>${esc(p.nome)}</b>${num(p.meses) > 1 ? ` (${brl(valorCobrar(a, p))} a cada ${p.meses} meses)` : ''}` : ''} · pago até <b>${a.valido_ate ? dataBR(a.valido_ate) : '—'}</b></p>
@@ -155,11 +157,11 @@
   function vCheckin(){
     const q = (S.acCk || '').trim().toLowerCase(), hoje = hojeISO();
     const res = q ? alunos().filter(a => !a.inativo && ((a.nome || '').toLowerCase().includes(q) || (dig(q) && dig(a.cpf).startsWith(dig(q))))).slice(0, 8) : [];
-    const hj = (S.ac_checkins || []).filter(c => (c.em || '').slice(0, 10) === hoje).sort((a, b) => b.em.localeCompare(a.em));
+    const hj = checkins().filter(c => (c.em || '').slice(0, 10) === hoje).sort((a, b) => b.em.localeCompare(a.em));
     const u = S.acUltimo, ua = u && alunos().find(a => a.id === u.aluno_id);
     return `<h2>Check-in</h2>
-    ${ua ? (() => { const s = situacao(ua); const ok = s.k !== 'atrasado'; return `<div class="card" style="border:2px solid ${ok ? 'var(--ok)' : 'var(--bad)'};background:${ok ? '#effaf3' : '#fff1f1'}">
-      <div style="font-size:13px;color:#5b6478">${u.em.slice(11, 16)} · entrada registrada</div>
+    ${ua && !u.excluido ? (() => { const s = situacao(ua); const ok = s.k !== 'atrasado'; return `<div class="card" style="border:2px solid ${ok ? 'var(--ok)' : 'var(--bad)'};background:${ok ? '#effaf3' : '#fff1f1'}">
+      <div style="font-size:13px;color:#5b6478;display:flex;align-items:center;gap:8px">${u.em.slice(11, 16)} · entrada registrada <button class="btn sm" data-act="acDelCheck" data-id="${esc(u.id)}" style="margin-left:auto">Aluno errado? Excluir</button></div>
       <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700">${ok ? '✓' : '!'} ${esc(ua.nome)}</div>
       <div style="font-size:16px">${ok ? `Liberado · pago até <b>${dataBR(ua.valido_ate)}</b>${s.k === 'vencendo' ? ' · <b>' + s.txt + '</b>' : ''}` : `<b>${s.dias ? `Mensalidade atrasada há ${s.dias} dia${s.dias === 1 ? '' : 's'}` : 'Sem mensalidade paga'}</b> — peça para passar na recepção`}</div>
       ${!ok && pode('caixa') ? `<div class="actions" style="justify-content:flex-start"><button class="btn pri" data-act="acReceber" data-id="${esc(ua.id)}">Receber agora</button></div>` : ''}</div>`; })() : ''}
@@ -167,7 +169,22 @@
       <input id="acCkBusca" placeholder="Digite e toque no aluno…" value="${esc(S.acCk || '')}" autocomplete="off" style="font-size:18px">
       <div class="results">${res.map(a => `<div class="res" data-act="acCheck" data-id="${esc(a.id)}"><span>${esc(a.nome)} <span class="small">${a.cpf ? fmtDoc(a.cpf) : ''}</span></span>${tagSit(a)}</div>`).join('') || (q ? '<div class="small" style="padding:8px">Nenhum aluno ativo encontrado.</div>' : '')}</div></div>
     <div class="card"><h3 style="margin-top:0">Hoje: ${hj.length} entrada${hj.length === 1 ? '' : 's'}</h3>
-      ${hj.length ? hj.slice(0, 40).map(c => `<div class="total"><span>${c.em.slice(11, 16)} · ${esc(c.nome)}</span><span>${c.atrasado ? '<span class="tag b">atrasado</span>' : '<span class="tag g">ok</span>'}</span></div>`).join('') : '<p class="small">Ninguém treinou ainda hoje.</p>'}</div>`;
+      ${hj.length ? hj.slice(0, 40).map(c => `<div class="total"><span>${c.em.slice(11, 16)} · ${esc(c.nome)}</span><span>${c.atrasado ? '<span class="tag b">atrasado</span>' : '<span class="tag g">ok</span>'} <button class="btn sm" data-act="acDelCheck" data-id="${esc(c.id)}" title="Excluir este check-in">excluir</button></span></div>`).join('') : '<p class="small">Ninguém treinou ainda hoje.</p>'}</div>`;
+  }
+  // excluir check-in feito no aluno errado (qualquer usuário da recepção; fica marcado como excluído)
+  async function excluirCheckin(id){
+    const c = (S.ac_checkins || []).find(x => x.id === id); if (!c || c.excluido) return;
+    if (!confirm(`Excluir o check-in de ${c.nome} às ${c.em.slice(11, 16)}?`)) return;
+    const a = alunos().find(x => x.id === c.aluno_id);
+    const ok = await safe(async () => {
+      await put('ac_checkins', { ...c, excluido:true, excluido_em:isoNow(), excluido_por:S.meuId || null });
+      if (a && a.ultimo_checkin === c.em){ // volta o "último treino" para o check-in anterior
+        const ant = checkins().filter(x => x.aluno_id === a.id && x.id !== c.id).sort((x, y) => String(y.em).localeCompare(String(x.em)))[0];
+        await put('ac_alunos', { ...a, ultimo_checkin:ant ? ant.em : null });
+      }
+    }, 'Check-in excluído.');
+    if (ok && S.acUltimo && S.acUltimo.id === id) S.acUltimo = null;
+    if (ok) render();
   }
   async function checkin(id){
     const a = alunos().find(x => x.id === id); if (!a) return;
@@ -225,7 +242,7 @@
   /* ---------------- quadro no Início ---------------- */
   function inicioHtml(){
     const L = alunos(), at = L.filter(a => situacao(a).k === 'atrasado'), ve = L.filter(a => situacao(a).k === 'vencendo'), ativos = L.filter(a => !a.inativo).length;
-    const hoje = hojeISO(), ck = (S.ac_checkins || []).filter(c => (c.em || '').slice(0, 10) === hoje).length;
+    const hoje = hojeISO(), ck = checkins().filter(c => (c.em || '').slice(0, 10) === hoje).length;
     const mes = r2(mensais().filter(m => (m.pago_em || '').slice(0, 7) === hoje.slice(0, 7)).reduce((s, m) => s + num(m.valor), 0));
     // pedido do Lucas: aniversariantes do dia e mensalidades que vencem hoje
     const venceHoje = L.filter(a => !a.inativo && a.valido_ate === hoje), valHoje = r2(venceHoje.reduce((s, a) => s + valorCobrar(a, planoAc(a.plano_id)), 0));
@@ -277,7 +294,7 @@
             linhas:ven.map(a => [a.nome, a.telefone || '', (planoAc(a.plano_id) || {}).nome || '', a.valido_ate, valorCobrar(a, planoAc(a.plano_id))]) }] };
     }
     if (aba === 'alunos'){
-      const ativos = L.filter(a => !a.inativo), novos = L.filter(a => noPer(a.inicio, ini, fim)), C = (S.ac_checkins || []).filter(c => noPer(c.em, ini, fim));
+      const ativos = L.filter(a => !a.inativo), novos = L.filter(a => noPer(a.inicio, ini, fim)), C = checkins().filter(c => noPer(c.em, ini, fim));
       const freq = {}, dsem = [0, 0, 0, 0, 0, 0, 0], hora = {};
       C.forEach(c => { freq[c.aluno_id] = (freq[c.aluno_id] || 0) + 1; dsem[new Date(c.em.slice(0, 10) + 'T12:00:00').getDay()]++; const h = c.em.slice(11, 13); hora[h] = (hora[h] || 0) + 1; });
       const sumidos = ativos.filter(a => situacao(a).k !== 'atrasado' && (!a.ultimo_checkin || dias(a.ultimo_checkin.slice(0, 10), hoje) >= 15)).sort((a, b) => String(a.ultimo_checkin || '').localeCompare(String(b.ultimo_checkin || '')));
@@ -360,6 +377,7 @@
       case 'acSalvarReceb': await salvarReceb(); return true;
       case 'acEstornar': await estornar(id); return true;
       case 'acCheck': await checkin(id); return true;
+      case 'acDelCheck': await excluirCheckin(id); return true;
       case 'acNovoPlano': formPlano(); return true;
       case 'acEditPlano': formPlano({ ...planoAc(id) }); return true;
       case 'acSalvarPlano': await salvarPlano(id); return true;
@@ -384,7 +402,7 @@
       ac_mensal:'<path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/>'
     },
     // permissões: funcionário cadastra aluno, faz check-in e recebe; planos, exclusões e desfazer pagamento só gerente/dono
-    perm:{ acNovoAluno:'cliente', acEditAluno:'cliente', acSalvarAluno:'cliente', acReceber:'caixa', acSalvarReceb:'caixa', acCheck:'caixa',
+    perm:{ acNovoAluno:'cliente', acEditAluno:'cliente', acSalvarAluno:'cliente', acReceber:'caixa', acSalvarReceb:'caixa', acCheck:'caixa', acDelCheck:'caixa',
       acRelAba:'relatorio', acDelAluno:'empresa', acEstornar:'empresa', acNovoPlano:'empresa', acEditPlano:'empresa', acSalvarPlano:'empresa', acDelPlano:'empresa' },
     acoes, inicioHtml, empresaHtml, titulosFin, caixaExtras, relModelo,
     _teste:{ maisMeses, situacao } // usado pelos testes automáticos
