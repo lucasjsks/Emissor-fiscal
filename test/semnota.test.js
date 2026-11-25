@@ -127,3 +127,26 @@ test('senha do gerente: só o dono cria; confere; funcionária entra como gerent
   assert.match((await chamar(perfil, 't3', { empresa_id:'E1', acao:'gerente', senha:'errada' })).body.erro, /bloqueado/);
   assert.equal((await chamar(perfil, 't3', { empresa_id:'E1', acao:'gerente', senha:'4321' })).code, 429, 'bloqueado mesmo com a senha certa');
 });
+
+// ---------- planos (escolhidos no cadastro; só o servidor grava plano e limite de caixas) ----------
+test('plano: dono escolhe; vale só para o tipo da empresa; limite de caixas acompanha; não reduz abaixo dos caixas cadastrados', async () => {
+  const { default: plano } = await import('../api/plano.js');
+  let r = await chamar(plano, 't3', { empresa_id:'E1', plano:'cpf' });
+  assert.equal(r.code, 403, 'funcionário não escolhe plano');
+  r = await chamar(plano, 't1', { empresa_id:'E1', plano:'1caixa' });
+  assert.equal(r.code, 400); assert.match(r.body.erro, /Pessoa Física/);
+  r = await chamar(plano, 't1', { empresa_id:'E1', plano:'cpf' });
+  assert.equal(r.code, 200); assert.equal(docs['empresas/E1'].plano.valor, 49.99); assert.equal(docs['empresas/E1'].limite_caixas, 1);
+  r = await chamar(plano, 't1', { empresa_id:'E2', plano:'cpf' });
+  assert.equal(r.code, 400);
+  r = await chamar(plano, 't1', { empresa_id:'E2', plano:'2caixas' });
+  assert.equal(docs['empresas/E2'].plano.id, '2caixas'); assert.equal(docs['empresas/E2'].plano.valor, 129.99); assert.equal(docs['empresas/E2'].limite_caixas, 2);
+  docs['empresas/E2'].pdvs = [{ id:'a' }, { id:'b' }];
+  r = await chamar(plano, 't1', { empresa_id:'E2', plano:'1caixa' });
+  assert.equal(r.code, 400); assert.match(r.body.erro, /Exclua o caixa/); assert.equal(docs['empresas/E2'].plano.id, '2caixas');
+  r = await chamar(plano, 't1', { empresa_id:'E2', plano:'xx' });
+  assert.equal(r.code, 400);
+  const { planoDaEmpresa } = await import('../api/_planos.js');
+  assert.equal(planoDaEmpresa({ doc_tipo:'cpf', plano:{ id:'2caixas' } }), null, 'plano de CNPJ não vale para loja CPF');
+  assert.equal(planoDaEmpresa({ plano:{ id:'1caixa' } }).valor, 89.99);
+});

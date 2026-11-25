@@ -35,6 +35,7 @@ header{background:#0A1630;color:#fff}
 .card .sub{color:#4A5875;margin:0 0 16px;font-size:15px}
 label{display:block;font-weight:600;font-size:13px;margin:12px 0 5px}
 .tipo{display:flex;gap:6px;margin-top:4px}.tipo button{flex:1;padding:10px 8px;border:1.5px solid #d5dbe6;border-radius:10px;background:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:#0A1630}.tipo button.on{background:#0A1630;color:#fff;border-color:#0A1630}.tipo small{display:block;font-weight:400;font-size:11px;opacity:.8}
+.planos{display:flex;gap:6px;margin-top:4px}.planos button{flex:1;padding:10px 8px;border:1.5px solid #d5dbe6;border-radius:10px;background:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:#0A1630;text-align:center}.planos button.on{background:#0A1630;color:#fff;border-color:#0A1630}.planos b{display:block;font-size:17px;margin-top:2px}.planos small{display:block;font-weight:400;font-size:11px;opacity:.8}
 input{width:100%;font:inherit;font-size:15px;padding:11px 13px;border:1px solid #CDD5E2;border-radius:11px;background:#fff;color:#0A1630}
 input:focus{outline:2px solid #0E7A5A;outline-offset:1px;border-color:#0E7A5A}
 .duo{display:flex;gap:12px;flex-wrap:wrap}.duo>div{flex:1 1 180px;min-width:0}
@@ -63,7 +64,7 @@ input:focus{outline:2px solid #0E7A5A;outline-offset:1px;border-color:#0E7A5A}
 <ul>
 <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>A conta começa em <b>modo de teste</b>: emita notas de teste, sem valor fiscal, e conheça tudo com calma.</span></li>
 <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>Os dados da empresa vêm da Receita pelo CNPJ: você só confere.</span></li>
-<li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>Para emitir de verdade, você envia o certificado digital A1 e a gente ativa o plano de <b>R$ 89,99/mês</b>.</span></li>
+<li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>Para emitir de verdade, você envia o certificado digital A1 e escolhe o plano: <b>R$ 89,99</b> (1 caixa), <b>R$ 129,99</b> (2 caixas) ou <b>R$ 49,99</b> (sem CNPJ). A primeira mensalidade só vence 30 dias depois.</span></li>
 <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>Dúvidas? Fale no WhatsApp <a href="https://wa.me/5586981931921" target="_blank" rel="noopener">(86) 98193-1921</a>.</span></li>
 </ul>
 </section>
@@ -74,6 +75,8 @@ input:focus{outline:2px solid #0E7A5A;outline-offset:1px;border-color:#0E7A5A}
 <p class="sub">Todos os campos são obrigatórios.</p>
 <label>Sua loja tem CNPJ?</label>
 <div class="tipo" id="tipo"><button type="button" data-t="cnpj" class="on">Tenho CNPJ<small>emite nota fiscal</small></button><button type="button" data-t="cpf">Ainda não (CPF)<small>vende sem nota: estoque, caixa e financeiro</small></button></div>
+<label>Plano</label>
+<div class="planos" id="planos"></div>
 <label for="nome">Seu nome</label><input id="nome" autocomplete="name" required>
 <div class="duo">
 <div><label for="fone">WhatsApp</label><input id="fone" inputmode="tel" autocomplete="tel" placeholder="(86) 99999-9999" required></div>
@@ -107,12 +110,23 @@ function cpfOk(c){
   return dv(9) === +c[9] && dv(10) === +c[10];
 }
 const fmtCpf = d => d.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2}).*/, '$1.$2.$3-$4');
-let TIPO = 'cnpj';
+let TIPO = 'cnpj', PLANO = '1caixa';
+// planos (os mesmos de api/_planos.js; o valor só é cobrado 30 dias depois)
+const PLANOS = { cnpj:[['1caixa','1 Caixa','R$ 89,99','emite NF-e e cupom'],['2caixas','2 Caixas','R$ 129,99','emite NF-e e cupom']], cpf:[['cpf','Pessoa Física','R$ 49,99','vendas sem nota']] };
+function desenharPlanos(){
+  if (!PLANOS[TIPO].some(p => p[0] === PLANO)) PLANO = PLANOS[TIPO][0][0];
+  $('#planos').innerHTML = PLANOS[TIPO].map(([id, n, v, d]) => `<button type="button" data-p="${id}" class="${id === PLANO ? 'on' : ''}">${n}<b>${v}<small style="display:inline">/mês</small></b><small>${d}</small></button>`).join('');
+}
+$('#planos').addEventListener('click', ev => { const b = ev.target.closest('button[data-p]'); if (!b) return; PLANO = b.dataset.p; desenharPlanos(); });
+const pedido = new URLSearchParams(location.search).get('plano'); // vindo do site: /cadastro?plano=2caixas
+if (pedido === 'cpf'){ TIPO = 'cpf'; } if (pedido) PLANO = pedido;
 document.querySelectorAll('#tipo button').forEach(b => b.addEventListener('click', () => {
   TIPO = b.dataset.t; document.querySelectorAll('#tipo button').forEach(x => x.classList.toggle('on', x === b));
   $('#lbDoc').textContent = TIPO === 'cpf' ? 'Seu CPF' : 'CNPJ da empresa'; $('#cnpj').placeholder = TIPO === 'cpf' ? '000.000.000-00' : '00.000.000/0000-00';
   $('#lbEmp').textContent = TIPO === 'cpf' ? 'Nome da loja' : 'Nome da empresa'; $('#cnpj').value = '';
+  desenharPlanos();
 }));
+if (TIPO === 'cpf') document.querySelector('#tipo button[data-t="cpf"]').click(); else desenharPlanos();
 const fmtCnpj = d => d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2}).*/, '$1.$2.$3/$4-$5');
 const fmtFone = d => d.length > 10 ? d.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3') : d.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
 $('#cnpj').addEventListener('blur', e => { const d = dig(e.target.value); if (d.length === 14) e.target.value = fmtCnpj(d); else if (d.length === 11) e.target.value = fmtCpf(d); });
@@ -143,7 +157,7 @@ $('#form').addEventListener('submit', async ev => {
   try {
     const sb = await supa();
     const { data, error } = await sb.auth.signUp({ email, password:senha, options:{ emailRedirectTo:SISTEMA,
-      data:TIPO === 'cpf' ? { nome, telefone:fone, empresa, cpf:cnpj, tipo:'cpf', origem:'site' } : { nome, telefone:fone, empresa, cnpj, origem:'site' } } });
+      data:TIPO === 'cpf' ? { nome, telefone:fone, empresa, cpf:cnpj, tipo:'cpf', plano:'cpf', origem:'site' } : { nome, telefone:fone, empresa, cnpj, plano:PLANO, origem:'site' } } });
     const jaExiste = (error && /already|registered|exists/i.test(error.message)) || (data && data.user && Array.isArray(data.user.identities) && !data.user.identities.length);
     if (jaExiste) throw new Error('Já existe uma conta com este e-mail. <a href="https://app.notaoneapp.com.br">Acesse o sistema</a> com a sua senha ou use "Esqueci a senha".');
     if (error) throw new Error(/password/i.test(error.message) ? 'Senha fraca: use pelo menos 8 caracteres, misturando letras e números.' : /email/i.test(error.message) ? 'E-mail inválido. Confira o endereço.' : esc(error.message));

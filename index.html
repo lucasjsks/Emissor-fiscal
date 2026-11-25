@@ -409,6 +409,12 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
 .rel-tab{overflow-x:auto}.rel-tab table{width:100%;border-collapse:collapse;font-size:13px}.rel-tab th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#6b778c;text-align:left;padding:6px 8px;border-bottom:1px solid #e3e8f0;white-space:nowrap}
 .rel-tab td{padding:7px 8px;border-bottom:1px solid #f0f2f6}.rel-tab .r{text-align:right;white-space:nowrap}.rel-tab tr.tot td{font-weight:700;border-top:1px solid #cfd6e2;background:#f8f9fb}.rel-tab td.neg{color:#b42318}
 .rel-kpis{flex-wrap:wrap}.rel-kpis div{min-width:130px}.rel-abas{flex-wrap:wrap}
+/* planos (cadastro da empresa e quadro Plano) */
+.planos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:6px 0}
+.plano{display:flex;flex-direction:column;gap:3px;text-align:left;padding:12px;border:1.5px solid #d5dbe6;border-radius:14px;background:#fff;font:inherit;color:#0A1630;cursor:pointer}
+.plano b{font-size:15px}.plano .pv{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}.plano .pv small{font-size:12px;font-weight:400;color:#5b6478}
+.plano.on{border-color:#0A1630;box-shadow:0 0 0 2px #C6F432 inset;background:#f7fbe8}
+.plano:disabled{opacity:.6}
 </style>
 </head>
 <body>
@@ -1316,6 +1322,7 @@ function vEmpresa(){
     <p>CPF ${fmtDoc(e.cpf)}${e.telefone ? ' · ' + esc(e.telefone) : ''}<br>${esc(e.logradouro)}, ${esc(e.numero)} — ${esc(e.bairro)}<br>${esc(e.municipio)}/${esc(e.uf)}${e.cep ? ' · CEP ' + esc(e.cep) : ''}</p>
     <p><span class="tag w">Sem nota fiscal</span> <span class="small">Próxima venda nº <b>${esc(e.prox_venda || 1)}</b></span></p>
     ${pode('empresa') ? '<p class="small">Abriu o CNPJ? Toque em <b>Editar</b> e escolha <b>CNPJ</b>: a loja passa a emitir nota fiscal, sem perder nada.</p>' : ''}</div>
+  ${cardPlano()}
   ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
@@ -1336,6 +1343,7 @@ function vEmpresa(){
     <p class="small">CPF obrigatório na NFC-e a partir de <b>${brl(e.limite_cpf_nfce || 10000)}</b>.</p></div>
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
+  ${cardPlano()}
   ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
@@ -1363,7 +1371,10 @@ function formEmpresa(e, tipo){
   e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1',
     cnpj:dig(meta.cnpj), cpf:dig(meta.cpf), razao:meta.tipo === 'cpf' ? (meta.nome || '') : '', fantasia:meta.empresa || '', telefone:meta.telefone || '' };
   tipo = tipo || (e.id ? (e.doc_tipo === 'cpf' ? 'cpf' : 'cnpj') : meta.tipo === 'cpf' ? 'cpf' : 'cnpj');
-  S.empForm = { e, tipo };
+  const ant = (S.empForm || {}).plano, escolheAgora = !e.id || docEmp(e) !== tipo; // cadastro novo ou troca CPF ↔ CNPJ
+  const plOk = id => planosDoc(tipo).some(p => p.id === id) ? id : null;
+  S.empForm = { e, tipo, plano:escolheAgora ? (plOk(ant) || plOk(meta.plano) || planosDoc(tipo)[0].id) : null };
+  const blocoPlano = escolheAgora ? `<h3>Plano</h3>${planosHtml(tipo, S.empForm.plano, 'empPlano')}<p class="small">A primeira mensalidade só vence 30 dias depois. Dá para mudar de plano quando quiser, em Empresa → Plano.</p>` : '';
   const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   if (tipo === 'cpf'){
     openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
@@ -1373,6 +1384,7 @@ function formEmpresa(e, tipo){
     <div class="row">${fld('eLog','Endereço (rua) *',e.logradouro)}${fld('eNum','Número *',e.numero)}</div>
     <div class="row">${fld('eBai','Bairro *',e.bairro)}${fld('eCep','CEP (preenche o endereço)',e.cep,'inputmode="numeric" autocomplete="off"')}</div>
     <div class="row">${fld('eMun','Município *',e.municipio)}${sel('eUf','UF',e.uf,UFS.map(u => [u,u]))}</div>
+    ${blocoPlano}
     <div id="errM"></div>
     <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar dados da empresa</button></div>`);
     return;
@@ -1392,6 +1404,7 @@ function formEmpresa(e, tipo){
   <div class="row">${fld('eCsc','ID do CSC (só o número do ID)',e.csc_id,'inputmode="numeric"')}</div>
   ${fld('eLim','Exigir CPF na NFC-e a partir de (R$)', String(e.limite_cpf_nfce || 10000).replace('.', ','), 'data-rs inputmode="decimal"')}
   <p class="small">Confira o valor-limite de identificação do consumidor com a SEFAZ-PI.</p>
+  ${blocoPlano}
   <div id="errM"></div>
   <div class="actions">${e.id && !S.notas.length ? `<button class="btn bad" data-act="delEmp" data-id="${esc(e.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarEmp" data-id="${esc(e.id || '')}">Salvar dados da empresa</button></div>
   ${e.id ? `<div style="margin-top:18px">${cardAmbiente()}${cardCertificado()}</div>` : ''}`);
@@ -1415,8 +1428,8 @@ async function salvarEmp(id){
   if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
   if (!o.id) delete o.id;
   o.doc_tipo = 'cnpj'; // empresa com CNPJ emite nota fiscal (quem era CPF e abriu o CNPJ passa a emitir)
-  const novo = !o.id; let salvo;
-  if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
+  const novo = !o.id, plano = (S.empForm || {}).plano; let salvo;
+  if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); posSalvarPlano(salvo.id, plano); }
 }
 async function salvarEmpCpf(id){
   const o = { id:id || undefined, doc_tipo:'cpf', razao:val('eRazao').toUpperCase(), fantasia:val('eFant'), cpf:dig(val('eCpf')), cnpj:'', telefone:val('eFone'),
@@ -1434,8 +1447,14 @@ async function salvarEmpCpf(id){
   if (o.cep && o.cep.length !== 8) errs.push('CEP deve ter 8 dígitos.');
   if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
   if (!o.id) delete o.id;
-  const novo = !o.id; let salvo;
-  if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
+  const novo = !o.id, plano = (S.empForm || {}).plano; let salvo;
+  if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); posSalvarPlano(salvo.id, plano); }
+}
+// grava o plano escolhido no cadastro (só o servidor grava plano e limite de caixas)
+async function posSalvarPlano(id, plano){
+  if (!plano || S.mode !== 'db' || !id) return;
+  try { await aplicarPlano(id, plano); }
+  catch(err){ toast('A empresa foi salva, mas o plano não: escolha de novo em Empresa → Plano. (' + err.message + ')'); }
 }
 
 // alerta de estoque = estoque mínimo (estoque_min): chegou nessa quantidade, entra em "Mercadorias para comprar"
@@ -1875,7 +1894,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { sgSalvar:'empresa', sgForm:'empresa', sgTrocar:'empresa', empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', salvarCiencia:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { sgSalvar:'empresa', sgForm:'empresa', sgTrocar:'empresa', empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', salvarCiencia:'empresa', trocarPlano:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'cadProduto', editProd:'cadProduto', salvarProd:'cadProduto', delProd:'produto', confDelProd:'produto', verEstoque:'produto', abrirFuncionarios:'empresa', fnNovo:'empresa', fnCriar:'empresa', fnSenha:'empresa', fnSalvarSenha:'empresa', fnRemover:'empresa', fnConfRemover:'empresa',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -2192,6 +2211,32 @@ function perguntarPdvSePreciso(){
   formEscolherPdv();
 }
 
+/* ---------- planos do NotaOne (lista oficial vem de /api/config; esta é a reserva) ---------- */
+const PLANOS_PADRAO = [
+  { id:'cpf', nome:'Pessoa Física', valor:49.99, caixas:1, doc:'cpf', resumo:'Sem CNPJ: vendas com comprovante, estoque, financeiro e relatórios' },
+  { id:'1caixa', nome:'1 Caixa', valor:89.99, caixas:1, doc:'cnpj', resumo:'NF-e e NFC-e, 1 caixa (PDV), estoque, compras e financeiro' },
+  { id:'2caixas', nome:'2 Caixas', valor:129.99, caixas:2, doc:'cnpj', resumo:'NF-e e NFC-e, 2 caixas (PDV), estoque, compras e financeiro' }];
+const planos = () => S.planos || PLANOS_PADRAO;
+const planosDoc = doc => planos().filter(p => p.doc === doc);
+const docEmp = e => (e && e.doc_tipo === 'cpf') ? 'cpf' : 'cnpj';
+const planoAtual = (e = emp()) => { const p = planos().find(x => x.id === ((e || {}).plano || {}).id); return p && p.doc === docEmp(e) ? p : null; };
+// escolha do plano (cadastro da empresa e quadro Plano): cartões clicáveis
+const planosHtml = (doc, marcado, act) => `<div class="planos">${planosDoc(doc).map(p => `<button type="button" class="plano${p.id === marcado ? ' on' : ''}" data-act="${act}" data-p="${p.id}">
+  <b>${esc(p.nome)}</b><span class="pv">${brl(p.valor)}<small>/mês</small></span><span class="small">${esc(p.resumo)}</span></button>`).join('')}</div>`;
+async function aplicarPlano(empresa_id, plano){
+  const r = await api('plano', { empresa_id, plano });
+  if (r.aviso) setTimeout(() => toast(r.aviso), 3000);
+  return r;
+}
+function cardPlano(){
+  const e = emp(); if (!e || !pode('empresa')) return '';
+  const p = planoAtual(e), dono = S.papelEmp === 'dono', doc = docEmp(e), op = planosDoc(doc);
+  return `<div class="card" id="cardPlano"><h3 style="margin-top:0">Plano ${p ? `<span class="tag g">${esc(p.nome)} · ${brl(p.valor)}/mês</span>` : '<span class="tag w">não escolhido</span>'}</h3>
+    ${!p ? `<p class="small">${e.plano && e.plano.id ? 'O plano anterior não vale para o tipo de cadastro atual da empresa. ' : ''}Escolha o plano da empresa${op.length > 1 ? '' : ' para continuar'}:</p>` : op.length > 1 ? '<p class="small">Precisa de mais caixas ou quer reduzir? Toque no outro plano para mudar. O valor da mensalidade acompanha o plano.</p>' : ''}
+    ${dono ? planosHtml(doc, p && p.id, 'trocarPlano') : '<p class="small">Só o dono da empresa muda o plano.</p>'}
+    <div id="planoMsg"></div></div>`;
+}
+
 /* ---------- configuração dos caixas (aba Empresa) ---------- */
 function cardCaixas(){
   const L = pdvsEmp(), lim = limiteCaixas(), cheio = L.length >= lim;
@@ -2202,7 +2247,8 @@ function cardCaixas(){
       <button class="btn sm" data-act="renPdv" data-id="${esc(p.id)}">Renomear</button><button class="btn sm bad" data-act="delPdv" data-id="${esc(p.id)}">Excluir</button></div>`).join('')}</div>`
       : '<p class="small"><b>Nenhum caixa cadastrado:</b> todos os computadores usam um caixa só.</p>'}
     <p class="small">Seu plano inclui <b>${lim} caixa(s)</b>${L.length ? ` · ${L.length} em uso` : ''}.</p>
-    ${cheio ? `<div class="msg info">Precisa de mais caixas? <a href="${esc(linkSuporte(`Quero mais caixas para a empresa (hoje tenho ${L.length}).`))}" target="_blank" rel="noopener"><b>Fale com o suporte</b></a> e liberamos para você.</div>`
+    ${cheio ? (planosDoc(docEmp(emp())).some(p => p.caixas > lim) ? '<div class="msg info">Precisa de mais caixas? Mude de plano no quadro <b>Plano</b>, aqui na aba Empresa.</div>'
+      : `<div class="msg info">Precisa de mais caixas? <a href="${esc(linkSuporte(`Quero mais caixas para a empresa (hoje tenho ${L.length}).`))}" target="_blank" rel="noopener"><b>Fale com o suporte</b></a> e liberamos para você.</div>`)
       : `<div class="actions"><button class="btn pri" data-act="novoPdv">+ Novo caixa</button></div>`}</div>`;
 }
 function formPdv(id){
@@ -2905,7 +2951,7 @@ async function iniciarProducao(){
   try {
     const r = await fetch('/api/config'), cfg = await r.json();
     if (!r.ok || !cfg.supabaseUrl) throw new Error(cfg.erro || 'configuração ausente');
-    S.ambiente = cfg.ambiente; S.mensal = cfg.mensalidade || null;
+    S.ambiente = cfg.ambiente; S.mensal = cfg.mensalidade || null; if (Array.isArray(cfg.planos) && cfg.planos.length) S.planos = cfg.planos;
     const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
     SB = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   } catch(e){ S.falha = 'Não foi possível iniciar o sistema: ' + e.message; S.carregando = false; render(); return; }
@@ -4487,6 +4533,17 @@ async function acoesLoja(a, t, id){
       try { await api('perfil', { empresa_id:S.empId, acao:'definir', senha:n, atual:$('#sgAtual').value }); closeModal(); toast('Senha do gerente trocada.'); }
       catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
       return true; }
+    case 'empPlano': { // escolha do plano no cadastro da empresa (sem redesenhar, para não perder o que foi digitado)
+      if (S.empForm) S.empForm.plano = t.dataset.p;
+      t.parentNode.querySelectorAll('.plano').forEach(b => b.classList.toggle('on', b === t)); return true; }
+    case 'trocarPlano': {
+      const e = emp(), p = planos().find(x => x.id === t.dataset.p), atual = planoAtual(e);
+      if (!e || !p || (atual && atual.id === p.id)) return true;
+      if (atual && !confirm(`Mudar do plano ${atual.nome} (${brl(atual.valor)}/mês) para o plano ${p.nome} (${brl(p.valor)}/mês)?`)) return true;
+      t.disabled = true;
+      try { await aplicarPlano(e.id, p.id); toast(`Plano ${p.nome} ativado.`); }
+      catch(err){ t.disabled = false; const m = $('#planoMsg'); if (m) m.innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+      return true; }
     case 'empTipo': { // troca CPF ↔ CNPJ no cadastro da empresa, mantendo o que já foi digitado
       const f = S.empForm || {}, e = { ...(f.e || {}) };
       [['eRazao','razao'],['eFant','fantasia'],['eFone','telefone'],['eLog','logradouro'],['eNum','numero'],['eBai','bairro'],['eCep','cep'],['eMun','municipio'],['eUf','uf']].forEach(([i, k]) => { if ($('#' + i)) e[k] = val(i); });
@@ -4551,7 +4608,7 @@ function cardAssinatura(){
   if (!S.mensal || !pode('empresa')) return '';
   const a = msAss(), teste = S.mensal.teste ? ' <span class="tag w">modo de teste</span>' : '';
   if (!a) return `<div class="card" id="cardMensal"><h3 style="margin-top:0">Mensalidade do NotaOne${teste}</h3>
-    <p>Plano NotaOne: <b>${brl(S.mensal.valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
+    <p>${planoAtual() ? 'Plano ' + esc(planoAtual().nome) : 'Plano NotaOne'}: <b>${brl((planoAtual() || S.mensal).valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
     <p class="small">A primeira mensalidade vence <b>30 dias depois</b> de assinar; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
     <div class="actions"><button class="btn pri" data-act="msAssinar">Assinar agora</button></div><div id="msMsg"></div></div>`;
   setTimeout(msAtualizarSePreciso, 0);

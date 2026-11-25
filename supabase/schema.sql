@@ -205,16 +205,16 @@ drop trigger if exists limite_caixas on public.docs;
 create trigger limite_caixas before insert or update on public.docs
   for each row execute function public.limite_caixas();
 
--- MENSALIDADE (Asaas): empresas/<id>.assinatura só é gravada pelo servidor (api/asaas.js, service_role).
+-- MENSALIDADE (Asaas): empresas/<id>.assinatura e .plano só são gravados pelo servidor (api/asaas.js, api/plano.js, service_role).
 -- A tela não consegue criar nem mudar (nem "marcar como paga"): o valor antigo é mantido.
 create or replace function public.proteger_assinatura() returns trigger
 language plpgsql as $$
 begin
   if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
   if tg_op = 'UPDATE' then
-    new.data := (new.data - 'assinatura') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura'));
+    new.data := (new.data - 'assinatura' - 'plano') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano'));
   else
-    new.data := new.data - 'assinatura';
+    new.data := new.data - 'assinatura' - 'plano';
   end if;
   return new;
 end $$;
