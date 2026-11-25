@@ -1349,6 +1349,7 @@ function vEmpresa(){
     <p><span class="tag w">Sem nota fiscal</span> <span class="small">Próxima venda nº <b>${esc(e.prox_venda || 1)}</b></span></p>
     ${pode('empresa') ? '<p class="small">Abriu o CNPJ? Toque em <b>Editar</b> e escolha <b>CNPJ</b>: a loja passa a emitir nota fiscal, sem perder nada.</p>' : ''}</div>
   ${cardPlano()}
+  ${gancho('empresaHtml', '')}
   ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
@@ -1370,6 +1371,7 @@ function vEmpresa(){
   ${dUf.length ? `<div class="card"><h3 style="margin-top:0">DIFAL por UF de destino</h3><p class="small">Guardado automaticamente a cada NF-e. Para mudar, edite na própria tela da NF-e.</p>
     <div class="list">${dUf.sort().map(([uf, c]) => `<div class="it"><div class="grow"><b>${esc(uf)}</b></div><div class="small">interna ${String(c.aliq).replace('.', ',')}% · FCP ${String(c.fcp || 0).replace('.', ',')}% · base ${c.metodo === 'unica' ? 'única' : 'dupla'}</div></div>`).join('')}</div></div>` : ''}
   ${cardPlano()}
+  ${gancho('empresaHtml', '')}
   ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
