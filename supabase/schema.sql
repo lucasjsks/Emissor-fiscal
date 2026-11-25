@@ -118,7 +118,8 @@ alter table public.admins enable row level security;
 
 drop policy if exists docs_ler on public.docs;
 create policy docs_ler on public.docs for select to authenticated
-  using (col = 'ncm' or public.meu_papel(empresa_id) is not null);
+  -- empresas/<id>/segredos (senha do gerente, em hash) só o servidor lê
+  using (col = 'ncm' or (public.meu_papel(empresa_id) is not null and split_part(col, '/', 3) <> 'segredos'));
 
 drop policy if exists docs_inserir on public.docs;
 create policy docs_inserir on public.docs for insert to authenticated
@@ -242,10 +243,12 @@ create or replace function public.proteger_limite_funcionarios() returns trigger
 language plpgsql as $$
 begin
   if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
+  -- campos que só o servidor grava: limite do plano, lista de funcionários (quadros da tela de escolha) e aviso de senha do gerente criada
   if tg_op = 'UPDATE' then
-    new.data := (new.data - 'limite_funcionarios') || jsonb_strip_nulls(jsonb_build_object('limite_funcionarios', old.data->'limite_funcionarios'));
+    new.data := (new.data - 'limite_funcionarios' - 'funcionarios' - 'senha_gerente') || jsonb_strip_nulls(jsonb_build_object(
+      'limite_funcionarios', old.data->'limite_funcionarios', 'funcionarios', old.data->'funcionarios', 'senha_gerente', old.data->'senha_gerente'));
   else
-    new.data := new.data - 'limite_funcionarios';
+    new.data := new.data - 'limite_funcionarios' - 'funcionarios' - 'senha_gerente';
   end if;
   return new;
 end $$;

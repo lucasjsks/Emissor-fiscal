@@ -91,3 +91,11 @@ update docs set data = data || '{"limite_funcionarios":10}' where path='empresas
 reset role;
 select public.definir_limite_funcionarios('11.222.333/0001-81', 3);
 select data->>'limite_funcionarios' as limite_func_3 from docs where path='empresas/'||:'e';
+-- senha do gerente: a coleção segredos só o servidor lê/grava; a tela não marca senha_gerente nem muda a lista de funcionários
+reset role; set role service_role;
+insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/segredos/gerente','empresas/'||:'e'||'/segredos',:'e','{"hash":"x"}');
+reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+select count(*) as segredo_visivel_0 from docs where col='empresas/'||:'e'||'/segredos';
+insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/segredos/g2','empresas/'||:'e'||'/segredos',:'e','{}'); -- deve falhar (RLS)
+update docs set data = data || '{"senha_gerente":true,"funcionarios":[{"email":"x"}]}' where path='empresas/'||:'e' returning data->>'senha_gerente' as senha_ger_nulo, data->>'funcionarios' as func_nulo;
+reset role;

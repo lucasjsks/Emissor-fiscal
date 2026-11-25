@@ -5,7 +5,7 @@
 //   acao 'senha'   {empresa_id, user_id, senha}       → troca a senha do funcionário
 //   acao 'remover' {empresa_id, user_id}              → tira o acesso (e apaga o login, se ele não tiver outro acesso)
 // Limite do plano: empresa.limite_funcionarios (padrão 2; só o suporte muda — definir_limite_funcionarios no banco).
-import { rota, Falha, env, usuario, papelDe, getDoc, sb } from './_lib.js';
+import { rota, Falha, env, usuario, papelDe, getDoc, sb, rpc } from './_lib.js';
 
 export const LIMITE_PADRAO = 2;
 const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
@@ -20,6 +20,10 @@ async function authAdmin(method, path, body){
   return { status:r.status, ok:r.ok, body:j || {} };
 }
 
+// lista pública dos funcionários (nome e e-mail de login) para os quadros da tela "Quem vai usar o sistema?"
+async function gravarLista(empresa_id, lista){
+  await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['funcionarios'], valor:lista.map(x => ({ user_id:x.user_id, nome:x.nome || x.email, email:x.email })) });
+}
 const operadores = empresa_id => sb(`/rest/v1/membros?select=user_id,criado_em&empresa_id=eq.${encodeURIComponent(empresa_id)}&papel=eq.operador`);
 async function confereFuncionario(empresa_id, uid){
   if (!/^[0-9a-f-]{36}$/i.test(String(uid || ''))) throw new Falha('Funcionário não encontrado.', 404);
@@ -40,7 +44,8 @@ export default rota(async (req, b) => {
       const r = await authAdmin('GET', '/users/' + m.user_id), us = r.body || {};
       return { user_id:m.user_id, email:us.email || '', nome:(us.user_metadata || {}).nome || '', criado_em:m.criado_em, ultimo_acesso:us.last_sign_in_at || null };
     }));
-    return { ok:true, funcionarios:lista, limite };
+    await gravarLista(empresa_id, lista);
+    return { ok:true, funcionarios:lista, limite, senha_gerente:!!e.senha_gerente };
   }
 
   if (acao === 'criar'){
@@ -48,6 +53,7 @@ export default rota(async (req, b) => {
     if (nome.length < 2) throw new Falha('Informe o nome do funcionário.');
     if (!emailOk(email)) throw new Falha('E-mail inválido.');
     if (senha.length < 8) throw new Falha('A senha precisa ter pelo menos 8 caracteres.');
+    if (!e.senha_gerente) throw new Falha('Antes de cadastrar funcionários, crie a senha do gerente (logo acima, no quadro Funcionários).');
     const atuais = await operadores(empresa_id) || [];
     if (atuais.length >= limite) throw new Falha(limite ? `Seu plano permite ${limite} funcionário(s). Para liberar mais, fale com o suporte.` : 'Seu plano não inclui funcionários. Fale com o suporte.');
     const r = await authAdmin('POST', '/users', { email, password:senha, email_confirm:true, user_metadata:{ nome, funcionario:true } });
@@ -60,6 +66,7 @@ export default rota(async (req, b) => {
     const novo = r.body.id || (r.body.user || {}).id;
     try { await sb('/rest/v1/membros', { method:'POST', prefer:'return=minimal', body:{ empresa_id, user_id:novo, papel:'operador' } }); }
     catch(err){ await authAdmin('DELETE', '/users/' + novo); throw err; } // não deixa login solto sem acesso
+    await gravarLista(empresa_id, [...(e.funcionarios || []).filter(x => x.user_id !== novo), { user_id:novo, nome, email }]);
     return { ok:true, funcionario:{ user_id:novo, email, nome } };
   }
 
@@ -77,6 +84,7 @@ export default rota(async (req, b) => {
     await sb(`/rest/v1/membros?empresa_id=eq.${encodeURIComponent(empresa_id)}&user_id=eq.${b.user_id}`, { method:'DELETE', prefer:'return=minimal' });
     const outros = await sb(`/rest/v1/membros?select=empresa_id&user_id=eq.${b.user_id}`);
     if (!outros || !outros.length) await authAdmin('DELETE', '/users/' + b.user_id); // libera o e-mail para outro cadastro
+    await gravarLista(empresa_id, (e.funcionarios || []).filter(x => x.user_id !== b.user_id));
     return { ok:true };
   }
   throw new Falha('Ação desconhecida.');

@@ -399,6 +399,12 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
   header{padding-top:14px}
 }
 .pdv-top{background:var(--navy)}
+/* tela "Quem vai usar o sistema?" */
+.perfil-tela{max-width:720px;margin:40px auto;text-align:center}.perfil-logo{width:64px;height:64px}.perfil-tela h2{margin:10px 0 4px}
+.perfil-grade{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin:24px 0}
+.perfil-card{width:190px;padding:22px 14px;border:1px solid #e3e8f0;border-radius:18px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;color:#0A1630;transition:transform .12s,box-shadow .12s}
+.perfil-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(10,22,48,.12)}.perfil-card b{font-size:17px}.perfil-card small{color:#6b778c}.perfil-card em{font-style:normal;font-size:11px;color:#1a7f37;background:#e7f6ec;border-radius:20px;padding:2px 8px}
+.perfil-ic{width:64px;height:64px;border-radius:50%;background:#0A1630;color:#C6F432;display:flex;align-items:center;justify-content:center;font:700 26px 'Space Grotesk',sans-serif}
 </style>
 </head>
 <body>
@@ -406,6 +412,7 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
   <h1 id="hTitle">NotaOne</h1>
   <select id="empSel" aria-label="Empresa"></select>
   <span class="badge" id="badge">…</span>
+  <button class="sair" id="btnTrocar" data-act="perfTrocar" title="Trocar de usuário" aria-label="Trocar de usuário" style="display:none"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5M16 4l3 3-3 3M19 7h-5"/></svg><span>Trocar usuário</span></button>
   <button class="sair" id="btnSair" data-act="pedirSair" title="Sair da conta" aria-label="Sair da conta" style="display:none"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/></svg><span>Sair</span></button>
 </header>
 <div class="amb" id="ambBar" style="display:none">Ambiente de <b>homologação</b>: as notas vão para a SEFAZ de testes e não têm valor fiscal.</div>
@@ -898,8 +905,9 @@ function render(){
   const ae = document.activeElement, aid = ae && ae.id, sel = ae && ae.selectionStart, val = ae && ae.value;
   renderNav(); renderHeader(); botaoSuporte();
   const m = $('#main');
-  const e = emp(), fora = S.carregando || S.falha || !S.logado || S.recuperando;
+  const e = emp(), perf = !S.carregando && !S.falha && S.logado && !S.recuperando ? precisaPerfil() : false, fora = S.carregando || S.falha || !S.logado || S.recuperando || !!perf;
   $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
+  $('#btnTrocar').style.display = !fora && e && (e.funcionarios || []).length && e.senha_gerente ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' && !semNota() ? '' : 'none';
   if (!fora && e && !abas().some(([k]) => k === S.tab)) S.tab = abas()[0][0]; // aba fora do acesso (funcionário) ou NF-e em empresa sem nota
   if (S.pdv && (fora || S.tab !== 'venda' || !e)) S.pdv = false;
@@ -907,6 +915,8 @@ function render(){
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
   else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
+  else if (perf === 'carregando'){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
+  else if (perf){ m.innerHTML = vQuemUsa(); }
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
   } else if (S.pdv && S.tab === 'venda') m.innerHTML = vPdv();
@@ -1835,7 +1845,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { sgSalvar:'empresa', sgForm:'empresa', sgTrocar:'empresa', empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'cadProduto', editProd:'cadProduto', salvarProd:'cadProduto', delProd:'produto', confDelProd:'produto', verEstoque:'produto', abrirFuncionarios:'empresa', fnNovo:'empresa', fnCriar:'empresa', fnSenha:'empresa', fnSalvarSenha:'empresa', fnRemover:'empresa', fnConfRemover:'empresa',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -2748,8 +2758,8 @@ async function aoMudarSessao(session){
   S.carregando = false; S.meuId = uidAtual; S.meuEmail = uidAtual ? session.user.email : ''; S.logado = !!uidAtual;
   S.meuMeta = uidAtual ? (session.user.user_metadata || {}) : {}; // dados do cadastro feito no site (nome, telefone, empresa, cnpj)
   unsubs.forEach(u => u()); unsubs = []; if (S.unsubEmp){ S.unsubEmp(); S.unsubEmp = null; } if (db && db.fechar) db.fechar();
-  S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null;
-  if (!uidAtual){ db = null; render(); renderBadge(); return; }
+  S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null; S.papelEmp = undefined; S.fn = null;
+  if (!uidAtual){ perfilMarcar(''); db = null; render(); renderBadge(); return; }
   db = criarShim(SB); S.mode = 'db'; S.papel = 'gerente'; S.isAdmin = true;
   await SB.rpc('aceitar_convites');
   const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm;
@@ -2952,7 +2962,7 @@ async function acoesV5(a, t, id){
         ${temCaixa ? '<div class="msg warn">Seu caixa continua aberto. Se terminou o expediente, feche o caixa antes de sair.</div>' : ''}
         <div class="actions"><button class="btn" data-act="fechar">Continuar no sistema</button><button class="btn bad" data-act="sair">Sair</button></div>`);
       return true; }
-    case 'sair': closeModal(); await SB.auth.signOut(); S.tab = 'inicio'; return true;
+    case 'sair': closeModal(); perfilMarcar(''); await SB.auth.signOut(); S.tab = 'inicio'; return true;
     case 'consultarNota': { t.disabled = true; const r = await eventoServidor({ tipo:'consultar', ref:id }); t.disabled = false; if (r) verNota(r.nota); return true; }
     case 'convidar': {
       const email = val('cvEmail'), papel = val('cvPapel');
@@ -4171,7 +4181,7 @@ function alertasInicio(){
   if (baixo) add('warn', `${baixo} produto(s) abaixo do estoque mínimo`, 'irPara', 'data-tab="produtos" data-fp="baixo"');
   if (pode('produto')){
     const err = P.filter(p => temErro(validarProduto(p, e))).length;
-    if (err) add('bad', `${err} produto(s) com erro fiscal no cadastro (podem dar rejeição)`, 'irPara', 'data-tab="produtos" data-fp="erro"');
+    if (err && !semNota()) add('bad', `${err} produto(s) com erro fiscal no cadastro (podem dar rejeição)`, 'irPara', 'data-tab="produtos" data-fp="erro"');
     const semPreco = P.filter(p => !(num(p.preco) > 0)).length;
     if (semPreco) add('warn', `${semPreco} produto(s) sem preço de venda`, 'irPara', 'data-tab="produtos"');
     const recP = S.recebidas.filter(r => recPendente(r) && !compraDaChave(r.chave)).length;
@@ -4199,6 +4209,62 @@ function bannerCertificado(){
   else { cls = 'ok'; txt = `Certificado digital: faltam <b>${d} dias</b> para vencer (${dataBR(venc)}).`; }
   return `<div class="cert-ban ${cls}"><span class="cert-ico">${cls === 'ok' ? '✓' : '!'}</span><div class="cert-txt">${txt}</div>${extra}</div>`;
 }
+/* ---------- Tela "Quem vai usar o sistema?" (loja com funcionários) ---------- */
+// A loja entra com o e-mail e a senha da conta (do dono). Com funcionários cadastrados, cada pessoa escolhe o seu quadro
+// e digita a SUA senha: Gerente → senha do gerente (api/perfil.js); funcionário → senha do login dele (signInWithPassword).
+// O perfil aberto fica guardado só nesta aba do navegador (sessionStorage): fechou o navegador, pergunta de novo.
+const perfilAtual = () => { try { return sessionStorage.getItem('notaone.perfil') || ''; } catch(_){ return ''; } };
+const perfilMarcar = v => { try { v ? sessionStorage.setItem('notaone.perfil', v) : sessionStorage.removeItem('notaone.perfil'); } catch(_){} };
+function precisaPerfil(){
+  const e = emp(); if (!e || S.mode !== 'db' || !(e.funcionarios || []).length || !e.senha_gerente) return false;
+  if (S.trocandoPerfil) return true;
+  if (S.papelEmp === undefined) return 'carregando';
+  return S.papelEmp === 'dono' && perfilAtual() !== 'gerente';
+}
+function vQuemUsa(){
+  const e = emp(), fs = e.funcionarios || [], eu = S.meuId;
+  const card = (id, nome, sub, ic, atual) => `<button class="perfil-card" data-act="perfEscolher" data-id="${esc(id)}"><span class="perfil-ic">${ic}</span><b>${esc(nome)}</b><small>${sub}</small>${atual ? '<em>em uso agora</em>' : ''}</button>`;
+  return `<div class="perfil-tela"><img src="img/logo.png" alt="" class="perfil-logo"><h2>Quem vai usar o sistema?</h2><p class="small">${esc(e.fantasia || e.razao || '')} · toque no seu nome e digite a sua senha</p>
+    <div class="perfil-grade">${card('gerente', 'Gerente', 'acesso completo', '★', S.papelEmp === 'dono' && perfilAtual() === 'gerente')}
+      ${fs.map(f => card(f.user_id, f.nome || f.email, 'vendas e produtos', esc((f.nome || f.email || '?').trim()[0].toUpperCase()), f.user_id === eu)).join('')}</div>
+    <div class="actions" style="justify-content:center">${S.trocandoPerfil && (S.papelEmp !== 'dono' || perfilAtual() === 'gerente') ? '<button class="btn" data-act="perfVoltar">Voltar</button>' : ''}<button class="btn" data-act="pedirSair">Sair da conta da loja</button></div></div>`;
+}
+function formPerfilSenha(id){
+  const e = emp(), f = (e.funcionarios || []).find(x => x.user_id === id), nome = id === 'gerente' ? 'Gerente' : f ? f.nome || f.email : '';
+  openModal(`${mhead(esc(nome))}<label for="perfSenha">${id === 'gerente' ? 'Senha do gerente' : 'Sua senha'}</label>
+    <input id="perfSenha" type="password" autocomplete="current-password"><div id="errM"></div>
+    <div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="perfEntrar" data-id="${esc(id)}">Entrar</button></div>`);
+  setTimeout(() => { const i = $('#perfSenha'); if (i){ i.focus(); i.addEventListener('keydown', ev => { if (ev.key === 'Enter'){ const b = document.querySelector('[data-act=perfEntrar]'); if (b) b.click(); } }); } }, 50);
+}
+async function perfEntrar(id, t){
+  const senha = $('#perfSenha').value; if (!senha) return $('#errM').innerHTML = '<div class="msg err">Digite a senha.</div>';
+  t.disabled = true; $('#errM').innerHTML = '<div class="msg info">Conferindo…</div>';
+  try {
+    if (id === 'gerente'){
+      const r = await api('perfil', { empresa_id:S.empId, acao:'gerente', senha });
+      perfilMarcar('gerente');
+      if (r.token_hash){ // estava na conta da funcionária: entra na conta da loja (do dono)
+        let { error } = await SB.auth.verifyOtp({ token_hash:r.token_hash, type:'magiclink' });
+        if (error) ({ error } = await SB.auth.verifyOtp({ token_hash:r.token_hash, type:'email' }));
+        if (error) throw new Error('Não foi possível entrar como gerente. Tente de novo.');
+      }
+    } else {
+      const f = (emp().funcionarios || []).find(x => x.user_id === id); if (!f) throw new Error('Funcionário não encontrado.');
+      const { error } = await SB.auth.signInWithPassword({ email:f.email, password:senha });
+      if (error) throw new Error('Senha incorreta.');
+      perfilMarcar('func'); S.tab = 'venda';
+    }
+    S.trocandoPerfil = false; closeModal(); render();
+  } catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function cardSenhaGerente(e){
+  return e.senha_gerente
+    ? `<div class="it"><div class="grow"><div class="t">Senha do gerente</div><div class="s">Pedida no quadro <b>Gerente</b> da tela "Quem vai usar o sistema?". Não é a senha da loja.</div></div><button class="btn sm" data-act="sgForm" style="flex:0 0 auto">Trocar senha do gerente</button></div>`
+    : `<div class="msg warn"><b>Primeiro, crie a senha do gerente.</b> Com funcionários cadastrados, o sistema abre na tela "Quem vai usar o sistema?" e o gerente entra com esta senha — use uma diferente da senha da loja, que só você saiba.</div>
+      <div class="row">${fld('sgNova','Senha do gerente (mínimo 4)','','type="password" autocomplete="new-password"')}${fld('sgConf','Repita a senha','','type="password" autocomplete="new-password"')}</div>
+      <div class="actions"><button class="btn pri" data-act="sgSalvar">Criar senha do gerente</button></div>`;
+}
+
 /* ---------- Funcionários (acesso limitado: vender, caixa, produtos e clientes) ---------- */
 // o dono cria o login da funcionária (e-mail e senha) pelo servidor (api/equipe.js); ela entra com papel 'operador'
 function fnCarregar(){
@@ -4210,24 +4276,48 @@ function fnCarregar(){
 function cardFuncionarios(){
   if (!S.isAdmin || S.mode !== 'db' || !emp()) return '';
   const f = S.fn && S.fn.emp === S.empId ? S.fn : null; if (!f) setTimeout(fnCarregar, 0);
-  const lista = f ? f.lista : [], cheio = f && f.limite !== null && lista.length >= f.limite;
+  const lista = f ? f.lista : [], cheio = f && f.limite !== null && lista.length >= f.limite, e = emp();
   return `<div class="card" id="cardFunc"><h3 style="margin-top:0">Funcionários</h3>
-    <p class="small">O funcionário entra com o próprio e-mail e senha e <b>só vende</b> (Caixa e PDV) e <b>cadastra produtos e clientes</b>. Ele não vê custo, financeiro, compras, relatórios nem os dados da empresa, e não cancela vendas.</p>
+    <p class="small">O funcionário entra pelo quadro com o nome dele e a senha dele e <b>só vende</b> (Caixa e PDV) e <b>cadastra produtos e clientes</b>. Ele não vê custo, financeiro, compras, relatórios nem os dados da empresa, e não cancela vendas.</p>
+    <p class="small">Com funcionários, ao entrar no sistema aparece a tela <b>"Quem vai usar o sistema?"</b>: cada um toca no seu nome e digita a sua senha.</p>
+    ${cardSenhaGerente(e)}
     ${!f ? '<div class="small">Carregando…</div>' : f.erro ? `<div class="msg err">${esc(f.erro)}</div>`
       : lista.length ? `<div class="list">${lista.map(x => `<div class="it"><div class="grow"><div class="t">${esc(x.nome || x.email)}</div><div class="s">${esc(x.email)}${x.ultimo_acesso ? ' · último acesso ' + fmtData(x.ultimo_acesso) : ' · ainda não entrou'}</div></div>
         <button class="btn sm" data-act="fnSenha" data-id="${esc(x.user_id)}" style="flex:0 0 auto">Trocar senha</button><button class="btn sm bad" data-act="fnRemover" data-id="${esc(x.user_id)}" style="flex:0 0 auto">Remover</button></div>`).join('')}</div>`
       : '<div class="empty" style="padding:8px 0">Nenhum funcionário cadastrado.</div>'}
-    ${f && !f.erro ? `<div class="actions">${cheio ? `<span class="small">Seu plano inclui ${f.limite} funcionário(s). Para liberar mais, <a href="${esc(linkSuporte('Quero liberar mais funcionários no NotaOne.'))}" target="_blank" rel="noopener">fale com o suporte</a>.</span>` : '<button class="btn pri" data-act="fnNovo">+ Novo funcionário</button>'}</div>` : ''}</div>`;
+    ${f && !f.erro ? `<div class="actions">${cheio ? `<span class="small">Seu plano inclui ${f.limite} funcionário(s). Para liberar mais, <a href="${esc(linkSuporte('Quero liberar mais funcionários no NotaOne.'))}" target="_blank" rel="noopener">fale com o suporte</a>.</span>` : (e.senha_gerente ? '<button class="btn pri" data-act="fnNovo">+ Novo funcionário</button>' : '')}</div>` : ''}</div>`;
 }
 async function acoesLoja(a, t, id){
   switch (a){
+    case 'perfEscolher': formPerfilSenha(id); return true;
+    case 'perfEntrar': await perfEntrar(id, t); return true;
+    case 'perfTrocar': S.trocandoPerfil = true; S.pdv = false; closeModal(); render(); return true;
+    case 'perfVoltar': S.trocandoPerfil = false; render(); return true;
+    case 'sgSalvar': {
+      const n = $('#sgNova').value, c = $('#sgConf').value;
+      if (n.length < 4) return toast('A senha do gerente precisa ter pelo menos 4 caracteres.'), true;
+      if (n !== c) return toast('As duas senhas não são iguais.'), true;
+      t.disabled = true;
+      try { await api('perfil', { empresa_id:S.empId, acao:'definir', senha:n }); perfilMarcar('gerente'); toast('Senha do gerente criada.'); }
+      catch(e){ toast(e.message); } t.disabled = false; return true; }
+    case 'sgForm':
+      openModal(`${mhead('Trocar senha do gerente')}${fld('sgAtual','Senha atual do gerente','','type="password" autocomplete="current-password"')}${fld('sgNova','Nova senha (mínimo 4)','','type="password" autocomplete="new-password"')}${fld('sgConf','Repita a nova senha','','type="password" autocomplete="new-password"')}
+        <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="sgTrocar">Salvar</button></div>`);
+      return true;
+    case 'sgTrocar': {
+      const n = $('#sgNova').value;
+      if (n.length < 4 || n !== $('#sgConf').value) return $('#errM').innerHTML = '<div class="msg err">A nova senha precisa ter pelo menos 4 caracteres e ser igual nas duas caixas.</div>', true;
+      t.disabled = true;
+      try { await api('perfil', { empresa_id:S.empId, acao:'definir', senha:n, atual:$('#sgAtual').value }); closeModal(); toast('Senha do gerente trocada.'); }
+      catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      return true; }
     case 'empTipo': { // troca CPF ↔ CNPJ no cadastro da empresa, mantendo o que já foi digitado
       const f = S.empForm || {}, e = { ...(f.e || {}) };
       [['eRazao','razao'],['eFant','fantasia'],['eFone','telefone'],['eLog','logradouro'],['eNum','numero'],['eBai','bairro'],['eCep','cep'],['eMun','municipio'],['eUf','uf']].forEach(([i, k]) => { if ($('#' + i)) e[k] = val(i); });
       if ($('#eCpf')) e.cpf = dig(val('eCpf')); if ($('#eCnpj')) e.cnpj = dig(val('eCnpj'));
       formEmpresa(e, t.dataset.t); return true; }
     case 'fnNovo':
-      openModal(`${mhead('Novo funcionário')}<p class="small">Ele vai entrar no NotaOne com este e-mail e esta senha. Passe os dados para ele pessoalmente.</p>
+      openModal(`${mhead('Novo funcionário')}<p class="small">Ele entra tocando no próprio nome na tela "Quem vai usar o sistema?" e digitando esta senha. O e-mail serve de identificação (e para entrar de outro aparelho).</p>
         ${fld('fnNome','Nome *','')}${fld('fnEmail','E-mail *','','type="email" autocomplete="off"')}${fld('fnSenha1','Senha (mínimo 8 caracteres) *','','type="password" autocomplete="new-password"')}
         <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="fnCriar">Criar acesso</button></div>`);
       return true;

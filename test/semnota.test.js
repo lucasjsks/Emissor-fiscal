@@ -9,10 +9,11 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
 const { default: emitir } = await import('../api/emitir.js');
 const { default: evento } = await import('../api/evento.js');
 const { default: equipe } = await import('../api/equipe.js');
+const { default: perfil } = await import('../api/perfil.js');
 
 let docs, membros, chamadas, usuarios;
 beforeEach(() => {
-  docs = { 'empresas/E1': { doc_tipo:'cpf', cpf:'52998224725', fantasia:'Loja do Zé', prox_venda:1, serie_nfce:'1', prox_nfce:1 },
+  docs = { 'empresas/E1': { doc_tipo:'cpf', cpf:'52998224725', fantasia:'Loja do Zé', prox_venda:1, serie_nfce:'1', prox_nfce:1, senha_gerente:true },
            'empresas/E2': { cnpj:'11222333000181', serie_nfce:'1', prox_nfce:5 } };
   membros = { 'E1|U1':'dono', 'E1|U3':'operador', 'E2|U1':'dono' };
   chamadas = []; usuarios = { U3:{ id:'U3', email:'ana@loja.com', user_metadata:{ nome:'Ana' } } };
@@ -31,16 +32,21 @@ beforeEach(() => {
       return json(rows);
     }
     if (u.pathname === '/rest/v1/rpc/proximo_numero'){ const d = docs['empresas/' + body.e]; const n = d[body.campo] || 1; d[body.campo] = n + 1; return json(n); }
+    if (u.pathname === '/rest/v1/rpc/gravar_campo_empresa'){ docs['empresas/' + body.e][body.caminho[0]] = body.valor; return json(null); }
     if (u.pathname.startsWith('/rest/v1/rpc/')) return json(null);
     if (u.pathname === '/rest/v1/docs' && method === 'GET'){ const p = u.searchParams.get('path'); const d = p && docs[p.slice(3)]; return json(d ? [{ data:d }] : []); }
     if (u.pathname === '/rest/v1/docs' && method === 'POST'){ [].concat(body).forEach(b => { docs[b.path] = b.data; }); return json(null, 201); }
     if (u.pathname.startsWith('/auth/v1/admin/users')){
+      if (u.pathname === '/auth/v1/admin/users/U1') return json({ id:'U1', email:'dono@loja.com' });
       const id = u.pathname.split('/')[5];
       if (method === 'POST'){ if (Object.values(usuarios).some(x => x.email === body.email)) return json({ msg:'A user with this email address has already been registered' }, 422);
         const n = { id:'00000000-0000-0000-0000-00000000000' + (Object.keys(usuarios).length + 4), email:body.email, user_metadata:body.user_metadata }; usuarios[n.id] = n; return json(n); }
       if (method === 'GET') return usuarios[id] ? json(usuarios[id]) : json({}, 404);
       if (method === 'PUT'){ usuarios[id].senha = body.password; return json(usuarios[id]); }
       if (method === 'DELETE'){ delete usuarios[id]; return json({}); }
+    }
+    if (u.pathname === '/auth/v1/admin/generate_link'){ return json({ properties:{ hashed_token:'tok-' + body.email } }); }
+    if (u.pathname.startsWith('/auth/v1/admin/users/')){
     }
     throw new Error('URL inesperada ' + url);
   };
@@ -94,4 +100,30 @@ test('funcionários: só o dono lista, cria, troca senha e remove; respeita o li
   assert.equal((await chamar(equipe, 't1', { empresa_id:'E1', acao:'senha', user_id:'U1', senha:'novasenha1' })).code, 404, 'não troca a senha de quem não é funcionário');
   assert.equal((await chamar(equipe, 't1', { empresa_id:'E1', acao:'remover', user_id:uid })).code, 200);
   assert.equal(membros['E1|' + uid], undefined); assert.equal(usuarios[uid], undefined);
+});
+
+test('funcionários: sem senha do gerente não cadastra; a lista dos quadros fica na empresa', async () => {
+  delete docs['empresas/E1'].senha_gerente;
+  assert.match((await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Bia', email:'bia@loja.com', senha:'12345678' })).body.erro, /senha do gerente/);
+  docs['empresas/E1'].senha_gerente = true;
+  const c = await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Bia', email:'bia@loja.com', senha:'12345678' });
+  assert.equal(c.code, 200);
+  assert.deepEqual(docs['empresas/E1'].funcionarios.map(x => x.nome), ['Bia']);
+});
+
+test('senha do gerente: só o dono cria; confere; funcionária entra como gerente com a senha; bloqueia após 5 erros', async () => {
+  assert.equal((await chamar(perfil, 't3', { empresa_id:'E1', acao:'definir', senha:'1234' })).code, 403);
+  assert.equal((await chamar(perfil, 't1', { empresa_id:'E1', acao:'definir', senha:'4321' })).code, 200);
+  const seg = docs['empresas/E1/segredos/gerente'];
+  assert.ok(seg.hash && seg.sal && !JSON.stringify(seg).includes('4321'), 'a senha não fica guardada em texto');
+  assert.equal(docs['empresas/E1'].senha_gerente, true);
+  // trocar exige a senha atual
+  assert.match((await chamar(perfil, 't1', { empresa_id:'E1', acao:'definir', senha:'9999', atual:'0000' })).body.erro, /atual/);
+  // dono confere (sem token); funcionária recebe um acesso de uso único para a conta do dono
+  assert.deepEqual((await chamar(perfil, 't1', { empresa_id:'E1', acao:'gerente', senha:'4321' })).body, { ok:true });
+  const f = await chamar(perfil, 't3', { empresa_id:'E1', acao:'gerente', senha:'4321' });
+  assert.equal(f.code, 200); assert.equal(f.body.token_hash, 'tok-dono@loja.com');
+  for (let k = 0; k < 4; k++) assert.match((await chamar(perfil, 't3', { empresa_id:'E1', acao:'gerente', senha:'errada' })).body.erro, /incorreta/);
+  assert.match((await chamar(perfil, 't3', { empresa_id:'E1', acao:'gerente', senha:'errada' })).body.erro, /bloqueado/);
+  assert.equal((await chamar(perfil, 't3', { empresa_id:'E1', acao:'gerente', senha:'4321' })).code, 429, 'bloqueado mesmo com a senha certa');
 });
