@@ -548,7 +548,7 @@ function renderBadge(){
   const b = $('#badge');
   if (!S.logado){ b.textContent = ''; b.style.display = 'none'; return; }
   // sem o papel (cada empresa tem um usuário só): mostra apenas "teste" quando estiver em homologação
-  const txt = S.papel === 'operador' ? 'funcionário' : S.ambiente === 'producao' || semNota() ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
+  const txt = S.papel === 'operador' ? 'funcionário' : S.ambiente === 'producao' || semNota() || (S.logado && emp() && !temAba('venda')) ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
   b.title = S.meuEmail || '';
 }
 async function safe(fn, okMsg){
@@ -917,6 +917,7 @@ function abas(){
   const i = base[0] && base[0][0] === 'inicio' ? 1 : 0; // funcionário não tem Início: as abas do módulo vêm primeiro
   return [...base.slice(0, i), ...extra, ...base.slice(i)];
 }
+const temAba = k => abas().some(([x]) => x === k);
 const nomeModelo = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '99' ? 'Venda' : n.modelo === '65' ? 'Cupom' : 'NF-e';
 const verCusto = () => S.papel !== 'operador';
 function renderNav(){
@@ -2529,7 +2530,7 @@ function relFinanceiro(){
         linhas:Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => [c, v, despT ? v / despT * 100 : 0]) }
     ] };
 }
-function relModelo(){ return S.relAba === 'estoque' ? relEstoque() : S.relAba === 'equipe' ? relEquipe() : relFinanceiro(); }
+function relModelo(){ const mm = gancho('relModelo', null); if (mm) return mm; return S.relAba === 'estoque' ? relEstoque() : S.relAba === 'equipe' ? relEquipe() : relFinanceiro(); }
 function relTelaHtml(M){
   const tab = s => `<div class="card"><h3 style="margin-top:0">${esc(s.tit)}</h3>${s.nota ? `<p class="small" style="margin-top:-4px">${esc(s.nota)}</p>` : ''}
     ${s.linhas.length ? `<div class="rel-tab"><table><tr>${s.cols.map(c => `<th class="${c.f && c.f !== 'data' ? 'r' : ''}">${esc(c.t)}</th>`).join('')}</tr>
@@ -4754,14 +4755,14 @@ function vInicio(){
   const formas = Object.entries(forma).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), maxF = Math.max(1, ...formas.map(x => x[1]));
   const prod = {}; M.v.forEach(n => (n.itens || []).forEach(i => { const k = i.pid || i.d; prod[k] = prod[k] || { d:i.d, u:i.u, q:0, v:0 }; prod[k].q = rq(prod[k].q + num(i.q)); prod[k].v = r2(prod[k].v + num(i.t) - num(i.desc)); }));
   const top = Object.values(prod).sort((a, b) => b.v - a.v).slice(0, 5);
-  const A = alertasInicio(), hora = +isoNow().slice(11, 13), saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+  const A = alertasInicio().filter(a => { const m = /data-tab="(\w+)"/.exec(a.extra || ''); return !m || temAba(m[1]); }), hora = +isoNow().slice(11, 13), saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const cor = { bad:'var(--bad)', warn:'var(--warn)', info:'var(--brand)' }, ico = { bad:'●', warn:'▲', info:'ℹ' };
   const tk = H.v.length ? r2(H.total / H.v.length) : 0;
-  const semVendas = !abas().some(([k]) => k === 'venda'); // módulo de serviço sem venda de produtos (ex.: academia)
+  const semVendas = !temAba('venda'); // módulo de serviço sem venda de produtos (ex.: academia)
   return `${bannerCertificado()}${bannerAssinatura()}<div class="row" style="align-items:flex-end"><div style="flex:1"><h2 style="margin-bottom:0">${saud}!</h2><div class="small">${esc((emp() || {}).fantasia || (emp() || {}).razao || '')} · ${DIAS_SEM[new Date(hoje + 'T12:00:00').getDay()]}, ${dataBR(hoje)}</div></div></div>
   ${gancho('inicioHtml', '')}
   <div class="ini-acoes">${pode('emitir') && !semVendas ? (semNota() ? '<button data-act="irPara" data-tab="venda"><b>＋</b>Nova venda</button>' : '<button data-act="irPara" data-tab="venda"><b>＋</b>Novo cupom</button><button data-act="irPara" data-tab="nfe" data-nfnova="1"><b>＋</b>Nova NF-e</button>') : ''}
-    ${pode('produto') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button><button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
+    ${pode('produto') && temAba('compras') ? '<button data-act="irPara" data-tab="compras"><b>⤓</b>Lançar compra</button>' : ''}${pode('produto') && temAba('produtos') ? '<button data-act="novoProd"><b>＋</b>Produto</button>' : ''}</div>
   <div class="${semVendas ? '' : 'grid2'}"><div>${semVendas ? '' : `
     <div class="card"><div class="small">Vendas de hoje</div>
       <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><b class="num" style="font-size:30px">${brl(H.total)}</b>${variacao(H.total, O.total)}<span class="small">ontem ${brl(O.total)}</span></div>
