@@ -70,6 +70,9 @@ language sql stable security definer set search_path = public as $$
     when split_part(p_col, '/', 3) in ('perfis','fornecedores','compras_xml','financeiro') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     -- produtos: o funcionário (operador) também cadastra e edita (não apaga; custo protegido pelo gatilho proteger_custo_operador)
     when split_part(p_col, '/', 3) in ('produtos','clientes','caixas') then public.meu_papel(p_empresa) is not null
+    -- módulo Academia: recepção (funcionário) cadastra aluno, faz check-in e recebe mensalidade; planos só gerente/dono
+    when split_part(p_col, '/', 3) in ('ac_alunos','ac_mensalidades','ac_checkins') then public.meu_papel(p_empresa) is not null
+    when split_part(p_col, '/', 3) = 'ac_planos' then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     else false
   end
 $$;
@@ -82,7 +85,7 @@ language sql stable security definer set search_path = public as $$
     -- empresa com notas não pode ser apagada (guarda fiscal obrigatória)
     when p_col = 'empresas' then coalesce(public.meu_papel(p_empresa) = 'dono', false)
       and not exists (select 1 from public.docs d where d.col = 'empresas/' || p_empresa || '/notas')
-    when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas','fornecedores','compras_xml','financeiro') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
+    when split_part(p_col, '/', 3) in ('produtos','perfis','clientes','caixas','fornecedores','compras_xml','financeiro','ac_alunos','ac_planos','ac_mensalidades','ac_checkins') then coalesce(public.meu_papel(p_empresa) in ('dono','gerente'), false)
     else false
   end
 $$;
