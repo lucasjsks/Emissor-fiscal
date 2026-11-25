@@ -2241,6 +2241,8 @@ function cardPlano(){
 function cardCaixas(){
   const L = pdvsEmp(), lim = limiteCaixas(), cheio = L.length >= lim;
   if (!pode('empresa')) return L.length ? `<div class="card"><h3 style="margin-top:0">Caixas</h3><p>${L.map(p => esc(p.nome)).join(', ')}</p></div>` : '';
+  // plano de 1 caixa: a loja usa um caixa só, sem cadastro de caixas (pedido do Lucas)
+  if (lim <= 1 && !L.length) return '';
   return `<div class="card"><h3 style="margin-top:0">Caixas da empresa</h3>
     <p class="small">Cadastre um caixa para cada computador que vende cupom (ex.: Caixa 01, Caixa 02). Ao abrir o Cupom ou o PDV, o sistema pergunta qual caixa aquele computador vai usar, e cada um tem sua abertura e fechamento.</p>
     ${L.length ? `<div class="list">${L.map(p => `<div class="it"><div class="grow"><div class="t">${esc(p.nome)}</div><div class="s">${statusPdvTxt(p)}${meuPdv() && meuPdv().id === p.id ? ' · <b>este computador</b>' : ''}</div></div>
