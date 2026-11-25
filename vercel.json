@@ -17,14 +17,38 @@
       "maxDuration": 60
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/site",
-      "destination": "/site/index.html"
+      "src": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "notaoneapp.com.br"
+        }
+      ],
+      "dest": "/site/index.html"
     },
     {
-      "source": "/site/cadastro",
-      "destination": "/site/cadastro.html"
+      "src": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.notaoneapp.com.br"
+        }
+      ],
+      "dest": "/site/index.html"
+    },
+    {
+      "src": "/site",
+      "dest": "/site/index.html"
+    },
+    {
+      "src": "/site/cadastro",
+      "dest": "/site/cadastro.html"
+    },
+    {
+      "src": "/cadastro",
+      "dest": "/site/cadastro.html"
     }
   ]
 }

@@ -53,7 +53,7 @@ input:focus{outline:2px solid #0E7A5A;outline-offset:1px;border-color:#0E7A5A}
 <body>
 <header><div class="nav">
 <a class="marca" href="/site"><img src="/img/logo.png" alt=""><span><b>Nota<span>One</span></b><small>EMISSÃO INTELIGENTE</small></span></a>
-<a class="bt" href="https://emissor-fiscal-orpin.vercel.app">Acessar sistema</a>
+<a class="bt" href="https://app.notaoneapp.com.br">Acessar sistema</a>
 </div></header>
 
 <main class="wrap">
@@ -85,12 +85,14 @@ input:focus{outline:2px solid #0E7A5A;outline-offset:1px;border-color:#0E7A5A}
 <div class="senha"><input id="senha" type="password" autocomplete="new-password" minlength="8" required><button type="button" id="ver" aria-label="Mostrar senha">Mostrar</button></div>
 <div id="msg"></div>
 <button class="enviar" id="enviar" type="submit">Criar minha conta</button>
-<p class="peq">Já tem conta? <a href="https://emissor-fiscal-orpin.vercel.app">Acessar sistema</a></p>
+<p class="peq">Já tem conta? <a href="https://app.notaoneapp.com.br">Acessar sistema</a></p>
 </form>
 </section>
 </main>
 
 <script type="module">
+// no domínio próprio o sistema fica em app.notaoneapp.com.br; no endereço da Vercel, na raiz do mesmo endereço
+const SISTEMA = /(^|\.)notaoneapp\.com\.br$/.test(location.hostname) ? 'https://app.notaoneapp.com.br' : location.origin;
 const $ = s => document.querySelector(s), dig = v => String(v || '').replace(/\D/g, '');
 const msg = (t, tipo = 'err') => { $('#msg').innerHTML = `<div class="msg ${tipo}">${t}</div>`; };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -140,16 +142,16 @@ $('#form').addEventListener('submit', async ev => {
   const bt = $('#enviar'); bt.disabled = true; bt.textContent = 'Criando sua conta…'; $('#msg').innerHTML = '';
   try {
     const sb = await supa();
-    const { data, error } = await sb.auth.signUp({ email, password:senha, options:{ emailRedirectTo:location.origin,
+    const { data, error } = await sb.auth.signUp({ email, password:senha, options:{ emailRedirectTo:SISTEMA,
       data:TIPO === 'cpf' ? { nome, telefone:fone, empresa, cpf:cnpj, tipo:'cpf', origem:'site' } : { nome, telefone:fone, empresa, cnpj, origem:'site' } } });
     const jaExiste = (error && /already|registered|exists/i.test(error.message)) || (data && data.user && Array.isArray(data.user.identities) && !data.user.identities.length);
-    if (jaExiste) throw new Error('Já existe uma conta com este e-mail. <a href="https://emissor-fiscal-orpin.vercel.app">Acesse o sistema</a> com a sua senha ou use "Esqueci a senha".');
+    if (jaExiste) throw new Error('Já existe uma conta com este e-mail. <a href="https://app.notaoneapp.com.br">Acesse o sistema</a> com a sua senha ou use "Esqueci a senha".');
     if (error) throw new Error(/password/i.test(error.message) ? 'Senha fraca: use pelo menos 8 caracteres, misturando letras e números.' : /email/i.test(error.message) ? 'E-mail inválido. Confira o endereço.' : esc(error.message));
-    if (data.session){ location.href = '/'; return; }
+    if (data.session){ location.href = SISTEMA; return; }
     $('#caixa').innerHTML = `<div class="feito"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0E7A5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M7 12.5l3.5 3.5L17 9"></path></svg>
       <h2>Conta criada!</h2><p>Enviamos um link de confirmação para <b>${esc(email)}</b>.<br>Abra o e-mail, clique no link e entre no sistema. Os dados da sua empresa já vão estar preenchidos.</p>
       <p class="peq">Não chegou? Olhe a caixa de spam ou fale no WhatsApp <a href="https://wa.me/5586981931921" target="_blank" rel="noopener">(86) 98193-1921</a>.</p>
-      <a class="bt2" href="https://emissor-fiscal-orpin.vercel.app">Acessar sistema</a></div>`;
+      <a class="bt2" href="https://app.notaoneapp.com.br">Acessar sistema</a></div>`;
   } catch(e){ msg(e.message || 'Não foi possível criar a conta. Tente de novo.'); bt.disabled = false; bt.textContent = 'Criar minha conta'; }
 });
 </script>
