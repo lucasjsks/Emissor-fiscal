@@ -89,11 +89,11 @@ test('funcionários: só o dono lista, cria, troca senha e remove; respeita o li
   assert.equal((await chamar(equipe, 't3', { empresa_id:'E1', acao:'listar' })).code, 403);
   const l = await chamar(equipe, 't1', { empresa_id:'E1', acao:'listar' });
   assert.equal(l.body.funcionarios.length, 1); assert.equal(l.body.funcionarios[0].nome, 'Ana'); assert.equal(l.body.limite, 2);
-  assert.match((await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Bia', email:'ana@loja.com', senha:'12345678' })).body.erro, /já tem uma conta/);
   assert.match((await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Bia', email:'bia@loja.com', senha:'123' })).body.erro, /8 caracteres/);
-  const c = await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Bia', email:'Bia@Loja.com', senha:'12345678' });
+  const c = await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Bia', senha:'12345678' });
   assert.equal(c.code, 200, JSON.stringify(c.body)); const uid = c.body.funcionario.user_id;
-  assert.equal(membros['E1|' + uid], 'operador'); assert.equal(usuarios[uid].email, 'bia@loja.com');
+  assert.equal(membros['E1|' + uid], 'operador'); assert.match(usuarios[uid].email, /^func-e1-[0-9a-f]{10}@funcionarios\.notaone\.example\.com$/, 'e-mail interno gerado pelo servidor');
+  assert.match((await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'bia', senha:'12345678' })).body.erro, /mesmo nome|com este nome/);
   assert.match((await chamar(equipe, 't1', { empresa_id:'E1', acao:'criar', nome:'Caio', email:'caio@loja.com', senha:'12345678' })).body.erro, /permite 2/);
   assert.equal((await chamar(equipe, 't1', { empresa_id:'E1', acao:'senha', user_id:uid, senha:'novasenha1' })).code, 200);
   assert.equal(usuarios[uid].senha, 'novasenha1');

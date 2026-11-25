@@ -4278,11 +4278,11 @@ function cardFuncionarios(){
   const f = S.fn && S.fn.emp === S.empId ? S.fn : null; if (!f) setTimeout(fnCarregar, 0);
   const lista = f ? f.lista : [], cheio = f && f.limite !== null && lista.length >= f.limite, e = emp();
   return `<div class="card" id="cardFunc"><h3 style="margin-top:0">Funcionários</h3>
-    <p class="small">O funcionário entra pelo quadro com o nome dele e a senha dele e <b>só vende</b> (Caixa e PDV) e <b>cadastra produtos e clientes</b>. Ele não vê custo, financeiro, compras, relatórios nem os dados da empresa, e não cancela vendas.</p>
+    <p class="small">O funcionário entra pelo quadro com o nome dele e a senha dele (sem e-mail) e <b>só vende</b> (Caixa e PDV) e <b>cadastra produtos e clientes</b>. Ele não vê custo, financeiro, compras, relatórios nem os dados da empresa, e não cancela vendas.</p>
     <p class="small">Com funcionários, ao entrar no sistema aparece a tela <b>"Quem vai usar o sistema?"</b>: cada um toca no seu nome e digita a sua senha.</p>
     ${cardSenhaGerente(e)}
     ${!f ? '<div class="small">Carregando…</div>' : f.erro ? `<div class="msg err">${esc(f.erro)}</div>`
-      : lista.length ? `<div class="list">${lista.map(x => `<div class="it"><div class="grow"><div class="t">${esc(x.nome || x.email)}</div><div class="s">${esc(x.email)}${x.ultimo_acesso ? ' · último acesso ' + fmtData(x.ultimo_acesso) : ' · ainda não entrou'}</div></div>
+      : lista.length ? `<div class="list">${lista.map(x => `<div class="it"><div class="grow"><div class="t">${esc(x.nome || 'Funcionário')}</div><div class="s">${x.ultimo_acesso ? 'último acesso ' + fmtData(x.ultimo_acesso) : 'ainda não entrou'}</div></div>
         <button class="btn sm" data-act="fnSenha" data-id="${esc(x.user_id)}" style="flex:0 0 auto">Trocar senha</button><button class="btn sm bad" data-act="fnRemover" data-id="${esc(x.user_id)}" style="flex:0 0 auto">Remover</button></div>`).join('')}</div>`
       : '<div class="empty" style="padding:8px 0">Nenhum funcionário cadastrado.</div>'}
     ${f && !f.erro ? `<div class="actions">${cheio ? `<span class="small">Seu plano inclui ${f.limite} funcionário(s). Para liberar mais, <a href="${esc(linkSuporte('Quero liberar mais funcionários no NotaOne.'))}" target="_blank" rel="noopener">fale com o suporte</a>.</span>` : (e.senha_gerente ? '<button class="btn pri" data-act="fnNovo">+ Novo funcionário</button>' : '')}</div>` : ''}</div>`;
@@ -4317,14 +4317,14 @@ async function acoesLoja(a, t, id){
       if ($('#eCpf')) e.cpf = dig(val('eCpf')); if ($('#eCnpj')) e.cnpj = dig(val('eCnpj'));
       formEmpresa(e, t.dataset.t); return true; }
     case 'fnNovo':
-      openModal(`${mhead('Novo funcionário')}<p class="small">Ele entra tocando no próprio nome na tela "Quem vai usar o sistema?" e digitando esta senha. O e-mail serve de identificação (e para entrar de outro aparelho).</p>
-        ${fld('fnNome','Nome *','')}${fld('fnEmail','E-mail *','','type="email" autocomplete="off"')}${fld('fnSenha1','Senha (mínimo 8 caracteres) *','','type="password" autocomplete="new-password"')}
+      openModal(`${mhead('Novo funcionário')}<p class="small">Ele entra tocando no próprio nome na tela "Quem vai usar o sistema?" e digitando esta senha.</p>
+        ${fld('fnNome','Nome *','')}${fld('fnSenha1','Senha (mínimo 8 caracteres) *','','type="password" autocomplete="new-password"')}
         <div id="errM"></div><div class="actions"><button class="btn" data-act="fechar">Cancelar</button><button class="btn pri" data-act="fnCriar">Criar acesso</button></div>`);
       return true;
     case 'fnCriar': {
       t.disabled = true; $('#errM').innerHTML = '<div class="msg info">Criando o acesso…</div>';
-      try { await api('equipe', { empresa_id:S.empId, acao:'criar', nome:val('fnNome'), email:val('fnEmail'), senha:$('#fnSenha1').value });
-        S.fn = null; closeModal(); toast('Funcionário criado. Ele já pode entrar com o e-mail e a senha.'); render(); }
+      try { await api('equipe', { empresa_id:S.empId, acao:'criar', nome:val('fnNome'), senha:$('#fnSenha1').value });
+        S.fn = null; closeModal(); toast('Funcionário criado. Ele já pode entrar pelo quadro com o nome dele.'); render(); }
       catch(e){ t.disabled = false; $('#errM').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
       return true; }
     case 'fnSenha': {
