@@ -198,6 +198,23 @@ drop trigger if exists limite_caixas on public.docs;
 create trigger limite_caixas before insert or update on public.docs
   for each row execute function public.limite_caixas();
 
+-- MENSALIDADE (Asaas): empresas/<id>.assinatura só é gravada pelo servidor (api/asaas.js, service_role).
+-- A tela não consegue criar nem mudar (nem "marcar como paga"): o valor antigo é mantido.
+create or replace function public.proteger_assinatura() returns trigger
+language plpgsql as $$
+begin
+  if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
+  if tg_op = 'UPDATE' then
+    new.data := (new.data - 'assinatura') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura'));
+  else
+    new.data := new.data - 'assinatura';
+  end if;
+  return new;
+end $$;
+drop trigger if exists proteger_assinatura on public.docs;
+create trigger proteger_assinatura before insert or update on public.docs
+  for each row execute function public.proteger_assinatura();
+
 -- suporte: libera mais caixas para uma empresa. No SQL Editor do Supabase: select public.definir_limite_caixas('CNPJ', 3);
 create or replace function public.definir_limite_caixas(p_cnpj text, p_limite int) returns text
 language plpgsql security definer set search_path = public as $$

@@ -62,3 +62,10 @@ select public.definir_limite_caixas('11.222.333/0001-81', 3);
 select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
 update docs set data = data || '{"pdvs":[{"id":"a"},{"id":"b"},{"id":"c"}]}' where path='empresas/'||:'e' returning jsonb_array_length(data->'pdvs') as tres_caixas_ok, data->>'limite_caixas' as limite_3;
 reset role;
+-- mensalidade: só o servidor grava empresa.assinatura; a tela não consegue marcar como paga
+reset role;
+select public.gravar_campo_empresa(:'e', '{assinatura}', '{"id":"sub_1","situacao":"atrasada"}');
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"assinatura":{"id":"sub_1","situacao":"em_dia"}}' where path='empresas/'||:'e' returning data->'assinatura'->>'situacao' as assinatura_continua_atrasada;
+update docs set data = data - 'assinatura' where path='empresas/'||:'e' returning data->'assinatura'->>'id' as assinatura_nao_some_sub_1;
+reset role;
