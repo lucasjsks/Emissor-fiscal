@@ -1340,6 +1340,7 @@ function vEmpresa(){
   ${cardAssinatura()}
   ${cardCaixas()}
   ${cardContador()}
+  ${cardCiencia()}
   ${cardImpressao()}
   ${cardBalanca()}
   ${cardUsuarios()}
@@ -1874,7 +1875,7 @@ function pode(acao){
   if (S.papel === 'gerente') return true;
   return S.papel === 'operador' && PERM_OPERADOR.includes(acao);
 }
-const ACT_PERM = { sgSalvar:'empresa', sgForm:'empresa', sgTrocar:'empresa', empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', delEmp:'empresa', confDelEmp:'empresa',
+const ACT_PERM = { sgSalvar:'empresa', sgForm:'empresa', sgTrocar:'empresa', empTipo:'empresa', msBoleto:'empresa', msAssinar:'empresa', msAtualizar:'empresa', msPix:'empresa', salvarContador:'empresa', ctEnviarAgora:'empresa', ctConfEnviar:'empresa', confRemMembro:'usuarios', novaEmp:'empresa', editEmp:'empresa', salvarEmp:'empresa', salvarBalanca:'empresa', salvarImpressao:'empresa', salvarCiencia:'empresa', delEmp:'empresa', confDelEmp:'empresa',
   novoProd:'cadProduto', editProd:'cadProduto', salvarProd:'cadProduto', delProd:'produto', confDelProd:'produto', verEstoque:'produto', abrirFuncionarios:'empresa', fnNovo:'empresa', fnCriar:'empresa', fnSenha:'empresa', fnSalvarSenha:'empresa', fnRemover:'empresa', fnConfRemover:'empresa',
   novoCli:'cliente', editCli:'cliente', salvarCli:'cliente', delCli:'clienteDel', confDelCli:'clienteDel',
   emitirNfce:'emitir', emitirNfe:'emitir', cancelarNota:'cancelar', confCancelar:'cancelar', importarNcm:'ncm', salvarNcm:'ncm',
@@ -3303,7 +3304,7 @@ function prazoRec(r){ // ciência/confirmação: 180 dias; desconhecimento é ma
 }
 async function recBuscar(btn, silencioso){
   if (btn) btn.disabled = true;
-  try { const r = await api('recebidas', { empresa_id:S.empId, acao:'buscar' }); if (!silencioso) toast(r.gravadas ? `${r.gravadas} nota(s) atualizada(s).` : 'Nenhuma nota nova.'); }
+  try { const r = await api('recebidas', { empresa_id:S.empId, acao:'buscar' }); if (!silencioso) toast((r.gravadas ? `${r.gravadas} nota(s) atualizada(s).` : 'Nenhuma nota nova.') + (r.ciencias ? ` Ciência dada em ${r.ciencias}.` : '')); }
   catch(e){ S.recErroEm = Date.now(); if (!silencioso) toast(e.message); else S.recErro = e.message; }
   finally { if (btn) btn.disabled = false; }
 }
@@ -3325,7 +3326,7 @@ function verRecebida(chave){
   openModal(`${mhead('Nota recebida')}
   <div class="card" style="margin:0 0 10px"><b>${esc(r.emitente_nome)}</b> <span class="small">${fmtDoc(r.emitente_doc)}</span><br>
     <span class="small">Emitida em ${dataBR(r.data_emissao)} · valor <b>${brl(r.valor)}</b><br>Chave ${fmtChave(r.chave)}</span><br>
-    <span class="small">Situação na SEFAZ: <b>${r.situacao === 'cancelada' ? 'cancelada pelo fornecedor' : esc(r.situacao)}</b> · sua resposta: <b>${ml}</b>${r.manifestado_em ? ' em ' + fmtData(r.manifestado_em) : ''}</span></div>
+    <span class="small">Situação na SEFAZ: <b>${r.situacao === 'cancelada' ? 'cancelada pelo fornecedor' : esc(r.situacao)}</b> · sua resposta: <b>${ml}</b>${r.manifestado_em ? ' em ' + fmtData(r.manifestado_em) : ''}${r.ciencia_auto && r.manifestacao === 'ciencia' ? ' (dada pelo sistema)' : ''}</span></div>
   ${c ? `<div class="msg ok">Esta nota já deu entrada no estoque (compra nº ${esc(c.numero)}).</div><div class="actions" style="margin-top:0"><button class="btn" data-act="verCompra" data-id="${esc(c.id)}">Ver a compra</button></div>` : ''}
   ${!aberta ? '<div class="msg warn">O fornecedor cancelou esta nota. Não há o que fazer com ela.</div>' : ''}
   ${aberta && !c && !['desconhecimento','nao_realizada'].includes(r.manifestacao) ? `<h3>Aceitar</h3>
@@ -4815,6 +4816,17 @@ function imprimirCupom(n){
     setTimeout(() => f.remove(), 60000);
   }, 250);
 }
+// ciência automática das notas de fornecedores (o servidor dá a ciência ao buscar; ciencia_auto = false desliga)
+function cardCiencia(){
+  const e = emp() || {}; if (!pode('empresa') || !((e.mde || {}).sinc_em || (e.certificado || {}).manifestacao)) return '';
+  return `<div class="card"><h3 style="margin-top:0">Notas de fornecedores</h3>
+    <label class="chk"><input type="checkbox" id="cienciaAuto" data-act="salvarCiencia" ${e.ciencia_auto !== false ? 'checked' : ''}> Dar ciência sozinho assim que a nota do fornecedor chegar</label>
+    <p class="small">Assim a SEFAZ já libera a nota completa e, quando você clicar em <b>Aceitar</b> (Compras), a entrada no estoque abre na hora. A ciência só diz que você viu a nota: depois você ainda pode aceitar ou recusar. Vale para notas emitidas nos últimos 30 dias.</p></div>`;
+}
+async function salvarCiencia(){
+  const e = clone(emp()); e.ciencia_auto = $('#cienciaAuto').checked;
+  await safe(() => put('empresas', e), e.ciencia_auto ? 'Ciência automática ligada.' : 'Ciência automática desligada.');
+}
 function cardImpressao(){
   const i = (emp() || {}).impressao || {};
   return `<div class="card"><h3 style="margin-top:0">Impressão do cupom</h3>
@@ -4961,6 +4973,7 @@ document.addEventListener('click', async ev => {
     case 'salvarEmp': salvarEmp(id); break;
     case 'salvarBalanca': salvarBalanca(); break;
     case 'salvarImpressao': salvarImpressao(); break;
+    case 'salvarCiencia': salvarCiencia(); break;
     case 'enviarCertificado': await enviarCertificado(t); break;
     case 'formAmbiente': formAmbiente(t.dataset.v); break;
     case 'trocarAmbiente': await trocarAmbiente(t.dataset.v, t); break;
