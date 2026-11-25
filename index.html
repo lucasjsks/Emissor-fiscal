@@ -173,6 +173,7 @@ header select:disabled{background-image:none;padding-right:12px}
 .tag{padding:2px 8px;font-weight:600}
 .stats{gap:10px}.stats div{background:#f8f9fb;border:1px solid var(--line-2);border-radius:13px;padding:11px 8px}.stats b{font-size:21px;letter-spacing:-.02em}
 .res{border-radius:10px}.res:hover{background:var(--brand-soft)}
+.res.sel,.res.sel:hover{background:#0A1630!important;color:#fff!important}.res.sel .small,.res.sel b{color:#fff!important}
 .results{border-radius:12px}
 .msg{border-radius:11px}
 .empty{color:var(--muted)}
@@ -999,7 +1000,7 @@ function vPdv(){
     <div id="errV"></div>
     <div class="pdv-fim"><button class="btn bad" data-act="limpar" ${L.length ? '' : 'disabled'}>Cancelar venda</button><button class="btn pri" data-act="emitirNfce" ${L.length && cx ? '' : 'disabled'}>${S.conting ? 'Finalizar em contingência' : 'Finalizar venda'} (F9)</button></div>
   </div></div>
-  <div class="pdv-rod"><span><b>F2</b> produto</span><span><b>F3</b> CPF</span><span><b>F4</b> dinheiro</span><span><b>F6</b> PIX</span><span><b>F7</b> débito</span><span><b>F8</b> crédito</span><span><b>F9</b> finalizar</span><span><b>F10</b> desconto</span><span><b>3*código</b> quantidade</span><span><b>Del</b> remove o último item</span><span><b>Esc</b> limpa a busca</span></div>
+  <div class="pdv-rod"><span><b>F2</b> produto</span><span><b>F3</b> CPF</span><span><b>F4</b> dinheiro</span><span><b>F6</b> PIX</span><span><b>F7</b> débito</span><span><b>F8</b> crédito</span><span><b>F9</b> finalizar</span><span><b>F10</b> desconto</span><span><b>3*código</b> quantidade</span><span><b>↑ ↓</b> escolhe o produto</span><span><b>Del</b> remove o último item</span><span><b>Esc</b> limpa a busca</span></div>
   </div>`;
 }
 async function pdvAbrir(escolhido){
@@ -3953,12 +3954,22 @@ function entradaBusca(txt){
   if (d === q && d.length >= 8){ bip(false); toast(`Código ${d} não cadastrado.`); limparBusca(); return; }
   const f = document.querySelector('#resV .res'); if (f) addItem(f.dataset.id, mult);
 }
+// setas ↑ ↓ escolhem o produto na lista da busca; Enter adiciona o escolhido
+function moverSelecao(passo){
+  const itens = [...document.querySelectorAll('#resV .res')]; if (!itens.length) return false;
+  const atual = itens.findIndex(x => x.classList.contains('sel'));
+  let i = atual < 0 ? (passo > 0 ? 0 : itens.length - 1) : atual + passo;
+  i = Math.max(0, Math.min(itens.length - 1, i));
+  itens.forEach((x, k) => x.classList.toggle('sel', k === i));
+  itens[i].scrollIntoView({ block:'nearest' });
+  return true;
+}
 function atalhosHtml(){
   const F = S.produtos.filter(p => p.favorito).sort((a, b) => (a.descricao || '').localeCompare(b.descricao || '')).slice(0, 30);
   if (!F.length) return '';
   return `<div class="card"><h3 style="margin-top:0">Atalhos</h3><div class="atalhos">${F.map(p => `<button data-act="addCart" data-id="${esc(p.id)}"><span>${esc(p.descricao)}</span><b>${brl(p.preco)}</b></button>`).join('')}</div></div>`;
 }
-const TECLAS_CUPOM = '<div class="small teclas"><b>F2</b> buscar · <b>F4</b> dinheiro · <b>F6</b> PIX · <b>F7</b> débito · <b>F8</b> crédito · <b>F9</b> emitir · <b>3*código</b> multiplica · <b>Del</b> remove o último item</div>';
+const TECLAS_CUPOM = '<div class="small teclas"><b>F2</b> buscar · <b>F4</b> dinheiro · <b>F6</b> PIX · <b>F7</b> débito · <b>F8</b> crédito · <b>F9</b> emitir · <b>3*código</b> multiplica · <b>↑ ↓</b> escolhe o produto · <b>Del</b> remove o último item</div>';
 function teclaCupom(ev){
   if (S.tab !== 'venda') return false;
   if ($('#modal').classList.contains('on')){
@@ -4543,7 +4554,13 @@ document.addEventListener('change', ev => {
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') closeModal();
   if (ev.key === 'Enter' && ['lgEmail','lgSenha','lgNova'].includes(ev.target.id)){ const b = document.querySelector('#main .btn.pri'); if (b) b.click(); }
-  if (ev.key === 'Enter' && ev.target.id === 'busca'){ ev.preventDefault(); entradaBusca(ev.target.value); return; }
+  if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && ev.target.id === 'busca'){ if (moverSelecao(ev.key === 'ArrowDown' ? 1 : -1)) ev.preventDefault(); return; }
+  if (ev.key === 'Enter' && ev.target.id === 'busca'){
+    ev.preventDefault();
+    const sel = document.querySelector('#resV .res.sel');
+    if (sel) addItem(sel.dataset.id, separarMult(ev.target.value).mult); else entradaBusca(ev.target.value);
+    return;
+  }
   if (teclaCupom(ev)) return;
 });
 init();
