@@ -1423,26 +1423,29 @@ async function salvarEmpCpf(id){
   if (await safe(async () => { salvo = await put('empresas', o); }, 'Empresa salva.')){ closeModal(); if (novo) setEmp(salvo.id); else render(); }
 }
 
+// loja com CPF (sem nota fiscal): o produto não leva nenhuma informação fiscal (NCM, CFOP, CST, impostos)
+const CAMPOS_FISCAIS_PROD = () => [...Object.keys(TAXMAP), 'ncm', 'cest', 'origem', 'perfil_id'];
 function formProduto(p){
   const e = emp(), simples = String(e.regime) !== '3';
+  if (semNota(e)) p = p || { unidade:'UN' };
   p = p || { unidade:'UN', origem:'0', cfop:'5102', cst_csosn:simples ? '102' : '00', pis_cst:simples ? '49' : '01', cofins_cst:simples ? '49' : '01', pis_aliq:'0', cofins_aliq:'0', icms_aliq:simples ? '0' : '20,5', cst_ibscbs:'000', cclasstrib:'000001', gtin:'SEM GTIN' };
   openModal(`${mhead(p.id ? 'Editar produto' : 'Novo produto')}
   ${fld('pDesc','Descrição *',p.descricao)}
-  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}${fld('pCod','Código interno',p.codigo)}${fld('pGtin','Código de barras (GTIN)',p.gtin)}</div>
+  <div class="row">${fld('pPreco','Preço de venda *',p.preco ? String(p.preco).replace('.', ',') : '','data-rs inputmode="decimal"')}${fld('pUn','Unidade',p.unidade)}${fld('pCod','Código interno',p.codigo)}${fld('pGtin',semNota(e) ? 'Código de barras' : 'Código de barras (GTIN)',p.gtin)}</div>
   <label class="chk"><input type="checkbox" id="pFav" ${p.favorito ? 'checked' : ''}> Mostrar como atalho no cupom (botão de toque rápido)</label>
   <p class="small">Produto vendido na balança: o <b>Código interno</b> deve ser o mesmo código cadastrado na balança.</p>
-  <div ${semNota(e) ? 'style="display:none"' : ''}><h3>Tributação</h3>
+  ${semNota(e) ? '' : `<div><h3>Tributação</h3>
   <div class="row">${fld('pNcm','NCM * (8 dígitos)',p.ncm,'inputmode="numeric"')}${fld('pCest','CEST',p.cest,'inputmode="numeric"')}</div>
   <div id="ncmInfo" class="small" style="margin-top:4px">${ncmInfoHtml(p.ncm)}</div>
   ${perfilSelHtml(p)}
   ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
-  <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p></div>
+  <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p></div>`}
   <h3>Estoque</h3>
   <div class="row"><div><label>Saldo atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b>${p.custo_medio && verCusto() ? ` · custo médio ${brl(p.custo_medio)}` : ''}</div></div>
     ${fld('pEstMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}</div>
   <p class="small">O saldo muda só por compras, vendas e ajustes de inventário.</p>
   ${p.id && pode('produto') ? `<button class="btn" data-act="verEstoque" data-id="${esc(p.id)}">📦 Histórico e inventário</button>` : ''}
-  <div ${semNota(e) ? 'style="display:none"' : ''}><h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div></div>
+  ${semNota(e) ? '' : `<h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>`}
   <div id="errM"></div>
   <div class="actions">${p.id && pode('produto') ? `<button class="btn bad" data-act="delProd" data-id="${esc(p.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="salvarProd" data-id="${esc(p.id || '')}">Salvar</button></div>`);
   $('#mbox').classList.add('compacto'); // cadastro de produto mais junto (pedido do Lucas)
@@ -1460,7 +1463,9 @@ async function salvarProd(id, force){
   if (!(o.preco > 0)) errs.push('Informe um preço maior que zero.');
   if (!sn && !/^5\d{3}$/.test(o.cfop)) errs.push('CFOP deve ser de saída interna (começando com 5).');
   if (!sn && !o.cst_csosn) errs.push('Informe o CST/CSOSN.');
-  if (sn){ if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`; // sem nota fiscal: sem conferência fiscal
+  if (sn){ if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
+    // sem nota fiscal: nenhuma informação fiscal vai para o cadastro (e a que existir é retirada)
+    CAMPOS_FISCAIS_PROD().forEach(k => delete o[k]); o.gtin = o.gtin === 'SEM GTIN' ? '' : o.gtin;
     if (await safe(() => put('produtos', o), 'Produto salvo.')) closeModal(); return; }
   const v = validarProduto(o, emp());
   $('#valP').innerHTML = validarHtml(v);
