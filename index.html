@@ -1352,8 +1352,8 @@ function vEmpresa(){
   ${cardFuncionarios()}
   ${cardAssinatura()}
   ${cardCaixas()}
-  ${cardImpressao()}
-  ${cardBalanca()}
+  ${ramoDe(e) === 'servico' ? '' : cardImpressao()}
+  ${ramoDe(e) === 'servico' ? '' : cardBalanca()}
   ${cardPlano()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das vendas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes.</p>
@@ -1376,8 +1376,8 @@ function vEmpresa(){
   ${cardCaixas()}
   ${cardContador()}
   ${cardCiencia()}
-  ${cardImpressao()}
-  ${cardBalanca()}
+  ${ramoDe(e) === 'servico' ? '' : cardImpressao()}
+  ${ramoDe(e) === 'servico' ? '' : cardBalanca()}
   ${cardPlano()}
   ${cardUsuarios()}
   ${pode('backup') ? `<div class="card"><h3 style="margin-top:0">Backup</h3><p class="small">Exporta produtos, clientes, resumo das notas e dados da empresa numa planilha Excel. A mesma planilha serve para importar produtos e clientes (por exemplo, para cadastrar em lote ou copiar para outra empresa).</p>
