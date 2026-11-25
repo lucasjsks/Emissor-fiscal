@@ -4118,7 +4118,7 @@ async function msPix(pid){
   catch(e){ $('#msPixBox').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
   const box = $('#msPixBox'); if (!box) return;
   if (r.paga){ box.innerHTML = '<div class="msg ok">Esta mensalidade já está paga. Obrigado!</div>'; return; }
-  if (r.semPix){ box.innerHTML = `<div class="msg err">Não foi possível gerar o PIX agora.</div>${r.link ? `<div class="actions"><a class="btn pri" href="${esc(r.link)}" target="_blank" rel="noopener">Pagar por boleto, cartão ou PIX na página de pagamento</a></div>` : ''}`; return; }
+  if (r.semPix){ box.innerHTML = `<div class="msg err">Não foi possível gerar o PIX agora.${r.erro ? `<div class="small" style="margin-top:4px">${esc(r.erro)}</div>` : ''}</div>${r.link ? `<div class="actions"><a class="btn pri" href="${esc(r.link)}" target="_blank" rel="noopener">Pagar por boleto, cartão ou PIX na página de pagamento</a></div>` : ''}`; return; }
   box.innerHTML = `<p style="text-align:center">Valor: <b>${brl(r.valor)}</b> · vencimento ${dataBR(r.venc)}</p>
     <div style="text-align:center"><img src="data:image/png;base64,${esc(r.imagem)}" alt="QR Code PIX" style="width:230px;max-width:80%;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff"></div>
     <p class="small" style="text-align:center">Abra o app do seu banco, escolha <b>Pagar com PIX</b> e aponte a câmera para o QR Code. Ou copie o código abaixo (PIX copia e cola).</p>
