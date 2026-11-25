@@ -23,7 +23,7 @@ insert into membros(empresa_id,user_id,papel) values (:'e','22222222-2222-2222-2
 reset role;
 select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;
 select public.lancar_compra(:'e', '{"numero":"12","itens":[{"produto_id":"P1","qtd_estoque":1,"custo_unit":1}]}'); -- operador: falha
-update docs set data = data || '{"preco":1}' where path='empresas/'||:'e'||'/produtos/P1'; -- operador: 0 linhas
+update docs set data = data || '{"preco":1}' where path='empresas/'||:'e'||'/produtos/P1' returning data->>'preco' as operador_muda_preco_1; -- funcionário edita produto
 select count(*) movimentos_visiveis_operador from docs where col='empresas/'||:'e'||'/movimentos';
 insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/compras_xml/x2','empresas/'||:'e'||'/compras_xml',:'e','{}'); -- operador: falha (RLS)
 reset role; set role service_role;
@@ -69,3 +69,25 @@ select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set ro
 update docs set data = data || '{"assinatura":{"id":"sub_1","situacao":"em_dia"}}' where path='empresas/'||:'e' returning data->'assinatura'->>'situacao' as assinatura_continua_atrasada;
 update docs set data = data - 'assinatura' where path='empresas/'||:'e' returning data->'assinatura'->>'id' as assinatura_nao_some_sub_1;
 reset role;
+
+-- funcionário (operador): edita e cadastra produto, mas não mexe no custo nem apaga
+reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;
+update docs set data = data || '{"preco":7,"custo":0.01,"custo_medio":0.01}' where path='empresas/'||:'e'||'/produtos/P1' returning data->>'preco' as preco_7, data->>'custo_medio' as custo_medio_nao_mudou;
+insert into docs(path,col,empresa_id,data) values ('empresas/'||:'e'||'/produtos/P9','empresas/'||:'e'||'/produtos',:'e','{"descricao":"CAPINHA","preco":20,"custo":3}') returning data->>'custo' as custo_novo_nulo;
+delete from docs where path='empresas/'||:'e'||'/produtos/P9' returning 'operador_apagou_NAO_DEVIA';
+reset role;
+-- empresa cadastrada com CPF: CPF único e numeração própria das vendas sem nota
+insert into auth.users values ('33333333-3333-3333-3333-333333333333','cpf@x.com'),('44444444-4444-4444-4444-444444444444','cpf2@x.com') on conflict do nothing;
+select pg_temp.como('33333333-3333-3333-3333-333333333333','cpf@x.com'); set role authenticated;
+select public.criar_empresa('{"razao":"ZE","doc_tipo":"cpf","cpf":"529.982.247-25"}') as ecpf \gset
+reset role; select pg_temp.como('44444444-4444-4444-4444-444444444444','cpf2@x.com'); set role authenticated;
+select public.criar_empresa('{"razao":"OUTRO ZE","doc_tipo":"cpf","cpf":"52998224725"}'); -- deve falhar: CPF já cadastrado
+reset role; set role service_role;
+select public.proximo_numero(:'ecpf', 'prox_venda') as venda_1, public.proximo_numero(:'ecpf', 'prox_venda') as venda_2;
+reset role;
+-- limite de funcionários: a tela não muda; o suporte libera
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"limite_funcionarios":10}' where path='empresas/'||:'e' returning data->>'limite_funcionarios' as limite_func_ignorado_nulo;
+reset role;
+select public.definir_limite_funcionarios('11.222.333/0001-81', 3);
+select data->>'limite_funcionarios' as limite_func_3 from docs where path='empresas/'||:'e';

@@ -67,7 +67,7 @@ export async function atualizar(empresa_id, e){
 async function assinar(empresa_id, e, u){
   const a = e.assinatura || {};
   if (a.id && (a.ambiente || 'sandbox') === ambienteAsaas() && a.situacao !== 'cancelada') throw new Falha('Esta empresa já tem a assinatura ativa.');
-  const cnpj = dig(e.cnpj); if (cnpj.length !== 14 && cnpj.length !== 11) throw new Falha('Cadastre o CNPJ da empresa antes de assinar.');
+  const cnpj = dig(e.cnpj || e.cpf); if (cnpj.length !== 14 && cnpj.length !== 11) throw new Falha('Cadastre o CNPJ (ou CPF) da empresa antes de assinar.');
   // aproveita o cliente se já existir no Asaas (mesmo CNPJ)
   const achados = await asaas('GET', `/customers?cpfCnpj=${cnpj}&limit=1`);
   let cli = Array.isArray(achados.data) && achados.data.find(c => !c.deleted);
