@@ -486,6 +486,21 @@ begin
   return public._mover(e, pid, novo_saldo - atual, 'ajuste', null, nullif(trim(motivo), ''), null, auth.uid());
 end $$;
 
+-- preço de compra informado à mão no cadastro do produto (opcional): vira o custo e o custo médio.
+-- As próximas compras lançadas recalculam o custo médio a partir dele.
+create or replace function public.definir_custo(e text, pid text, p_custo numeric) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(public.meu_papel(e), '') not in ('dono','gerente') then raise exception 'Só gerente ou dono pode informar o preço de compra.'; end if;
+  if p_custo is null or p_custo < 0 then raise exception 'Preço de compra inválido.'; end if;
+  perform set_config('app.estoque', '1', true);
+  update public.docs set data = data || jsonb_build_object('custo', round(p_custo, 4), 'custo_medio', round(p_custo, 4))
+   where path = 'empresas/' || e || '/produtos/' || pid;
+  if not found then raise exception 'Produto não encontrado.'; end if;
+end $$;
+revoke execute on function public.definir_custo(text, text, numeric) from public, anon;
+grant execute on function public.definir_custo(text, text, numeric) to authenticated;
+
 -- chamada pelo servidor: venda autorizada tira do estoque; cancelamento devolve. Não aplica duas vezes.
 create or replace function public.aplicar_estoque_nota(e text, p_ref text, desfazer boolean) returns void
 language plpgsql security definer set search_path = public as $$
