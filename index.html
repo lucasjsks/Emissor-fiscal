@@ -1455,9 +1455,10 @@ function formProduto(p){
   ${taxFieldsHtml(p, simples, sel('pOrig','Origem',p.origem,[['0','0 — Nacional'],['1','1 — Estrangeira (importação direta)'],['2','2 — Estrangeira (mercado interno)'],['3','3 — Nacional, conteúdo importado > 40%'],['5','5 — Nacional, conteúdo importado ≤ 40%'],['7','7 — Estrangeira sem similar, mercado interno']]))}
   <p class="small">No CFOP, informe o da venda dentro do estado (5xxx). Em NF-e interestadual o sistema troca para 6xxx sozinho.</p></div>`}
   <h3>Estoque</h3>
-  <div class="row"><div><label>Saldo atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b>${p.custo_medio && verCusto() ? ` · custo médio ${brl(p.custo_medio)}` : ''}</div></div>
-    ${fld('pEstMin','Estoque mínimo (alerta)', p.estoque_min ? String(p.estoque_min).replace('.', ',') : '', 'inputmode="decimal"')}</div>
-  <p class="small">O saldo muda só por compras, vendas e ajustes de inventário.</p>
+  ${pode('produto') ? `<div class="row">${fld('pEst', 'Estoque atual', temSaldo(p) ? String(p.estoque).replace('.', ',') : '', `inputmode="decimal" placeholder="0" data-orig="${temSaldo(p) ? esc(String(p.estoque)) : ''}"`)}</div>
+  <p class="small">Digite a quantidade que tem na loja agora${p.custo_medio && verCusto() ? ` (custo médio ${brl(p.custo_medio)})` : ''}. Depois, as vendas tiram e as compras lançadas somam sozinhas; se mudar o número aqui, fica registrado no histórico como ajuste.</p>`
+  : `<div class="row"><div><label>Estoque atual</label><div style="padding:10px 0"><b>${temSaldo(p) ? qtdTxt(p.estoque) + ' ' + esc(p.unidade || 'UN') : 'sem entrada ainda'}</b></div></div></div>
+  <p class="small">O estoque muda pelas vendas e pelas compras. Para corrigir, peça ao gerente.</p>`}
   ${p.id && pode('produto') ? `<button class="btn" data-act="verEstoque" data-id="${esc(p.id)}">📦 Histórico e inventário</button>` : ''}
   ${semNota(e) ? '' : `<h3>Conferência fiscal</h3><div id="valP">${p.id ? validarHtml(validarProduto(p, e)) : '<div class="small">A conferência roda quando você salvar.</div>'}</div>`}
   <div id="errM"></div>
@@ -1466,8 +1467,8 @@ function formProduto(p){
 }
 async function salvarProd(id, force){
   const o = { descricao:val('pDesc').toUpperCase(), codigo:val('pCod'), gtin:val('pGtin') || 'SEM GTIN', preco:numIn(val('pPreco')), unidade:(val('pUn') || 'UN').toUpperCase(),
-    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), estoque_min:numIn(val('pEstMin')), favorito:!!($('#pFav') && $('#pFav').checked) };
-  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn','estoque','custo_medio'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
+    ncm:dig(val('pNcm')), cest:dig(val('pCest')), origem:val('pOrig'), ...readTax(), perfil_id:val('pPerfil'), favorito:!!($('#pFav') && $('#pFav').checked) };
+  const antes = id && S.produtos.find(x => x.id === id); if (antes){ ['custo','cod_forn','estoque','custo_medio','estoque_min'].forEach(k => { if (antes[k] !== undefined) o[k] = antes[k]; }); }
   const pf = S.perfis.find(f => f.id === o.perfil_id);
   if (pf && Object.entries(taxOf(pf)).some(([k, v]) => String(v) !== String(o[k]))) o.perfil_id = '';
   if (o.gtin.toUpperCase() === 'SEM GTIN') o.gtin = 'SEM GTIN'; else o.gtin = dig(o.gtin);
@@ -1480,14 +1481,26 @@ async function salvarProd(id, force){
   if (sn){ if (errs.length) return $('#errM').innerHTML = `<div class="msg err">${errs.join('<br>')}</div>`;
     // sem nota fiscal: nenhuma informação fiscal vai para o cadastro (e a que existir é retirada)
     CAMPOS_FISCAIS_PROD().forEach(k => delete o[k]); o.gtin = o.gtin === 'SEM GTIN' ? '' : o.gtin;
-    if (await safe(() => put('produtos', o), 'Produto salvo.')) closeModal(); return; }
+    if (await gravarProduto(o)) closeModal(); return; }
   const v = validarProduto(o, emp());
   $('#valP').innerHTML = validarHtml(v);
   if (errs.length || temErro(v)){ $('#errM').innerHTML = `<div class="msg err">${errs.length ? errs.join('<br>') : 'Corrija os erros da conferência fiscal acima.'}</div>`; return; }
   if (temAviso(v) && !force){
     $('#errM').innerHTML = `<div class="msg warn">Há ${v.filter(x => x.n === 'aviso').length} aviso(s) na conferência fiscal. Confira antes de salvar.</div><button class="btn block" data-act="salvarProd" data-id="${esc(id || '')}" data-force="1">Salvar mesmo assim</button>`;
     $('#valP').scrollIntoView({ behavior:'smooth', block:'center' }); return; }
-  if (await safe(() => put('produtos', o), 'Produto salvo.')) closeModal();
+  if (await gravarProduto(o)) closeModal();
+}
+// salva o produto e, se o gerente mudou o "Estoque atual", acerta o saldo (fica no histórico como ajuste de inventário)
+async function gravarProduto(o){
+  const el = $('#pEst'), v = el ? el.value.trim() : '', orig = el ? el.dataset.orig : '';
+  if (v !== '' && !(numIn(v) >= 0)) return $('#errM').innerHTML = '<div class="msg err">Estoque atual inválido: digite a quantidade (0 ou mais).</div>', false;
+  let salvo; if (!await safe(async () => { salvo = await put('produtos', o); })) return false;
+  const muda = el && v !== '' && pode('produto') && (orig === '' || numIn(v) !== num(orig));
+  if (muda && SB){
+    const { error } = await SB.rpc('ajustar_estoque', { e:S.empId, pid:salvo.id, novo_saldo:numIn(v), motivo:o.id ? 'Ajuste no cadastro do produto' : 'Estoque inicial (cadastro do produto)' });
+    if (error){ toast('Produto salvo, mas o estoque não foi ajustado: ' + error.message); return true; }
+  }
+  toast('Produto salvo.'); return true;
 }
 
 function formCliente(c){
