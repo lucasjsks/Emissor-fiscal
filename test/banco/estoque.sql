@@ -69,6 +69,11 @@ select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set ro
 update docs set data = data || '{"assinatura":{"id":"sub_1","situacao":"em_dia"}}' where path='empresas/'||:'e' returning data->'assinatura'->>'situacao' as assinatura_continua_atrasada;
 update docs set data = data - 'assinatura' where path='empresas/'||:'e' returning data->'assinatura'->>'id' as assinatura_nao_some_sub_1;
 reset role;
+-- plano: só o servidor grava (api/plano.js)
+select public.gravar_campo_empresa(:'e', '{plano}', '{"id":"1caixa","valor":89.99}');
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"plano":{"id":"2caixas","valor":1}}' where path='empresas/'||:'e' returning data->'plano'->>'id' as plano_continua_1caixa;
+reset role;
 
 -- funcionário (operador): edita e cadastra produto, mas não mexe no custo nem apaga
 reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;

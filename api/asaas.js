@@ -7,6 +7,7 @@
 // POST do Asaas (webhook, cabeçalho asaas-access-token = ASAAS_WEBHOOK_TOKEN) → atualiza a empresa dona da assinatura.
 // Variáveis na Vercel: ASAAS_ATIVO ('sim' liga a mensalidade na tela; sem ele fica desligada), ASAAS_API_KEY, ASAAS_AMBIENTE ('producao' ou vazio = sandbox), ASAAS_WEBHOOK_TOKEN, ASAAS_VALOR (opcional, padrão 89,99).
 // empresa.assinatura só é gravada aqui no servidor (a tela não consegue mudar: gatilho proteger_assinatura).
+import { planoDaEmpresa } from './_planos.js';
 import { timingSafeEqual } from 'node:crypto';
 import { rota, Falha, env, usuario, papelDe, getDoc, rpc, sb, isoBR } from './_lib.js';
 
@@ -76,7 +77,7 @@ async function assinar(empresa_id, e, u){
     cli = await asaas('POST', '/customers', { name:e.razao || e.fantasia || 'Empresa', cpfCnpj:cnpj, email:u.email || undefined,
       mobilePhone:fone.length >= 10 ? fone : undefined, externalReference:empresa_id, company:e.fantasia || undefined });
   }
-  const sub = await asaas('POST', '/subscriptions', { customer:cli.id, billingType:'UNDEFINED', value:valorMensal(), cycle:'MONTHLY',
+  const sub = await asaas('POST', '/subscriptions', { customer:cli.id, billingType:'UNDEFINED', value:(planoDaEmpresa(e) || {}).valor || valorMensal(), cycle:'MONTHLY',
     nextDueDate:primeiroVenc(), description:'Mensalidade NotaOne — Emissão Inteligente', externalReference:empresa_id });
   const novo = { id:sub.id, cliente:cli.id, ambiente:ambienteAsaas(), criada_em:isoBR(), criada_por:u.id };
   await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['assinatura'], valor:novo });
