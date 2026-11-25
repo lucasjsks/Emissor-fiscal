@@ -42,6 +42,7 @@ beforeEach(() => {
       }
       if (p.startsWith('/subscriptions/')) return json(assinaturas[p.split('/')[2]] || {}, assinaturas[p.split('/')[2]] ? 200 : 404);
       if (p === '/payments') return json({ data:pagamentos.filter(x => x.subscription === u.searchParams.get('subscription')) });
+      if (p.endsWith('/identificationField')) return json({ identificationField:'00190000090123456789012345678901234567890123456', barCode:'00191234500000089990000001234567890123456789', nossoNumero:'123' });
       if (p.endsWith('/pixQrCode')) return json({ encodedImage:'QUJD', payload:'00020126pix', expirationDate:'2026-12-01 23:59:59' });
       if (p.startsWith('/payments/')){ const x = pagamentos.find(y => y.id === p.split('/')[2]); return x ? json(x) : json({ errors:[{ description:'não encontrado' }] }, 404); }
     }
@@ -86,6 +87,15 @@ test('pix: devolve QR Code só de mensalidade da própria assinatura', async () 
   pagamentos.push({ id:'pay_X', subscription:'sub_outra', value:10, dueDate:'2026-11-01', status:'PENDING' });
   const x = await tela('t1', { empresa_id:'E1', acao:'pix', pagamento_id:'pay_X' });
   assert.equal(x.code, 404);
+});
+
+test('boleto: devolve linha digitável e código de barras só da própria assinatura', async () => {
+  await tela('t1', { empresa_id:'E1', acao:'assinar' });
+  pagamentos[0].bankSlipUrl = 'https://asaas/b/1';
+  const r = await tela('t1', { empresa_id:'E1', acao:'boleto', pagamento_id:'pay_1' });
+  assert.equal(r.code, 200); assert.equal(r.body.barras.length, 44); assert.ok(r.body.linha.length >= 47); assert.equal(r.body.pdf, 'https://asaas/b/1');
+  pagamentos.push({ id:'pay_Y', subscription:'sub_outra', value:10, dueDate:'2026-11-01', status:'PENDING' });
+  assert.equal((await tela('t1', { empresa_id:'E1', acao:'boleto', pagamento_id:'pay_Y' })).code, 404);
 });
 
 test('webhook: confere o token e marca a mensalidade como paga', async () => {
