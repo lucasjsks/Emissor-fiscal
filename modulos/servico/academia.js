@@ -195,14 +195,15 @@
 
   /* ---------------- Mensalidades (recebidas, a receber, planos) ---------------- */
   function vMensal(){
+    estiloBase();
     const mes = S.acMes || hojeISO().slice(0, 7), M = mensais().filter(m => (m.pago_em || '').slice(0, 7) === mes).sort((a, b) => b.pago_em.localeCompare(a.pago_em));
     const tot = r2(M.reduce((s, m) => s + num(m.valor), 0));
     const pend = alunos().filter(a => ['atrasado','vencendo'].includes(situacao(a).k)).sort((a, b) => String(a.valido_ate).localeCompare(String(b.valido_ate)));
     const prev = pend.reduce((s, a) => s + valorCobrar(a, planoAc(a.plano_id)), 0);
     const meses = [...new Set([hojeISO().slice(0, 7), ...mensais().map(m => (m.pago_em || '').slice(0, 7))])].sort().reverse();
     return `<h2>Mensalidades</h2>
-    <div class="card"><div class="stats"><div><b>${brl(tot)}</b>recebido no mês</div><div><b>${M.length}</b>pagamentos</div><div><b>${pend.length}</b>a receber (${brl(prev)})</div></div></div>
-    <div class="grid2"><div class="card"><h3 style="margin-top:0">A receber — atrasados e vencendo em 7 dias</h3>${pend.length ? `<div class="fin-lista">${pend.map(a => `
+    <div class="card"><div class="stats ac-stats"><div><b>${brl(tot)}</b>recebido no mês</div><div><b>${M.length}</b>pagamentos</div><div><b>${pend.length}</b>a receber (${brl(prev)})</div></div></div>
+    <div class="grid2 ac-g2"><div class="card"><h3 style="margin-top:0">A receber — atrasados e vencendo em 7 dias</h3>${pend.length ? `<div class="fin-lista">${pend.map(a => `
         <div class="fin-l nt-l ${situacao(a).k === 'atrasado' ? 'vencido' : 'hoje'}" data-act="acVerAluno" data-id="${esc(a.id)}"><div class="fin-v">${a.valido_ate ? a.valido_ate.slice(8, 10) + '/' + a.valido_ate.slice(5, 7) : '—'}<small>venc.</small></div>
           <div class="fin-d"><b>${esc(a.nome)}</b><span>${esc((planoAc(a.plano_id) || {}).nome || 'sem plano')} · ${brl(valorCobrar(a, planoAc(a.plano_id)))}</span></div>
           <div class="fin-r">${tagSit(a)}${linkZap(a, 'sm')}${pode('caixa') ? `<button class="btn sm pri" data-act="acReceber" data-id="${esc(a.id)}">Receber</button>` : ''}</div></div>`).join('')}</div>` : '<p class="small">Ninguém atrasado nem vencendo. 🎉</p>'}</div>
@@ -241,6 +242,7 @@
 
   /* ---------------- quadro no Início ---------------- */
   function inicioHtml(){
+    estiloBase();
     const L = alunos(), at = L.filter(a => situacao(a).k === 'atrasado'), ve = L.filter(a => situacao(a).k === 'vencendo'), ativos = L.filter(a => !a.inativo).length;
     const hoje = hojeISO(), ck = checkins().filter(c => (c.em || '').slice(0, 10) === hoje).length;
     const mes = r2(mensais().filter(m => (m.pago_em || '').slice(0, 7) === hoje.slice(0, 7)).reduce((s, m) => s + num(m.valor), 0));
@@ -250,7 +252,7 @@
     const loja = (emp() || {}).fantasia || 'academia';
     const parabens = a => { const t = fone(a.telefone); return t ? `<a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${t}?text=${encodeURIComponent(`Feliz aniversário, ${a.nome.split(' ')[0]}! 🎉 A equipe da ${loja} deseja muita saúde e ótimos treinos! 💪`)}">Parabenizar</a>` : ''; };
     return `<div class="card"><div class="row" style="align-items:center"><h3 style="margin:0;flex:1">Academia</h3><button class="btn pri" data-tab="ac_checkin" style="flex:0 0 auto">Check-in</button></div>
-      <div class="stats"><div><b>${ativos}</b>alunos ativos</div><div><b>${ck}</b>treinos hoje</div><div style="cursor:pointer" data-tab="ac_mensal"><b style="${venceHoje.length ? 'color:var(--warn)' : ''}">${venceHoje.length}</b>vence${venceHoje.length === 1 ? '' : 'm'} hoje${venceHoje.length ? ' · ' + brl(valHoje) : ''}</div><div><b>${aniv.length}</b>aniversariante${aniv.length === 1 ? '' : 's'} hoje</div><div><b>${brl(mes)}</b>mensalidades no mês</div></div>
+      <div class="stats ac-stats"><div><b>${ativos}</b>alunos ativos</div><div><b>${ck}</b>treinos hoje</div><div style="cursor:pointer" data-tab="ac_mensal"><b style="${venceHoje.length ? 'color:var(--warn)' : ''}">${venceHoje.length}</b>vence${venceHoje.length === 1 ? '' : 'm'} hoje${venceHoje.length ? ' · ' + brl(valHoje) : ''}</div><div><b>${aniv.length}</b>aniversariante${aniv.length === 1 ? '' : 's'} hoje</div><div><b>${brl(mes)}</b>mensalidades no mês</div></div>
       ${venceHoje.length ? `<h3>Vencem hoje</h3>${venceHoje.map(a => `<div class="total"><span style="cursor:pointer" data-act="acVerAluno" data-id="${esc(a.id)}"><b>${esc(a.nome)}</b> <span class="small">${esc((planoAc(a.plano_id) || {}).nome || '')}</span></span><span class="num">${brl(valorCobrar(a, planoAc(a.plano_id)))} ${linkZap(a, 'sm')}${pode('caixa') ? ` <button class="btn sm pri" data-act="acReceber" data-id="${esc(a.id)}">Receber</button>` : ''}</span></div>`).join('')}` : ''}
       ${aniv.length ? `<h3>🎂 Aniversariantes de hoje</h3>${aniv.map(a => `<div class="total"><span style="cursor:pointer" data-act="acVerAluno" data-id="${esc(a.id)}"><b>${esc(a.nome)}</b> <span class="small">${(() => { const id = +hoje.slice(0, 4) - +a.nascimento.slice(0, 4); return id > 0 && id < 120 ? id + ' anos' : ''; })()}</span></span><span>${parabens(a)}</span></div>`).join('')}` : ''}
       ${at.length ? `<div class="msg err" style="cursor:pointer" data-act="acFiltro" data-f="atrasados" data-ir="1"><b>${at.length}</b> aluno(s) com mensalidade atrasada — toque para ver</div>` : ''}
@@ -336,6 +338,14 @@
   // contas do Financeiro do núcleo (o nome titulosFin aqui dentro é o gancho do módulo)
   const titulosFin_nucleo = () => (typeof window.titulosFin === 'function' ? window.titulosFin() : []);
   const COR = ['#257de0', '#f47230', '#00b894', '#f2a600', '#6a4ce2', '#ee7fac']; // cores fixas por ordem (forma, plano)
+  // Ajustes de celular do módulo (telas estreitas): números quebram linha, listas não alargam a tela
+  function estiloBase(){
+    if (document.getElementById('acBaseCss')) return;
+    const st = document.createElement('style'); st.id = 'acBaseCss';
+    st.textContent = `.ac-stats{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(96px,1fr))}.ac-stats>div{min-width:0}
+.ac-g2>*{min-width:0}.ac-g2 .fin-d{min-width:0}.ac-g2 .fin-d b,.ac-g2 .fin-d span{overflow-wrap:anywhere}`;
+    document.head.appendChild(st);
+  }
   function estiloDash(){
     if (document.getElementById('acDashCss')) return;
     const st = document.createElement('style'); st.id = 'acDashCss';
