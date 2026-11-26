@@ -154,3 +154,15 @@ select (public.admin_painel()->0) ? 'dono_email' as painel_tem_email;
 select count(*) as admin_nao_le_segredos_0 from docs where split_part(col, '/', 3) = 'segredos';
 update docs set data = data || '{"fantasia":"HACK"}' where path='empresas/'||:'e' returning 1 as admin_nao_grava_vazio;
 reset role;
+
+-- baixa manual da mensalidade do NotaOne (Painel): só admin; estende o pago até; desfaz só a última
+select pg_temp.como('55555555-5555-5555-5555-555555555555','admin@x.com'); set role authenticated;
+select (public.admin_baixa_mensalidade(:'e', 89.99, 1, 'pix', '2026-11-26', 'teste')->>'pago_ate') is not null as baixa_1_ok;
+select public.admin_baixa_mensalidade(:'e', 179.98, 2, 'dinheiro', null, null) as mm \gset
+select jsonb_array_length((:'mm')::jsonb->'pagamentos') as duas_baixas, ((:'mm')::jsonb->>'pago_ate')::date - ((:'mm')::jsonb->'pagamentos'->1->>'de')::date between 59 and 62 as dois_meses;
+select public.admin_desfazer_baixa(:'e', (:'mm')::jsonb->'pagamentos'->0->>'id') as so_ultima_erro;
+select jsonb_array_length(public.admin_desfazer_baixa(:'e', (:'mm')::jsonb->'pagamentos'->1->>'id')->'pagamentos') as sobra_uma;
+reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+select public.admin_baixa_mensalidade(:'e', 1, 1, 'pix', null, null) as dono_nao_da_baixa_erro;
+update docs set data = data || '{"mensalidade_manual":{"pago_ate":"2099-01-01"}}' where path='empresas/'||:'e' returning data->'mensalidade_manual'->>'pago_ate' <> '2099-01-01' as tela_nao_altera_t;
+reset role;

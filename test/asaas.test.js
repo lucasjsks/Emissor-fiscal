@@ -190,3 +190,22 @@ test('situação: empresa com plano e sem assinatura ganha a mensalidade ao abri
   const r2 = await tela('t1', { empresa_id:'E1', acao:'situacao' });
   assert.equal(r2.body.criada, undefined); assert.ok(!chamadas.some(c => c.url === '/v3/subscriptions' && c.method === 'POST'));
 });
+
+// Painel NotaOne: o administrador dá baixa na mensalidade aberta do Asaas (recebida por fora)
+test('admin_baixa: só administrador; marca a mensalidade aberta como recebida no Asaas', async () => {
+  await tela('t1', { empresa_id:'E1', acao:'assinar' });
+  const antes = globalThis.fetch; let recebida = null;
+  globalThis.fetch = async (url, opt = {}) => {
+    const u = new URL(url);
+    if (u.host === 'sb.test' && u.pathname === '/rest/v1/admins') return { ok:true, status:200, text:async () => JSON.stringify(opt.headers && u.searchParams.get('user_id') === 'eq.U3' ? [{ user_id:'U3' }] : []) };
+    if (u.host === 'api-sandbox.asaas.com' && u.pathname.endsWith('/receiveInCash')){ recebida = JSON.parse(opt.body); pagamentos[0].status = 'RECEIVED_IN_CASH'; pagamentos[0].clientPaymentDate = recebida.paymentDate; return { ok:true, status:200, text:async () => '{}' }; }
+    return antes(url, opt);
+  };
+  try {
+    let r = await tela('t1', { empresa_id:'E1', acao:'admin_baixa', valor:89.99, data:'2026-11-26' });
+    assert.equal(r.code, 403, 'dono não é administrador');
+    r = await tela('t3', { empresa_id:'E1', acao:'admin_baixa', valor:89.99, data:'2026-11-26' });
+    assert.equal(r.code, 200); assert.equal(recebida.paymentDate, '2026-11-26'); assert.equal(recebida.value, 89.99);
+    assert.equal(docs['empresas/E1'].assinatura.ultimo_pagamento.pago_em, '2026-11-26');
+  } finally { globalThis.fetch = antes; }
+});
