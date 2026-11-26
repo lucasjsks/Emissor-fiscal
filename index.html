@@ -1432,10 +1432,8 @@ function formEmpresa(e, tipo){
   e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1',
     cnpj:dig(meta.cnpj), cpf:dig(meta.cpf), razao:meta.tipo === 'cpf' ? (meta.nome || '') : '', fantasia:meta.empresa || '', telefone:meta.telefone || '' };
   tipo = tipo || (e.id ? (e.doc_tipo === 'cpf' ? 'cpf' : 'cnpj') : meta.tipo === 'cpf' ? 'cpf' : 'cnpj');
-  const ant = (S.empForm || {}).plano, escolheAgora = !e.id || docEmp(e) !== tipo; // cadastro novo ou troca CPF ↔ CNPJ
-  const plOk = id => planosDoc(tipo).some(p => p.id === id) ? id : null;
-  S.empForm = { e, tipo, plano:escolheAgora ? (plOk(ant) || plOk(meta.plano) || planosDoc(tipo)[0].id) : null };
-  const blocoPlano = escolheAgora ? `<h3>Plano</h3>${planosHtml(tipo, S.empForm.plano, 'empPlano')}<p class="small">A primeira mensalidade só vence 30 dias depois. Dá para mudar de plano quando quiser, em Empresa → Plano.</p>` : '';
+  S.empForm = { e, tipo, plano:(S.empForm || {}).plano };
+  const blocoPlano = `<div id="empPlanoBox">${blocoPlanoEmp(grupoPlano(e.modulo, e.servico, tipo))}</div>`;
   const ramoAtual = e.modulo === 'servico' ? 'servico:' + (e.servico || SERVICOS[0][0]) : 'comercio';
   const ramo = sel('eRamo', 'Ramo de atividade', ramoAtual, [['comercio','Comércio (loja, mercado, distribuidora…)'], ...SERVICOS.map(([k, l]) => ['servico:' + k, 'Serviço — ' + l])]);
   const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
@@ -1476,6 +1474,17 @@ function formEmpresa(e, tipo){
   if (doSite) setTimeout(() => { const c = $('#eCnpj'); if (c) autoPreencher(c); }, 50); // busca razão social e endereço na Receita
 }
 // ramo escolhido no cadastro da empresa: comércio ou serviço (com o tipo de serviço)
+// bloco "Plano" do cadastro da empresa: aparece na empresa nova ou quando o grupo de planos muda (CPF ↔ CNPJ, academia ↔ outros ramos)
+function blocoPlanoEmp(grupo){
+  const f = S.empForm || {}, orig = f.e && f.e.id ? S.empresas.find(x => x.id === f.e.id) : null, meta = S.meuMeta || {};
+  const escolheAgora = !orig || docEmp(orig) !== grupo, plOk = id => planosDoc(grupo).some(p => p.id === id) ? id : null;
+  f.plano = escolheAgora ? (plOk(f.plano) || plOk(meta.plano) || (planosDoc(grupo)[0] || {}).id || null) : null;
+  return escolheAgora && f.plano ? `<h3>Plano</h3>${planosHtml(grupo, f.plano, 'empPlano')}<p class="small">A primeira mensalidade só vence 30 dias depois. Dá para mudar de plano quando quiser, em Empresa → Plano.</p>` : '';
+}
+document.addEventListener('change', ev => {
+  if (!ev.target || ev.target.id !== 'eRamo' || !S.empForm || !$('#empPlanoBox')) return;
+  const r = ramoDoForm(); $('#empPlanoBox').innerHTML = blocoPlanoEmp(grupoPlano(r.modulo, r.servico, S.empForm.tipo));
+});
 function ramoDoForm(){
   const v = $('#eRamo') ? val('eRamo') : 'comercio';
   return v.startsWith('servico:') ? { modulo:'servico', servico:v.slice(8) } : { modulo:'comercio', servico:null };
@@ -2285,10 +2294,13 @@ function perguntarPdvSePreciso(){
 const PLANOS_PADRAO = [
   { id:'cpf', nome:'Pessoa Física', valor:49.99, caixas:1, doc:'cpf', resumo:'Sem CNPJ: vendas com comprovante, estoque, financeiro e relatórios' },
   { id:'1caixa', nome:'1 Caixa', valor:89.99, caixas:1, doc:'cnpj', resumo:'NF-e e NFC-e, 1 caixa (PDV), estoque, compras e financeiro' },
-  { id:'2caixas', nome:'2 Caixas', valor:129.99, caixas:2, doc:'cnpj', resumo:'NF-e e NFC-e, 2 caixas (PDV), estoque, compras e financeiro' }];
+  { id:'2caixas', nome:'2 Caixas', valor:129.99, caixas:2, doc:'cnpj', resumo:'NF-e e NFC-e, 2 caixas (PDV), estoque, compras e financeiro' },
+  { id:'academia', nome:'Academia', valor:89.99, caixas:1, doc:'academia', resumo:'Alunos, check-in, mensalidades, avisos no WhatsApp, financeiro e relatórios' }];
 const planos = () => S.planos || PLANOS_PADRAO;
 const planosDoc = doc => planos().filter(p => p.doc === doc);
-const docEmp = e => (e && e.doc_tipo === 'cpf') ? 'cpf' : 'cnpj';
+// grupo de planos: academia (com CPF ou CNPJ, preço único — pedido do Lucas, 26/11/2026) ou, nos outros ramos, CPF / CNPJ
+const grupoPlano = (modulo, servico, tipo) => modulo === 'servico' && servico === 'academia' ? 'academia' : tipo === 'cpf' ? 'cpf' : 'cnpj';
+const docEmp = e => grupoPlano((e || {}).modulo, (e || {}).servico, (e || {}).doc_tipo);
 const planoAtual = (e = emp()) => { const p = planos().find(x => x.id === ((e || {}).plano || {}).id); return p && p.doc === docEmp(e) ? p : null; };
 // escolha do plano (cadastro da empresa e quadro Plano): cartões clicáveis
 const planosHtml = (doc, marcado, act) => `<div class="planos">${planosDoc(doc).map(p => `<button type="button" class="plano${p.id === marcado ? ' on' : ''}" data-act="${act}" data-p="${p.id}">

@@ -149,4 +149,17 @@ test('plano: dono escolhe; vale só para o tipo da empresa; limite de caixas aco
   const { planoDaEmpresa } = await import('../api/_planos.js');
   assert.equal(planoDaEmpresa({ doc_tipo:'cpf', plano:{ id:'2caixas' } }), null, 'plano de CNPJ não vale para loja CPF');
   assert.equal(planoDaEmpresa({ plano:{ id:'1caixa' } }).valor, 89.99);
+  // academia: plano próprio de R$ 89,99, com CPF ou CNPJ (pedido do Lucas, 26/11/2026)
+  assert.equal(planoDaEmpresa({ modulo:'servico', servico:'academia', doc_tipo:'cpf', plano:{ id:'academia' } }).valor, 89.99);
+  assert.equal(planoDaEmpresa({ modulo:'servico', servico:'academia', plano:{ id:'academia' } }).valor, 89.99);
+  assert.equal(planoDaEmpresa({ modulo:'servico', servico:'academia', plano:{ id:'1caixa' } }), null, 'academia não usa plano do comércio');
+  assert.equal(planoDaEmpresa({ plano:{ id:'academia' } }), null, 'comércio não usa plano da academia');
+  docs['empresas/E1'].modulo = 'servico'; docs['empresas/E1'].servico = 'academia';
+  r = await chamar(plano, 't1', { empresa_id:'E1', plano:'cpf' });
+  assert.equal(r.code, 400); assert.match(r.body.erro, /plano Academia/);
+  r = await chamar(plano, 't1', { empresa_id:'E1', plano:'academia' });
+  assert.equal(r.code, 200); assert.equal(docs['empresas/E1'].plano.valor, 89.99); assert.equal(docs['empresas/E1'].limite_caixas, 1);
+  r = await chamar(plano, 't1', { empresa_id:'E2', plano:'academia' });
+  assert.equal(r.code, 400); assert.match(r.body.erro, /só para academias/);
+  delete docs['empresas/E1'].modulo; delete docs['empresas/E1'].servico;
 });

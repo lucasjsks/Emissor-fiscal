@@ -13,7 +13,8 @@ export default rota(async (req, b) => {
   if (!e) throw new Falha('Empresa não encontrada.', 404);
   const p = planoPorId(b.plano);
   if (!p) throw new Falha('Plano inválido.');
-  if (p.doc !== docDaEmpresa(e)) throw new Falha(p.doc === 'cpf' ? 'O plano Pessoa Física é só para quem não tem CNPJ.' : 'Empresa sem CNPJ usa o plano Pessoa Física.');
+  const g = docDaEmpresa(e);
+  if (p.doc !== g) throw new Falha(g === 'academia' ? 'Academia usa o plano Academia.' : p.doc === 'academia' ? 'O plano Academia é só para academias.' : p.doc === 'cpf' ? 'O plano Pessoa Física é só para quem não tem CNPJ.' : 'Empresa sem CNPJ usa o plano Pessoa Física.');
   const caixas = Array.isArray(e.pdvs) ? e.pdvs.length : 0;
   if (caixas > p.caixas) throw new Falha(`Este plano permite ${p.caixas} caixa(s) e a empresa tem ${caixas} cadastrados. Exclua o caixa a mais em Empresa → Caixas da empresa e tente de novo.`);
   const plano = { id:p.id, nome:p.nome, valor:p.valor, caixas:p.caixas, escolhido_em:isoBR(), escolhido_por:u.id };
