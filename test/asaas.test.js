@@ -124,3 +124,30 @@ test('situação: cobrança vencida deixa a assinatura atrasada; assinatura inat
   assert.equal(s.situacao, 'atrasada'); assert.equal(s.aberta.id, 'b'); assert.equal(s.dia, 10); assert.equal(s.mensalidades[0].id, 'b');
   assert.equal(montarSituacao({ id:'sub_1', status:'INACTIVE' }, []).situacao, 'cancelada');
 });
+
+// cobrança automática (pedido do Lucas, 26/11/2026): ao escolher o plano, a mensalidade já nasce no Asaas com a 1ª cobrança em 30 dias
+test('plano: ao escolher o plano a assinatura é criada sozinha no Asaas; trocar de plano só muda o valor', async () => {
+  const { default: plano } = await import('../api/plano.js');
+  const pedir = (token, body) => new Promise(resolve => { const res = { code:0, status(c){ this.code = c; return this; }, json(o){ resolve({ code:this.code, body:o }); }, setHeader(){} };
+    plano({ method:'POST', headers:{ authorization:'Bearer ' + token }, body }, res); });
+  let r = await pedir('t1', { empresa_id:'E1', plano:'2caixas' });
+  assert.equal(r.code, 200); assert.equal(r.body.aviso, '');
+  const sub = chamadas.find(c => c.url === '/v3/subscriptions' && c.method === 'POST');
+  assert.ok(sub, 'criou a assinatura'); assert.equal(sub.body.value, 129.99); assert.equal(sub.body.nextDueDate, primeiroVenc());
+  assert.equal(docs['empresas/E1'].assinatura.id, 'sub_1'); assert.equal(r.body.assinatura.proximo_venc || r.body.assinatura.aberta.venc, primeiroVenc());
+  chamadas = [];
+  r = await pedir('t1', { empresa_id:'E1', plano:'1caixa' });
+  assert.equal(r.code, 200);
+  assert.ok(!chamadas.some(c => c.url === '/v3/subscriptions' && c.method === 'POST'), 'não cria outra assinatura');
+  assert.ok(chamadas.some(c => c.url === '/v3/subscriptions/sub_1' && c.body.value === 89.99), 'atualiza o valor');
+});
+test('plano: com a cobrança desligada o plano é salvo sem criar assinatura', async () => {
+  const { default: plano } = await import('../api/plano.js');
+  process.env.ASAAS_ATIVO = 'nao';
+  try {
+    const r = await new Promise(resolve => { const res = { code:0, status(c){ this.code = c; return this; }, json(o){ resolve({ code:this.code, body:o }); }, setHeader(){} };
+      plano({ method:'POST', headers:{ authorization:'Bearer t1' }, body:{ empresa_id:'E1', plano:'1caixa' } }, res); });
+    assert.equal(r.code, 200); assert.equal(docs['empresas/E1'].plano.id, '1caixa'); assert.equal(docs['empresas/E1'].assinatura, undefined);
+    assert.ok(!chamadas.some(c => c.host === 'api-sandbox.asaas.com'));
+  } finally { process.env.ASAAS_ATIVO = 'sim'; }
+});

@@ -1436,7 +1436,10 @@ function formEmpresa(e, tipo){
   S.empForm = { e, tipo, plano:(S.empForm || {}).plano };
   const blocoPlano = `<div id="empPlanoBox">${blocoPlanoEmp(grupoPlano(e.modulo, e.servico, tipo))}</div>`;
   const ramoAtual = e.modulo === 'servico' ? 'servico:' + (e.servico || SERVICOS[0][0]) : 'comercio';
-  const ramo = sel('eRamo', 'Ramo de atividade', ramoAtual, [['comercio','Comércio (loja, mercado, distribuidora…)'], ...SERVICOS.map(([k, l]) => ['servico:' + k, 'Serviço — ' + l])]);
+  // o ramo é escolhido no cadastro e depois não muda mais pela tela (pedido do Lucas, 26/11/2026; o banco também trava — gatilho proteger_ramo)
+  const ramoFixo = !!(e.id && S.empresas.some(x => x.id === e.id));
+  const ramo = sel('eRamo', 'Ramo de atividade', ramoAtual, [['comercio','Comércio (loja, mercado, distribuidora…)'], ...SERVICOS.map(([k, l]) => ['servico:' + k, 'Serviço — ' + l])]).replace('<select id="eRamo"', ramoFixo ? '<select id="eRamo" disabled' : '<select id="eRamo"')
+    + (ramoFixo ? `<p class="small" style="margin-top:2px">O ramo de atividade é definido no cadastro e não pode ser mudado. Precisa mudar? <a href="${esc(linkSuporte('Preciso mudar o ramo de atividade da empresa.'))}" target="_blank" rel="noopener">Fale com o suporte</a>.</p>` : '');
   const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   if (tipo === 'cpf'){
     openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
@@ -2309,6 +2312,7 @@ const planosHtml = (doc, marcado, act) => `<div class="planos">${planosDoc(doc).
 async function aplicarPlano(empresa_id, plano){
   const r = await api('plano', { empresa_id, plano });
   if (r.aviso) setTimeout(() => toast(r.aviso), 3000);
+  else if (r.assinatura && r.assinatura.proximo_venc) setTimeout(() => toast(`Mensalidade do NotaOne ativada: a 1ª cobrança vence em ${dataBR(r.assinatura.proximo_venc)}.`), 2500);
   return r;
 }
 function cardPlano(){

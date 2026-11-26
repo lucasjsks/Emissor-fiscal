@@ -225,6 +225,33 @@ drop trigger if exists proteger_assinatura on public.docs;
 create trigger proteger_assinatura before insert or update on public.docs
   for each row execute function public.proteger_assinatura();
 
+-- RAMO DE ATIVIDADE (pedido do Lucas, 26/11/2026): escolhido no cadastro, não muda mais pela tela.
+-- Ao alterar, a tela (authenticated) não consegue trocar modulo/servico (empresa antiga sem ramo fica como comércio).
+-- Suporte troca no SQL Editor: select public.definir_ramo('CNPJ ou CPF', 'academia');  (ou 'comercio')
+create or replace function public.proteger_ramo() returns trigger
+language plpgsql as $$
+begin
+  if new.col <> 'empresas' or tg_op <> 'UPDATE' or current_user not in ('authenticated', 'anon') then return new; end if;
+  new.data := (new.data - 'modulo' - 'servico') || jsonb_strip_nulls(jsonb_build_object('modulo', coalesce(old.data->'modulo', '"comercio"'::jsonb), 'servico', old.data->'servico'));
+  return new;
+end $$;
+drop trigger if exists proteger_ramo on public.docs;
+create trigger proteger_ramo before update on public.docs
+  for each row execute function public.proteger_ramo();
+create or replace function public.definir_ramo(p_doc text, p_ramo text) returns text
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if current_user in ('authenticated', 'anon') and not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  if p_ramo not in ('comercio', 'academia') then raise exception 'Ramo inválido: use comercio ou academia.'; end if;
+  update public.docs set data = (data - 'modulo' - 'servico') || case when p_ramo = 'comercio' then '{"modulo":"comercio"}'::jsonb else jsonb_build_object('modulo', 'servico', 'servico', p_ramo) end
+   where col = 'empresas' and public.doc_empresa(data) = regexp_replace(p_doc, '\D', '', 'g');
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ/CPF.'; end if;
+  return 'Ramo alterado para ' || p_ramo || '. Depois, escolha o plano certo em Empresa → Plano.';
+end $$;
+revoke execute on function public.definir_ramo(text, text) from public, anon;
+
 -- suporte: libera mais caixas para uma empresa. No SQL Editor do Supabase: select public.definir_limite_caixas('CNPJ', 3);
 create or replace function public.definir_limite_caixas(p_cnpj text, p_limite int) returns text
 language plpgsql security definer set search_path = public as $$

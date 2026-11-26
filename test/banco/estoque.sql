@@ -74,6 +74,16 @@ select public.gravar_campo_empresa(:'e', '{plano}', '{"id":"1caixa","valor":89.9
 select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
 update docs set data = data || '{"plano":{"id":"2caixas","valor":1}}' where path='empresas/'||:'e' returning data->'plano'->>'id' as plano_continua_1caixa;
 reset role;
+-- ramo de atividade: a tela não muda (empresa sem ramo fica comércio); o suporte muda com definir_ramo
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"modulo":"servico","servico":"academia"}' where path='empresas/'||:'e' returning data->>'modulo' as ramo_continua_comercio, data->>'servico' as servico_vazio;
+reset role;
+select public.definir_ramo((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), 'academia') as suporte_muda_ramo;
+select data->>'modulo' as modulo_servico, data->>'servico' as servico_academia from docs where path='empresas/'||:'e';
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = (data || '{"modulo":"comercio"}'::jsonb) - 'servico' where path='empresas/'||:'e' returning data->>'servico' as continua_academia;
+reset role;
+select public.definir_ramo((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), 'comercio') as volta_comercio;
 
 -- funcionário (operador): edita e cadastra produto, mas não mexe no custo nem apaga
 reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;

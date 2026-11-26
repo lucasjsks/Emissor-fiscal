@@ -2,7 +2,7 @@
 // A tela não consegue gravar esses campos (gatilhos no banco); só este servidor.
 import { rota, Falha, usuario, papelDe, getDoc, rpc, isoBR } from './_lib.js';
 import { planoPorId, docDaEmpresa } from './_planos.js';
-import { asaas, ambienteAsaas } from './asaas.js';
+import { asaas, ambienteAsaas, assinar, asaasLigado } from './asaas.js';
 
 export default rota(async (req, b) => {
   const u = await usuario(req);
@@ -21,11 +21,15 @@ export default rota(async (req, b) => {
   await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['plano'], valor:plano });
   await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['limite_caixas'], valor:p.caixas });
   // mensalidade já assinada no Asaas: o valor acompanha o plano (inclusive as mensalidades em aberto)
-  let aviso = '';
+  let aviso = '', assinatura = null;
   const a = e.assinatura || {};
   if (a.id && a.situacao !== 'cancelada' && process.env.ASAAS_API_KEY && (a.ambiente || 'sandbox') === ambienteAsaas()){
     try { await asaas('POST', `/subscriptions/${encodeURIComponent(a.id)}`, { value:p.valor, updatePendingPayments:true }); }
     catch(err){ aviso = 'O plano mudou, mas não foi possível atualizar o valor da mensalidade. Fale com o suporte.'; }
+  } else if (asaasLigado()){
+    // primeira escolha de plano: a mensalidade do NotaOne já nasce no Asaas, com a 1ª cobrança para daqui a 30 dias
+    try { assinatura = await assinar(empresa_id, { ...e, plano, limite_caixas:p.caixas }, u); }
+    catch(err){ aviso = 'O plano foi salvo, mas a mensalidade não foi gerada (' + err.message + '). Toque em "Assinar" em Empresa → Mensalidade do NotaOne ou fale com o suporte.'; }
   }
-  return { ok:true, plano, aviso };
+  return { ok:true, plano, aviso, assinatura };
 });
