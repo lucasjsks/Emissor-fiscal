@@ -209,3 +209,28 @@ test('admin_baixa: só administrador; marca a mensalidade aberta como recebida n
     assert.equal(docs['empresas/E1'].assinatura.ultimo_pagamento.pago_em, '2026-11-26');
   } finally { globalThis.fetch = antes; }
 });
+
+// Painel NotaOne: valor especial da mensalidade → a assinatura do Asaas passa a cobrar esse valor
+test('admin_valor: só administrador; atualiza o valor da assinatura no Asaas', async () => {
+  await tela('t1', { empresa_id:'E1', acao:'assinar' });
+  const antes = globalThis.fetch; let mudou = null;
+  globalThis.fetch = async (url, opt = {}) => {
+    const u = new URL(url);
+    if (u.host === 'sb.test' && u.pathname === '/rest/v1/admins') return { ok:true, status:200, text:async () => JSON.stringify(u.searchParams.get('user_id') === 'eq.U3' ? [{ user_id:'U3' }] : []) };
+    if (u.host === 'api-sandbox.asaas.com' && /^\/v3\/subscriptions\/[^/]+$/.test(u.pathname) && opt.method === 'POST'){ mudou = JSON.parse(opt.body); return { ok:true, status:200, text:async () => '{}' }; }
+    return antes(url, opt);
+  };
+  try {
+    docs['empresas/E1'].mensalidade_especial = { valor:59.9 };
+    let r = await tela('t1', { empresa_id:'E1', acao:'admin_valor' });
+    assert.equal(r.code, 403, 'dono não é administrador');
+    r = await tela('t3', { empresa_id:'E1', acao:'admin_valor' });
+    assert.equal(r.code, 200); assert.equal(mudou.value, 59.9); assert.equal(mudou.updatePendingPayments, true);
+  } finally { globalThis.fetch = antes; delete docs['empresas/E1'].mensalidade_especial; }
+});
+
+test('valorDaEmpresa: valor especial vence o do plano', async () => {
+  const { valorDaEmpresa } = await import('../api/_planos.js');
+  assert.equal(valorDaEmpresa({ cnpj:'1', plano:{ id:'1caixa' } }), 89.99);
+  assert.equal(valorDaEmpresa({ cnpj:'1', plano:{ id:'1caixa' }, mensalidade_especial:{ valor:59.9 } }), 59.9);
+});

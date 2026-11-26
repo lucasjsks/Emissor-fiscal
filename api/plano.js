@@ -1,7 +1,7 @@
 // POST /api/plano — o dono escolhe (ou troca) o plano da empresa: grava empresa.plano e o limite de caixas.
 // A tela não consegue gravar esses campos (gatilhos no banco); só este servidor.
 import { rota, Falha, usuario, papelDe, getDoc, rpc, isoBR } from './_lib.js';
-import { planoPorId, docDaEmpresa } from './_planos.js';
+import { planoPorId, docDaEmpresa, valorEspecial } from './_planos.js';
 import { asaas, ambienteAsaas, assinar, asaasLigado } from './asaas.js';
 
 export default rota(async (req, b) => {
@@ -24,7 +24,7 @@ export default rota(async (req, b) => {
   let aviso = '', assinatura = null;
   const a = e.assinatura || {};
   if (a.id && a.situacao !== 'cancelada' && process.env.ASAAS_API_KEY && (a.ambiente || 'sandbox') === ambienteAsaas()){
-    try { await asaas('POST', `/subscriptions/${encodeURIComponent(a.id)}`, { value:p.valor, updatePendingPayments:true }); }
+    try { await asaas('POST', `/subscriptions/${encodeURIComponent(a.id)}`, { value:valorEspecial(e) || p.valor, updatePendingPayments:true }); }
     catch(err){ aviso = 'O plano mudou, mas não foi possível atualizar o valor da mensalidade. Fale com o suporte.'; }
   } else if (asaasLigado()){
     // primeira escolha de plano: a mensalidade do NotaOne já nasce no Asaas, com a 1ª cobrança para daqui a 30 dias

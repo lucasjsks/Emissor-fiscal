@@ -166,3 +166,13 @@ reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.c
 select public.admin_baixa_mensalidade(:'e', 1, 1, 'pix', null, null) as dono_nao_da_baixa_erro;
 update docs set data = data || '{"mensalidade_manual":{"pago_ate":"2099-01-01"}}' where path='empresas/'||:'e' returning data->'mensalidade_manual'->>'pago_ate' <> '2099-01-01' as tela_nao_altera_t;
 reset role;
+-- valor especial da mensalidade (Painel): só admin grava; a tela da empresa não altera; zero volta ao plano
+select pg_temp.como('55555555-5555-5555-5555-555555555555','admin@x.com'); set role authenticated;
+select (public.admin_valor_mensalidade(:'e', 59.9, 'piloto')->>'valor')::numeric = 59.9 as valor_especial_ok;
+reset role; select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+select public.admin_valor_mensalidade(:'e', 1, null) as dono_nao_muda_valor_erro;
+update docs set data = data || '{"mensalidade_especial":{"valor":1}}' where path='empresas/'||:'e' returning (data->'mensalidade_especial'->>'valor')::numeric = 59.9 as tela_nao_muda_valor_t;
+reset role; select pg_temp.como('55555555-5555-5555-5555-555555555555','admin@x.com'); set role authenticated;
+select public.admin_valor_mensalidade(:'e', 0, null) is null as volta_ao_plano;
+select not (data ? 'mensalidade_especial') as sem_especial from docs where path='empresas/'||:'e';
+reset role;

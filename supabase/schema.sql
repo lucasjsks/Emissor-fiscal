@@ -216,9 +216,9 @@ language plpgsql as $$
 begin
   if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
   if tg_op = 'UPDATE' then
-    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo' - 'mensalidade_manual') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade', 'liberar_tipo', old.data->'liberar_tipo', 'mensalidade_manual', old.data->'mensalidade_manual'));
+    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo' - 'mensalidade_manual' - 'mensalidade_especial') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade', 'liberar_tipo', old.data->'liberar_tipo', 'mensalidade_manual', old.data->'mensalidade_manual', 'mensalidade_especial', old.data->'mensalidade_especial'));
   else
-    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo' - 'mensalidade_manual';
+    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo' - 'mensalidade_manual' - 'mensalidade_especial';
   end if;
   return new;
 end $$;
@@ -269,7 +269,7 @@ begin
     select jsonb_strip_nulls(jsonb_build_object(
       'id', e.empresa_id, 'fantasia', e.data->'fantasia', 'razao', e.data->'razao', 'cnpj', e.data->'cnpj', 'cpf', e.data->'cpf',
       'doc_tipo', e.data->'doc_tipo', 'modulo', e.data->'modulo', 'servico', e.data->'servico', 'plano', e.data->'plano',
-      'assinatura', (e.data->'assinatura') - 'mensalidades', 'sem_mensalidade', e.data->'sem_mensalidade', 'mensalidade_manual', e.data->'mensalidade_manual', 'ambiente', e.data->'ambiente',
+      'assinatura', (e.data->'assinatura') - 'mensalidades', 'sem_mensalidade', e.data->'sem_mensalidade', 'mensalidade_manual', e.data->'mensalidade_manual', 'mensalidade_especial', e.data->'mensalidade_especial', 'ambiente', e.data->'ambiente',
       'certificado', e.data->'certificado', 'telefone', e.data->'telefone', 'municipio', e.data->'municipio', 'uf', e.data->'uf',
       'funcionarios', case when jsonb_typeof(e.data->'funcionarios') = 'array' then jsonb_array_length(e.data->'funcionarios') else 0 end,
       'criado_em', dono.criado_em, 'dono_email', dono.email,
@@ -340,6 +340,26 @@ begin
   update public.docs set data = jsonb_set(data, '{mensalidade_manual}', mm, true) where path = 'empresas/' || p_empresa;
   return mm;
 end $$;
+-- VALOR ESPECIAL DA MENSALIDADE (pedido do Lucas, 26/11/2026): o administrador combina com o cliente um valor diferente do plano.
+-- Fica em empresas/<id>.mensalidade_especial {valor, obs, em, por} (a tela da empresa não grava: proteger_assinatura).
+-- Valor nulo ou zero = volta ao valor do plano.
+create or replace function public.admin_valor_mensalidade(p_empresa text, p_valor numeric, p_obs text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  if not exists (select 1 from public.docs where path = 'empresas/' || p_empresa) then raise exception 'Empresa não encontrada.'; end if;
+  if p_valor is not null and p_valor < 0 then raise exception 'Valor inválido.'; end if;
+  if p_valor is null or p_valor = 0 then
+    update public.docs set data = data - 'mensalidade_especial' where path = 'empresas/' || p_empresa;
+    return null;
+  end if;
+  v := jsonb_strip_nulls(jsonb_build_object('valor', round(p_valor, 2), 'obs', nullif(trim(coalesce(p_obs, '')), ''), 'em', now(), 'por', auth.uid()));
+  update public.docs set data = jsonb_set(data, '{mensalidade_especial}', v, true) where path = 'empresas/' || p_empresa;
+  return v;
+end $$;
+revoke execute on function public.admin_valor_mensalidade(text, numeric, text) from public, anon;
+grant execute on function public.admin_valor_mensalidade(text, numeric, text) to authenticated;
 revoke execute on function public.admin_baixa_mensalidade(text, numeric, int, text, date, text) from public, anon;
 revoke execute on function public.admin_desfazer_baixa(text, text) from public, anon;
 grant execute on function public.admin_baixa_mensalidade(text, numeric, int, text, date, text) to authenticated;
