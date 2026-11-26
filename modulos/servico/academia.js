@@ -142,7 +142,6 @@
       ${fld('acRValor', 'Valor recebido', brl(valorCobrar(a, p)), 'data-rs inputmode="decimal"')}
       <div class="row">${sel('acRForma', 'Forma de pagamento', '17', PAGAMENTOS.filter(([c]) => ['01','17','04','03','99'].includes(c)))}${fld('acRDe', 'Período começa em', de, 'type="date"')}</div>
       <div id="acRAte" class="msg info"></div><div id="errM"></div>
-      ${caixaAberto() ? '' : '<p class="small">O caixa está fechado: o pagamento fica registrado, mas não entra na conferência do caixa.</p>'}
       <div class="actions"><button class="btn pri" data-act="acSalvarReceb">Confirmar recebimento</button></div>`);
     atualizarAte();
   }
@@ -155,7 +154,7 @@
     if (!p) return $('#errM').innerHTML = '<div class="msg err">Escolha o plano.</div>';
     if (!(valor > 0)) return $('#errM').innerHTML = '<div class="msg err">Informe o valor recebido.</div>';
     if (!de) return $('#errM').innerHTML = '<div class="msg err">Informe a data de início do período.</div>';
-    const meses = +val('acRMeses') || 1, ate = maisMeses(de, meses), cx = caixaAberto();
+    const meses = +val('acRMeses') || 1, ate = maisMeses(de, meses), cx = null; // academia sem aba Caixa (pedido do Lucas, 26/11/2026): o recebimento vai direto para o Financeiro
     const m = { id:uid(), aluno_id:a.id, aluno_nome:a.nome, plano_id:p.id, plano_nome:p.nome, meses, de, ate, valor:r2(valor), forma:val('acRForma'), pago_em:isoNow(), recebido_por:S.meuId || null, caixa:cx ? cx.id : null, ate_anterior:a.valido_ate || null };
     const ok = await safe(async () => { await put('ac_mensalidades', m); await put('ac_alunos', { ...a, plano_id:p.id, valido_ate:ate, inativo:false }); }, `Recebido! ${a.nome.split(' ')[0]} pago até ${dataBR(ate)}.`);
     if (ok){ closeModal(); S.acRec = null; }
@@ -538,7 +537,7 @@ details.acd-det summary{cursor:pointer;font-weight:600;color:#0A1630;padding:6px
     // [chave, rótulo, funcionário vê?]
     abas:[['ac_checkin', 'Check-in', true], ['ac_alunos', 'Alunos', true], ['ac_mensal', 'Mensalidades', true]],
     // academia não vende produtos (pedido do Lucas): sem NF-e, Clientes, Vender/Cupom, Vendas/Notas, Compras e Produtos
-    esconder:['nfe', 'clientes', 'venda', 'notas', 'compras', 'produtos'],
+    esconder:['nfe', 'clientes', 'venda', 'notas', 'compras', 'produtos', 'caixa'], // Caixa saiu a pedido do Lucas (26/11/2026)
     views:{ ac_checkin:vCheckin, ac_alunos:vAlunos, ac_mensal:vMensal, relatorios:vRelAcademia }, // Relatórios: os de serviço, no lugar dos de venda
     icones:{
       ac_checkin:'<path d="M4 12l5 5L20 6"/>',
