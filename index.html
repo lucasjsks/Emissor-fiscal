@@ -1440,11 +1440,14 @@ function formEmpresa(e, tipo){
   const ramoFixo = !!(e.id && S.empresas.some(x => x.id === e.id));
   const ramo = sel('eRamo', 'Ramo de atividade', ramoAtual, [['comercio','Comércio (loja, mercado, distribuidora…)'], ...SERVICOS.map(([k, l]) => ['servico:' + k, 'Serviço — ' + l])]).replace('<select id="eRamo"', ramoFixo ? '<select id="eRamo" disabled' : '<select id="eRamo"')
     + (ramoFixo ? `<p class="small" style="margin-top:2px">O ramo de atividade é definido no cadastro e não pode ser mudado. Precisa mudar? <a href="${esc(linkSuporte('Preciso mudar o ramo de atividade da empresa.'))}" target="_blank" rel="noopener">Fale com o suporte</a>.</p>` : '');
-  const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  // depois do cadastro o tipo (CNPJ/CPF) fica fixo e só a opção escolhida aparece (pedido do Lucas, 26/11/2026);
+  // o suporte libera a troca com: select public.liberar_troca_cadastro('CNPJ ou CPF', true);
+  const orig = e.id ? S.empresas.find(x => x.id === e.id) : null, tipoFixo = !!(orig && !orig.liberar_tipo);
+  const seg = `<label>Tipo de cadastro</label><div class="seg" style="margin-bottom:6px">${[['cnpj','CNPJ — emite nota fiscal'],['cpf','CPF — sem nota fiscal']].filter(([k]) => !tipoFixo || k === tipo).map(([k, l]) => `<button data-act="empTipo" data-t="${k}" class="${tipo === k ? 'on' : ''}"${tipoFixo ? ' disabled style="cursor:default;opacity:1"' : ''}>${l}</button>`).join('')}</div>`;
   if (tipo === 'cpf'){
     openModal(`${mhead(e.id ? 'Editar empresa' : 'Nova empresa')}${seg}
     ${ramo}
-    <p class="small">Para quem ainda não tem CNPJ: vende no caixa e no PDV com <b>comprovante de venda (não é documento fiscal)</b>, controla estoque, financeiro e relatórios. Quando abrir o CNPJ, é só trocar aqui para <b>CNPJ</b> — nada se perde.</p>
+    <p class="small">Para quem ainda não tem CNPJ: vende no caixa e no PDV com <b>comprovante de venda (não é documento fiscal)</b>, controla estoque, financeiro e relatórios. ${tipoFixo ? `Abriu o CNPJ? <a href="${esc(linkSuporte('Abri o CNPJ e quero passar a emitir nota fiscal.'))}" target="_blank" rel="noopener">Fale com o suporte</a> para liberar a troca — nada se perde.` : 'Quando abrir o CNPJ, é só trocar aqui para <b>CNPJ</b> — nada se perde.'}</p>
     <div class="row">${fld('eRazao','Nome do dono *',e.razao)}${fld('eFant','Nome da loja *',e.fantasia)}</div>
     <div class="row">${fld('eCpf','CPF do dono *',fmtDoc(e.cpf),'inputmode="numeric" autocomplete="off"')}${fld('eFone','Telefone',e.telefone,'inputmode="tel"')}</div>
     <div class="row">${fld('eLog','Endereço (rua) *',e.logradouro)}${fld('eNum','Número *',e.numero)}</div>
@@ -4750,6 +4753,7 @@ async function acoesLoja(a, t, id){
       return true; }
     case 'empTipo': { // troca CPF ↔ CNPJ no cadastro da empresa, mantendo o que já foi digitado
       const f = S.empForm || {}, e = { ...(f.e || {}) };
+      { const o = e.id ? S.empresas.find(x => x.id === e.id) : null; if (o && !o.liberar_tipo) return; } // tipo fixo depois do cadastro
       [['eRazao','razao'],['eFant','fantasia'],['eFone','telefone'],['eLog','logradouro'],['eNum','numero'],['eBai','bairro'],['eCep','cep'],['eMun','municipio'],['eUf','uf']].forEach(([i, k]) => { if ($('#' + i)) e[k] = val(i); });
       if ($('#eCpf')) e.cpf = dig(val('eCpf')); if ($('#eCnpj')) e.cnpj = dig(val('eCnpj'));
       if ($('#eRamo')) Object.assign(e, ramoDoForm());

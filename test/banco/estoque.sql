@@ -91,6 +91,12 @@ reset role;
 select public.definir_sem_mensalidade((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), true) as suporte_marca;
 select data->>'sem_mensalidade' as sem_mensalidade_true from docs where path='empresas/'||:'e';
 select public.definir_sem_mensalidade((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), false) as suporte_desmarca;
+-- troca de tipo de cadastro: só o suporte libera; a tela não se libera sozinha
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"liberar_tipo":true}' where path='empresas/'||:'e' returning data->>'liberar_tipo' as tela_nao_libera_vazio;
+reset role;
+select public.liberar_troca_cadastro((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), true) as suporte_libera;
+select public.liberar_troca_cadastro((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), false) as suporte_trava;
 
 -- funcionário (operador): edita e cadastra produto, mas não mexe no custo nem apaga
 reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;
