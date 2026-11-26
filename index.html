@@ -977,7 +977,9 @@ function render(){
   const ae = document.activeElement, aid = ae && ae.id, sel = ae && ae.selectionStart, val = ae && ae.value;
   renderNav(); renderHeader(); botaoSuporte();
   const m = $('#main');
-  const e = emp(), perf = !S.carregando && !S.falha && S.logado && !S.recuperando ? precisaPerfil() : false, fora = S.carregando || S.falha || !S.logado || S.recuperando || !!perf;
+  // logo depois de entrar, enquanto a lista de empresas ainda não chegou: mostra "Carregando…" (e não o "Bem-vindo, cadastre a empresa" com o menu errado)
+  const esperandoEmp = S.logado && S.mode === 'db' && S.loadingDb && !S.empresas.length && !S.falha;
+  const e = emp(), perf = !S.carregando && !esperandoEmp && !S.falha && S.logado && !S.recuperando ? precisaPerfil() : false, fora = S.carregando || esperandoEmp || S.falha || !S.logado || S.recuperando || !!perf;
   $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
   $('#btnTrocar').style.display = !fora && e && (e.funcionarios || []).length && e.senha_gerente ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' && !semNota() && abas().some(([k]) => k === 'venda') ? '' : 'none';
@@ -986,7 +988,7 @@ function render(){
   if (S.pdv && (fora || S.tab !== 'venda' || !e)) S.pdv = false;
   document.body.classList.toggle('pdv', !!S.pdv);
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
-  else if (S.carregando){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
+  else if (S.carregando || esperandoEmp){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (perf === 'carregando'){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
   else if (perf){ m.innerHTML = vQuemUsa(); }
@@ -3252,7 +3254,7 @@ async function aoMudarSessao(session){
   unsubs.forEach(u => u()); unsubs = []; if (S.unsubEmp){ S.unsubEmp(); S.unsubEmp = null; } if (db && db.fechar) db.fechar();
   S.empresas = []; S.empId = null; SUBCOLS.forEach(k => S[k] = []); S.ncmMap = null; S.papelEmp = undefined; S.fn = null;
   if (!uidAtual){ perfilMarcar(''); db = null; render(); renderBadge(); return; }
-  db = criarShim(SB); S.mode = 'db'; S.papel = 'gerente'; S.isAdmin = true;
+  db = criarShim(SB); S.mode = 'db'; S.papel = 'gerente'; S.isAdmin = true; S.loadingDb = true; // até a lista de empresas chegar
   await SB.rpc('aceitar_convites');
   const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm; S.suporte = null; S.minhas = null;
   // administrador da plataforma lê todas as empresas (Painel NotaOne), mas o sistema dele continua mostrando só as suas
