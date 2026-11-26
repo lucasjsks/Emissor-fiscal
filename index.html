@@ -522,6 +522,8 @@ const SUBCOLS = ['produtos','clientes','notas','caixas','perfis','inutilizacoes'
 // compras_xml (XML original das notas de compra) é lido só sob demanda
 const colOf = k => k === 'empresas' ? 'empresas' : `empresas/${S.empId}/${k}`;
 const emp = () => S.empresas.find(e => e.id === S.empId) || null;
+// administrador: as empresas dele + a que está aberta em modo suporte; demais usuários: o que o banco devolve (só as suas)
+const filtrarEmpresas = () => !S.adminPlat || !S.minhas ? (S.empresasTodas || []) : (S.empresasTodas || []).filter(e => S.minhas.has(e.id) || e.id === S.suporte);
 
 // coleções próprias do módulo de serviço da empresa atual (ex.: ac_alunos)
 const colsModulo = () => ((modServ() || {}).cols || []);
@@ -568,7 +570,8 @@ function startDb(){
   db.doc('config/app').get().then(s => { if (s.exists){ cfgId = s.data().empresaAtual; if (cfgId && cfgId !== S.empId && S.empresas.find(e => e.id === cfgId)) setEmp(cfgId, false); } }).catch(() => {});
   S.unsubEmp = db.collection('empresas').onSnapshot(snap => {
     if (!snap.metadata.fromCache){ S.loadingDb = false; clearTimeout(timer); S.dbNote = ''; }
-    S.empresas = snap.docs.map(d => d.data());
+    S.empresasTodas = snap.docs.map(d => d.data());
+    S.empresas = filtrarEmpresas();
     if (!S.empId || !S.empresas.find(e => e.id === S.empId)){
       const alvo = (cfgId && S.empresas.find(e => e.id === cfgId)) ? cfgId : (S.empresas[0] && S.empresas[0].id) || null;
       if (alvo !== S.empId) setEmp(alvo, false);
@@ -932,10 +935,11 @@ const ICON = {
   estoque:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
   financeiro:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/>',
   relatorios:'<path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/>',
+  admin:'<path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/>',
   compras:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2h11.8L22 7H6.2"/>'
 };
 const TABS = [['inicio','Início'],['venda','Cupom'],['nfe','NF-e'],['notas','Notas'],['caixa','Caixa'],['compras','Compras'],['produtos','Produtos'],['clientes','Clientes'],['financeiro','Financeiro'],['relatorios','Relatórios'],['empresa','Empresa']];
-const NAV_SEC = { venda:'Vendas', compras:'Gestão', empresa:'Configuração' };
+const NAV_SEC = { venda:'Vendas', compras:'Gestão', empresa:'Configuração', admin:'NotaOne' };
 const navSec = () => { const m = modServ(); if (!m || !(m.abas || []).length) return NAV_SEC; const sec = { ...NAV_SEC }; sec[abas().find(([k]) => (m.abas || []).some(a => a[0] === k))?.[0]] = m.nome; return sec; };
 // empresa cadastrada com CPF: não emite nota fiscal (vende com comprovante não fiscal, modelo '99')
 const semNota = (e = emp()) => !!e && e.doc_tipo === 'cpf';
@@ -948,7 +952,7 @@ function abas(){
   const base = TABS.filter(([k]) => !(sn && k === 'nfe') && !esc_.includes(k) && (!op || ABAS_OPERADOR.includes(k)) && !(op && k === 'nfe' && !pode('emitir')))
     .map(([k, l]) => [k, ren[k] || (sn && k === 'venda' ? 'Vender' : sn && k === 'notas' ? 'Vendas' : l)]);
   const i = base[0] && base[0][0] === 'inicio' ? 1 : 0; // funcionário não tem Início: as abas do módulo vêm primeiro
-  return [...base.slice(0, i), ...extra, ...base.slice(i)];
+  return [...base.slice(0, i), ...extra, ...base.slice(i), ...(S.adminPlat ? [['admin','Painel NotaOne']] : [])]; // painel do administrador da plataforma
 }
 const temAba = k => abas().some(([x]) => x === k);
 const nomeModelo = n => n.op === 'dev_venda' ? 'Devolução' : n.op === 'dev_compra' ? 'Dev. compra' : n.modelo === '99' ? 'Venda' : n.modelo === '65' ? 'Cupom' : 'NF-e';
@@ -977,7 +981,8 @@ function render(){
   $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
   $('#btnTrocar').style.display = !fora && e && (e.funcionarios || []).length && e.senha_gerente ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' && !semNota() && abas().some(([k]) => k === 'venda') ? '' : 'none';
-  if (!fora && e && !abas().some(([k]) => k === S.tab)) S.tab = abas()[0][0]; // aba fora do acesso (funcionário) ou NF-e em empresa sem nota
+  if (!fora && e && !abas().some(([k]) => k === S.tab)) S.tab = abas()[0][0];
+  if (!fora && !e && S.adminPlat && S.tab !== 'empresa') S.tab = 'admin'; // administrador sem empresa própria abre no painel // aba fora do acesso (funcionário) ou NF-e em empresa sem nota
   if (S.pdv && (fora || S.tab !== 'venda' || !e)) S.pdv = false;
   document.body.classList.toggle('pdv', !!S.pdv);
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
@@ -985,11 +990,13 @@ function render(){
   else if (!S.logado || S.recuperando){ m.innerHTML = vLogin(); }
   else if (perf === 'carregando'){ m.innerHTML = '<div class="card empty">Carregando…</div>'; }
   else if (perf){ m.innerHTML = vQuemUsa(); }
+  else if (S.tab === 'admin' && S.adminPlat) m.innerHTML = vAdmin();
   else if (!e && S.tab !== 'empresa'){
     m.innerHTML = `<div class="card empty"><h2>Bem-vindo 👋</h2><p>${pode('empresa') ? 'Comece cadastrando a empresa emitente. Depois vêm os produtos e os clientes, e aí já dá para emitir.' : 'O gerente ainda não cadastrou a empresa emitente.'}</p>${pode('empresa') ? '<button class="btn pri" data-act="novaEmp">Cadastrar empresa</button>' : ''}</div>`;
   } else if (S.pdv && S.tab === 'venda') m.innerHTML = vPdv();
   else if (modServ() && (modServ().views || {})[S.tab]) m.innerHTML = modServ().views[S.tab]();
   else m.innerHTML = ({ inicio:vInicio, venda:vVenda, nfe:vNfeTab, notas:vNotas, caixa:vCaixa, compras:vCompras, estoque:vProdutos, produtos:vProdutos, clientes:vClientes, relatorios:vRelatorios, financeiro:vFinanceiro, empresa:vEmpresa })[S.tab]();
+  if (!fora && S.suporte && S.empId === S.suporte && e && S.tab !== 'admin') m.insertAdjacentHTML('afterbegin', `<div class="msg warn" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>Modo suporte</b><span style="flex:1">Você está vendo o sistema de <b>${esc(e.fantasia || e.razao || '')}</b> — somente leitura (nada é alterado).</span><button class="btn sm pri" data-act="admSair">Voltar ao Painel NotaOne</button></div>`);
   if (aid){ const el = document.getElementById(aid); if (el && el !== document.activeElement){ if (typeof val === 'string' && el.value !== val) el.value = val; el.focus(); try { el.setSelectionRange(sel, sel); } catch(_){} } }
 }
 
@@ -2787,6 +2794,77 @@ function dashFinanceiro(M){
 }
 document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('dsh-det')) S.relTabelas = ev.target.open; }, true);
 
+
+/* ---------- Painel NotaOne (pedido do Lucas, 26/11/2026): visão de todas as empresas, só para o administrador da plataforma
+   (tabela admins). Dados pela função do banco admin_painel(); "Abrir" entra no sistema da empresa em modo suporte (só leitura). ---------- */
+const RAMO_NOME = e => e.modulo === 'servico' ? 'Academia' : e.doc_tipo === 'cpf' ? 'Comércio PF' : 'Comércio';
+const nomeEmp = e => e.fantasia || e.razao || '(sem nome)';
+async function admCarregar(forcar){
+  if (S.admCarregando || (!forcar && S.adm && Date.now() - S.adm.em < 60e3)) return;
+  S.admCarregando = true; S.admErro = '';
+  try { const { data, error } = await SB.rpc('admin_painel'); if (error) throw error; S.adm = { lista:data || [], em:Date.now() }; }
+  catch(err){ S.admErro = /admin_painel/.test(err.message || '') ? 'Rode de novo o supabase/schema.sql no Supabase para ligar o painel.' : (err.message || 'Erro ao carregar.'); }
+  S.admCarregando = false; if (S.tab === 'admin') render();
+}
+function vAdmin(){
+  if (!S.adm){ admCarregar(); return `<div class="card empty">${S.admErro ? esc(S.admErro) : 'Carregando o painel…'}</div>`; }
+  setTimeout(() => admCarregar(), 0);
+  const L = S.adm.lista, hoje = isoNow().slice(0, 10), mes = hoje.slice(0, 7), d = (a, b) => Math.round((Date.parse(b.slice(0, 10) + 'T12:00:00Z') - Date.parse(a.slice(0, 10) + 'T12:00:00Z')) / 864e5);
+  const comPlano = L.filter(e => e.plano && e.plano.id && !e.sem_mensalidade), mrr = r2(comPlano.reduce((a, e) => a + num(e.plano.valor), 0));
+  const atras = L.filter(e => (e.assinatura || {}).situacao === 'atrasada'), novos = L.filter(e => String(e.criado_em || '').slice(0, 7) === mes);
+  const ativos = L.filter(e => e.ultima_atividade && d(e.ultima_atividade, hoje) <= 7), prod = L.filter(e => e.ambiente === 'producao');
+  const notasProd = L.reduce((a, e) => a + num(e.notas_prod_mes), 0);
+  const certAlerta = L.filter(e => e.certificado && e.certificado.valido_ate && d(hoje, e.certificado.valido_ate) <= 30);
+  const semPlano = L.filter(e => !(e.plano && e.plano.id)), parados = L.filter(e => !e.ultima_atividade || d(e.ultima_atividade, hoje) > 15), probl = L.filter(e => num(e.problemas_7d) > 0);
+  const ramos = ['Comércio','Comércio PF','Academia'].map((r, i) => ({ rot:r, v:L.filter(e => RAMO_NOME(e) === r).length, cor:['#0A1630','#257de0','#13804a'][i] }));
+  const pl = {}; comPlano.forEach(e => { const k = e.plano.nome || e.plano.id; pl[k] = pl[k] || { n:0, v:0 }; pl[k].n++; pl[k].v = r2(pl[k].v + num(e.plano.valor)); });
+  const meses = dUltMeses(m => L.filter(e => String(e.criado_em || '').slice(0, 7) === m).length);
+  const alertas = [
+    ...certAlerta.map(e => ({ e, cor:'var(--bad)', txt:`certificado ${d(hoje, e.certificado.valido_ate) < 0 ? 'vencido' : 'vence em ' + d(hoje, e.certificado.valido_ate) + ' dias'} (${dataBR(e.certificado.valido_ate)})` })),
+    ...atras.map(e => ({ e, cor:'var(--bad)', txt:`mensalidade do NotaOne atrasada${(e.assinatura.aberta || {}).valor ? ' · ' + brl(e.assinatura.aberta.valor) : ''}` })),
+    ...probl.map(e => ({ e, cor:'var(--warn)', txt:`${e.problemas_7d} nota(s) com problema nos últimos 7 dias` })),
+    ...semPlano.map(e => ({ e, cor:'var(--warn)', txt:'ainda não escolheu o plano' })),
+    ...parados.filter(e => !semPlano.includes(e)).map(e => ({ e, cor:'#6a4ce2', txt:e.ultima_atividade ? `sem usar o sistema há ${d(e.ultima_atividade, hoje)} dias` : 'nunca usou o sistema' })) ];
+  const q = (S.admBusca || '').toLowerCase(), fr = S.admRamo || '';
+  const lista = L.filter(e => (!fr || RAMO_NOME(e) === fr) && (!q || [nomeEmp(e), e.razao, e.cnpj, e.cpf, e.dono_email, e.municipio].some(x => String(x || '').toLowerCase().includes(q) || (dig(q) && dig(x).includes(dig(q))))))
+    .sort((a, b) => String(b.ultima_atividade || '').localeCompare(String(a.ultima_atividade || '')));
+  const zap = e => { const t = dig(e.telefone); return t.length >= 10 ? `<a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${t.startsWith('55') ? t : '55' + t}">WhatsApp</a>` : ''; };
+  const sitMens = e => { const a = e.assinatura || {}; return e.sem_mensalidade ? '<span class="tag">sem mensalidade</span>' : a.situacao === 'atrasada' ? '<span class="tag b">atrasada</span>' : a.situacao === 'em_dia' ? '<span class="tag g">em dia</span>' : a.situacao === 'cancelada' ? '<span class="tag">cancelada</span>' : '<span class="tag w">sem assinatura</span>'; };
+  return `<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1"><h2 style="margin:0">Painel NotaOne</h2><div class="small">Todas as empresas do sistema · atualizado ${new Date(S.adm.em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}</div></div><button class="btn" data-act="admAtualizar">Atualizar</button></div>
+  <div class="dsh-kpis">${dKpi('Clientes', L.length, `${novos.length} novo(s) este mês`, '#0A1630')}${dKpi('Mensalidades previstas', brl(mrr), `${comPlano.length} empresa(s) com plano · por mês`, '#13804a')}${dKpi('Mensalidades atrasadas', atras.length, atras.length ? 'veja a lista abaixo' : 'ninguém atrasado', atras.length ? 'var(--bad)' : 'var(--ok)', atras.length ? 'var(--bad)' : '')}${dKpi('Usaram nos últimos 7 dias', ativos.length, `${L.length ? Math.round(ativos.length / L.length * 100) : 0}% dos clientes`, '#257de0')}${dKpi('Notas fiscais no mês', notasProd, `em produção · ${prod.length} empresa(s) emitindo de verdade`, '#f2a600')}</div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Clientes por ramo</h3><div class="sub">Comércio (emite nota), Comércio PF (sem nota) e Academia</div>${dStack(ramos)}${dBarrasH(ramos, v => v + ' cliente' + (v === 1 ? '' : 's'))}</div>
+    <div class="dsh-card"><h3>Planos</h3><div class="sub">Quanto cada plano rende por mês</div>${Object.keys(pl).length ? dBarrasH(Object.entries(pl).sort((a, b) => b[1].v - a[1].v).map(([k, x]) => ({ rot:k, v:x.v, extra:x.n + ' cliente' + (x.n === 1 ? '' : 's') }))) : dVazio('Nenhuma empresa escolheu plano ainda.')}</div></div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Novos clientes por mês</h3><div class="sub">Últimos 6 meses</div>${dBarrasV(meses, v => v + ' cliente' + (v === 1 ? '' : 's'))}</div>
+    <div class="dsh-card"><h3>Precisa de atenção</h3><div class="sub">${alertas.length ? alertas.length + ' aviso(s)' : 'Tudo certo com os clientes'}</div>${alertas.length ? alertas.slice(0, 12).map(x => `<div class="dsh-row"><div class="n"><b>${esc(nomeEmp(x.e))}</b><span style="color:${x.cor}">${esc(x.txt)}</span></div>${zap(x.e)}<button class="btn sm" data-act="admAbrir" data-id="${esc(x.e.id)}">Abrir</button></div>`).join('') : dVazio('Nenhum aviso. 👍')}</div></div>
+  <div class="card"><h3 style="margin-top:0">Todas as empresas (${lista.length})</h3>
+    <div class="row" style="margin-bottom:8px"><input id="admBusca" placeholder="Buscar por nome, CNPJ/CPF, e-mail ou cidade" value="${esc(S.admBusca || '')}">
+      <select id="admRamo"><option value="">Todos os ramos</option>${['Comércio','Comércio PF','Academia'].map(r => `<option ${fr === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
+    ${lista.length ? `<div class="fin-lista">${lista.slice(0, S.admLim || 50).map(e => `<div class="fin-l nt-l">
+      <div class="fin-v">${e.ultima_atividade ? dataBR(e.ultima_atividade).slice(0, 5) : '—'}<small>último uso</small></div>
+      <div class="fin-d"><b>${esc(nomeEmp(e))} <span class="tag">${RAMO_NOME(e)}</span>${e.ambiente === 'producao' ? ' <span class="tag g">produção</span>' : ''}</b>
+        <span>${esc(fmtDoc(e.cnpj || e.cpf || ''))}${e.municipio ? ' · ' + esc(e.municipio) + (e.uf ? '/' + esc(e.uf) : '') : ''}${e.dono_email ? ' · ' + esc(e.dono_email) : ''} · desde ${e.criado_em ? dataBR(e.criado_em) : '—'}<br>
+        ${e.plano && e.plano.id ? esc(e.plano.nome) + ' ' + brl(e.plano.valor) : 'sem plano'} · ${e.modulo === 'servico' ? `${num(e.alunos)} aluno(s) · ${brl(num(e.mensalidades_mes))} em mensalidades no mês` : `${num(e.vendas_mes)} venda(s) · ${brl(num(e.fat_mes))} no mês · ${num(e.notas_prod_mes)} nota(s) em produção`}</span></div>
+      <div class="fin-r">${sitMens(e)}${zap(e)}<button class="btn sm pri" data-act="admAbrir" data-id="${esc(e.id)}">Abrir</button></div></div>`).join('')}</div>
+      ${lista.length > (S.admLim || 50) ? '<div class="actions"><button class="btn" data-act="admMais">Mostrar mais</button></div>' : ''}` : '<p class="empty">Nenhuma empresa encontrada.</p>'}</div>
+  <p class="small">"Abrir" mostra o sistema da empresa como o cliente vê, para dar suporte — somente leitura. Avise nos termos de uso que o suporte pode acessar os dados para ajudar o cliente.</p>`;
+}
+async function acoesAdmin(a, t, id){
+  if (!['admAtualizar','admAbrir','admSair','admMais'].includes(a)) return false;
+  if (!S.adminPlat) return true;
+  if (a === 'admAtualizar'){ await admCarregar(true); toast('Painel atualizado.'); return true; }
+  if (a === 'admMais'){ S.admLim = (S.admLim || 50) + 50; render(); return true; }
+  if (a === 'admAbrir'){
+    if (!(S.empresasTodas || []).some(e => e.id === id)) return toast('Empresa ainda não carregada. Tente de novo em instantes.'), true;
+    S.suporteVolta = S.minhas && S.empId && S.minhas.has(S.empId) ? S.empId : S.suporteVolta || null;
+    S.suporte = id; S.empresas = filtrarEmpresas(); S.tab = 'inicio'; setEmp(id, false); window.scrollTo(0, 0); return true; }
+  if (a === 'admSair'){
+    const volta = S.suporteVolta || ([...(S.minhas || [])][0] || null); S.suporte = null; S.empresas = filtrarEmpresas();
+    S.tab = 'admin'; setEmp(volta && S.empresas.some(e => e.id === volta) ? volta : (S.empresas[0] || {}).id || null, false); return true; }
+  return true;
+}
+document.addEventListener('input', ev => { if (ev.target.id === 'admBusca'){ S.admBusca = ev.target.value; S.admLim = 50; render(); } });
+document.addEventListener('change', ev => { if (ev.target.id === 'admRamo'){ S.admRamo = ev.target.value; render(); } });
+
 /* ---------- pacote mensal para a contabilidade (montado no servidor, com os XMLs) ---------- */
 const mesNome = m => ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
 const mesAntCont = () => { const [y, m] = isoNow().slice(0, 7).split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; };
@@ -3176,7 +3254,9 @@ async function aoMudarSessao(session){
   if (!uidAtual){ perfilMarcar(''); db = null; render(); renderBadge(); return; }
   db = criarShim(SB); S.mode = 'db'; S.papel = 'gerente'; S.isAdmin = true;
   await SB.rpc('aceitar_convites');
-  const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm;
+  const { data:adm } = await SB.rpc('eh_admin'); S.adminPlat = !!adm; S.suporte = null; S.minhas = null;
+  // administrador da plataforma lê todas as empresas (Painel NotaOne), mas o sistema dele continua mostrando só as suas
+  if (S.adminPlat){ const { data:ms } = await SB.from('membros').select('empresa_id').eq('user_id', uidAtual); S.minhas = new Set((ms || []).map(x => x.empresa_id)); }
   startDb(); carregarNcm(); render(); renderBadge();
   // cadastro feito pelo site: no primeiro acesso, abre o cadastro da empresa já com o CNPJ (a Receita preenche o resto)
   if (S.meuMeta && (dig(S.meuMeta.cnpj).length === 14 || (S.meuMeta.tipo === 'cpf' && dig(S.meuMeta.cpf).length === 11))) setTimeout(() => {
@@ -5234,6 +5314,7 @@ document.addEventListener('click', async ev => {
   if (ACT_PERM[a] && !pode(ACT_PERM[a])){ if (t.type === 'checkbox') t.checked = !t.checked; toast(ACT_PERM[a] === 'usuarios' ? 'Só o dono do sistema pode fazer isso.' : 'Seu acesso não permite essa ação. Peça ao dono da loja.'); return; }
   const P = () => S.produtos.find(x => x.id === id);
   { const m = modServ(); if (m && m.acoes && await m.acoes(a, t, id)) return; }
+  if (await acoesAdmin(a, t, id)) return;
   if (await acoesEstoque(a, t, id)) return;
   if (await acoesFin(a, t, id)) return;
   if (await acoesV5(a, t, id)) return;
