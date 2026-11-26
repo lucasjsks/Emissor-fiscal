@@ -314,7 +314,7 @@
           { tit:'Aniversariantes do mês', cols:[{ t:'Aluno' }, { t:'Dia' }, { t:'WhatsApp' }], linhas:aniv.map(a => [a.nome, a.nascimento.slice(8, 10) + '/' + mesAtual, a.telefone || '']) }] };
     }
     // financeiro da academia: o que entrou e saiu no período e a previsão dos próximos 30 dias
-    const T = titulosFin(), outrasRec = T.filter(t => t.tipo === 'receber' && t.auto !== 'academia' && t.pago_em && noPer(t.pago_em, ini, fim));
+    const T = titulosFin_nucleo(), outrasRec = T.filter(t => t.tipo === 'receber' && t.auto !== 'academia' && t.pago_em && noPer(t.pago_em, ini, fim));
     const pagas = T.filter(t => t.tipo === 'pagar' && t.pago_em && noPer(t.pago_em, ini, fim));
     const recM = r2(M.reduce((s, m) => s + num(m.valor), 0)), recO = r2(outrasRec.reduce((s, t) => s + num(t.valor_pago ?? t.valor), 0));
     const porCat = {}; pagas.forEach(t => { const c = t.categoria || 'Outras despesas'; porCat[c] = r2((porCat[c] || 0) + num(t.valor_pago ?? t.valor)); });
@@ -331,16 +331,130 @@
           linhas:[['Mensalidades a receber', r2(prevRec)], ['Contas a pagar', -r2(prevPag)], ['Saldo previsto', r2(prevRec - prevPag)]] },
         { tit:'Despesas pagas por categoria', cols:[{ t:'Categoria' }, { t:'Valor', f:'brl' }], linhas:Object.entries(porCat).sort((a, b) => b[1] - a[1]) }] };
   }
+  /* ---------------- Painel dos relatórios (visual) — pedido do Lucas: mais moderno, fácil de ler ----------------
+     Os números saem dos mesmos cálculos do relModelo (que continua servindo imprimir/PDF e planilha). */
+  // contas do Financeiro do núcleo (o nome titulosFin aqui dentro é o gancho do módulo)
+  const titulosFin_nucleo = () => (typeof window.titulosFin === 'function' ? window.titulosFin() : []);
+  const COR = ['#257de0', '#f47230', '#00b894', '#f2a600', '#6a4ce2', '#ee7fac']; // cores fixas por ordem (forma, plano)
+  function estiloDash(){
+    if (document.getElementById('acDashCss')) return;
+    const st = document.createElement('style'); st.id = 'acDashCss';
+    st.textContent = `.acd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:10px;margin-bottom:12px}
+.acd-kpi{background:#fff;border:1px solid #e3e8f0;border-radius:18px;padding:16px 18px;position:relative;overflow:hidden}
+.acd-kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--acc,#0A1630)}
+.acd-kpi small{display:block;color:#5b6478;font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.acd-kpi b{display:block;font-family:'Space Grotesk',sans-serif;font-size:28px;line-height:1.15;margin:6px 0 2px;color:#0A1630}
+.acd-kpi span{font-size:12.5px;color:#5b6478}.acd-kpi .up{color:#13804a;font-weight:700}.acd-kpi .down{color:#c2362f;font-weight:700}
+.acd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:12px}
+.acd-card{background:#fff;border:1px solid #e3e8f0;border-radius:18px;padding:16px 18px;margin-bottom:12px}
+.acd-card h3{margin:0 0 2px;font-size:15px}.acd-card .sub{font-size:12.5px;color:#5b6478;margin-bottom:12px}
+.acd-vbars{display:flex;align-items:flex-end;gap:4px;height:170px;padding-top:18px;border-bottom:1px solid #d5dbe6}
+.acd-vbars .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;position:relative;cursor:default}
+.acd-vbars .c i{display:block;width:100%;max-width:34px;background:#0A1630;border-radius:4px 4px 0 0;min-height:2px}
+.acd-vbars .c:hover i{background:#257de0}.acd-vbars .c.zero i{background:#d5dbe6}
+.acd-vbars .c em{position:absolute;top:-2px;font-style:normal;font-size:11px;font-weight:700;color:#0A1630;opacity:0;transform:translateY(-100%)}.acd-vbars .c:hover em,.acd-vbars .c.top em{opacity:1}
+.acd-xl{display:flex;gap:4px;margin-top:4px}.acd-xl span{flex:1;text-align:center;font-size:10.5px;color:#5b6478;min-width:0;overflow:hidden;white-space:nowrap}
+.acd-h{margin:8px 0}.acd-h .l{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px;gap:8px}.acd-h .l b{font-variant-numeric:tabular-nums}
+.acd-h .t{height:10px;background:#eef1f6;border-radius:99px;overflow:hidden}.acd-h .t i{display:block;height:100%;border-radius:99px}
+.acd-stack{display:flex;height:22px;border-radius:99px;overflow:hidden;gap:2px;background:#fff;margin:6px 0 10px}.acd-stack i{display:block;height:100%}
+.acd-leg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}.acd-leg span{display:inline-flex;align-items:center;gap:6px}.acd-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.acd-hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.acd-ring{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
+.acd-ring div{width:112px;height:112px;border-radius:50%;background:#fff;display:grid;place-items:center;text-align:center}
+.acd-ring b{font-family:'Space Grotesk',sans-serif;font-size:28px;line-height:1}.acd-ring small{font-size:11.5px;color:#5b6478}
+.acd-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eef1f6}.acd-row:last-child{border-bottom:0}
+.acd-row .n{flex:1;min-width:0}.acd-row .n b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.acd-row .n span{font-size:12px;color:#5b6478}
+.acd-heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:4px}.acd-heat div{border-radius:8px;padding:6px 2px;text-align:center;font-size:11px}.acd-heat div b{display:block;font-size:13px}
+.acd-big{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}.acd-big div{border-radius:14px;padding:12px 14px;background:#f5f7fb}.acd-big small{font-size:12px;color:#5b6478}.acd-big b{display:block;font-family:'Space Grotesk',sans-serif;font-size:22px}
+details.acd-det summary{cursor:pointer;font-weight:600;color:#0A1630;padding:6px 0}`;
+    document.head.appendChild(st);
+  }
+  const kpi = (rot, valor, sub = '', acc = '#0A1630', corValor = '') => `<div class="acd-kpi" style="--acc:${acc}"><small>${rot}</small><b${corValor ? ` style="color:${corValor}"` : ''}>${valor}</b><span>${sub}</span></div>`;
+  const variacaoTxt = (atual, ant) => { if (!ant) return atual ? '<span class="up">novo</span> vs período anterior' : 'sem dados no período anterior'; const p = Math.round((atual - ant) / ant * 100); return `<span class="${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}%</span> vs período anterior`; };
+  function barrasV(itens, fmt = v => brl(v)){ // [{rot, v, dica}]
+    const max = Math.max(1, ...itens.map(x => x.v)), iMax = itens.findIndex(x => x.v === max && x.v > 0), passo = Math.ceil(itens.length / 12);
+    return `<div class="acd-vbars">${itens.map((x, i) => `<div class="c ${x.v ? '' : 'zero'} ${i === iMax ? 'top' : ''}" title="${esc(x.dica || x.rot)}: ${esc(fmt(x.v))}"><em>${esc(fmt(x.v))}</em><i style="height:${Math.max(1.5, x.v / max * 100)}%"></i></div>`).join('')}</div>
+      <div class="acd-xl">${itens.map((x, i) => `<span>${i % passo === 0 ? esc(x.rot) : ''}</span>`).join('')}</div>`;
+  }
+  const barrasH = (itens, fmt = v => brl(v)) => { const max = Math.max(1, ...itens.map(x => x.v)); return itens.map((x, i) => `<div class="acd-h"><div class="l"><span>${x.cor !== false ? `<i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${x.cor || COR[i % COR.length]};margin-right:6px"></i>` : ''}${esc(x.rot)}</span><b>${esc(fmt(x.v))}${x.extra ? ` <span class="small" style="font-weight:400">${esc(x.extra)}</span>` : ''}</b></div><div class="t"><i style="width:${Math.max(1, x.v / max * 100)}%;background:${x.cor || COR[i % COR.length]}"></i></div></div>`).join(''); };
+  const vazio = txt => `<p class="small" style="padding:18px 0;text-align:center">${txt}</p>`;
+  function periodoAnterior(ini, fim){ const n = dias(ini, fim) + 1; return [diaMais(ini, -n), diaMais(ini, -1)]; }
+  function serieDias(ini, fim, lista, campoData, campoValor){
+    const n = Math.min(dias(ini, fim) + 1, 62), base = n === dias(ini, fim) + 1 ? ini : diaMais(fim, -61), soma = {};
+    lista.forEach(x => { const d = String(x[campoData] || '').slice(0, 10); soma[d] = r2((soma[d] || 0) + (campoValor ? num(x[campoValor]) : 1)); });
+    return Array.from({ length:n }, (_, k) => { const d = diaMais(base, k); return { rot:d.slice(8, 10) + '/' + d.slice(5, 7), v:soma[d] || 0, dica:dataBR(d) }; });
+  }
+
+  function dashReceb(ini, fim){
+    const M = mensais().filter(m => noPer(m.pago_em, ini, fim)), [pi, pf] = periodoAnterior(ini, fim), MA = mensais().filter(m => noPer(m.pago_em, pi, pf));
+    const tot = r2(M.reduce((s, m) => s + num(m.valor), 0)), totA = r2(MA.reduce((s, m) => s + num(m.valor), 0));
+    const porF = {}, porP = {}; M.forEach(m => { const f = PAG_NOME[m.forma] || 'Outros', p = m.plano_nome || 'Sem plano'; porF[f] = r2((porF[f] || 0) + num(m.valor)); porP[p] = r2((porP[p] || 0) + num(m.valor)); });
+    const formas = Object.entries(porF).sort((a, b) => b[1] - a[1]), planos = Object.entries(porP).sort((a, b) => b[1] - a[1]);
+    return `<div class="acd-kpis">${kpi('Recebido', brl(tot), variacaoTxt(tot, totA), '#13804a')}${kpi('Pagamentos', M.length, `${MA.length} no período anterior`)}${kpi('Ticket médio', brl(M.length ? r2(tot / M.length) : 0), 'por pagamento', '#257de0')}${kpi('Alunos que pagaram', new Set(M.map(m => m.aluno_id)).size, `de ${alunos().filter(a => !a.inativo).length} ativos`, '#f2a600')}</div>
+    <div class="acd-card"><h3>Recebimentos por dia</h3><div class="sub">Passe o mouse (ou toque) nas barras para ver o valor de cada dia.</div>${M.length ? barrasV(serieDias(ini, fim, M, 'pago_em', 'valor')) : vazio('Nenhuma mensalidade recebida no período.')}</div>
+    <div class="acd-grid"><div class="acd-card"><h3>Formas de pagamento</h3><div class="sub">Como os alunos pagaram</div>${formas.length ? `<div class="acd-stack">${formas.map(([, v], i) => `<i style="flex:${v};background:${COR[i % COR.length]}" title="${brl(v)}"></i>`).join('')}</div>${barrasH(formas.map(([k, v]) => ({ rot:k, v, extra:tot ? Math.round(v / tot * 100) + '%' : '' })))}` : vazio('—')}</div>
+      <div class="acd-card"><h3>Por plano</h3><div class="sub">Quanto cada plano trouxe</div>${planos.length ? barrasH(planos.map(([k, v]) => ({ rot:k, v }))) : vazio('—')}</div></div>`;
+  }
+  function dashInad(){
+    const hoje = hojeISO(), A = alunos().filter(a => !a.inativo), sit = a => situacao(a).k;
+    const em = A.filter(a => sit(a) === 'emdia'), ve = A.filter(a => sit(a) === 'vencendo'), at = A.filter(a => sit(a) === 'atrasado');
+    const n = A.length || 1, pEm = Math.round(em.length / n * 100), pVe = Math.round(ve.length / n * 100), pAt = 100 - pEm - pVe;
+    const devido = a => { const p = planoAc(a.plano_id), d = situacao(a).dias || 0; return r2(valorCobrar(a, p) * Math.max(1, Math.ceil(d / (30 * (num((p || {}).meses) || 1))))); };
+    const totAt = r2(at.reduce((s, a) => s + devido(a), 0));
+    const faixas = [['1 a 15 dias', 1, 15], ['16 a 30 dias', 16, 30], ['31 a 60 dias', 31, 60], ['mais de 60', 61, 1e9]].map(([rot, a, b]) => { const L = at.filter(x => (situacao(x).dias || 0) >= a && (situacao(x).dias || 0) <= b); return { rot, v:L.length, extra:brl(r2(L.reduce((s, x) => s + devido(x), 0))), cor:'var(--bad)' }; });
+    const em15 = diaMais(hoje, 15), prox = A.filter(a => a.valido_ate && a.valido_ate >= hoje && a.valido_ate <= em15).sort((a, b) => a.valido_ate.localeCompare(b.valido_ate));
+    return `<div class="acd-kpis">${kpi('Alunos atrasados', at.length, `${pAt}% dos ativos`, 'var(--bad)')}${kpi('Valor em atraso', brl(totAt), 'estimado', 'var(--bad)')}${kpi('Vencem em 7 dias', ve.length, brl(r2(ve.reduce((s, a) => s + valorCobrar(a, planoAc(a.plano_id)), 0))), 'var(--warn)')}${kpi('Em dia', em.length, `${pEm}% dos ativos`, 'var(--ok)')}</div>
+    <div class="acd-grid"><div class="acd-card"><h3>Saúde das mensalidades</h3><div class="sub">Situação dos ${A.length} alunos ativos hoje</div>
+      <div class="acd-hero"><div class="acd-ring" style="background:${A.length ? `conic-gradient(#13804a 0% ${pEm}%, #d97706 ${pEm}% ${pEm + pVe}%, #c2362f ${pEm + pVe}% 100%)` : '#eef1f6'}"><div><span><b>${pEm}%</b><br><small>em dia</small></span></div></div>
+        <div class="acd-leg" style="flex-direction:column;gap:8px"><span><i style="background:#13804a"></i>✓ Em dia: <b>${em.length}</b></span><span><i style="background:#d97706"></i>▲ Vencendo (7 dias): <b>${ve.length}</b></span><span><i style="background:#c2362f"></i>● Atrasados: <b>${at.length}</b></span></div></div></div>
+      <div class="acd-card"><h3>Há quanto tempo estão atrasados</h3><div class="sub">Quanto mais antigo, mais difícil de receber</div>${at.length ? barrasH(faixas, v => v + ' aluno' + (v === 1 ? '' : 's')) : vazio('Ninguém atrasado. 🎉')}</div></div>
+    <div class="acd-grid"><div class="acd-card"><h3>Cobrar agora</h3><div class="sub">Atrasados, do mais antigo para o mais recente</div>${at.length ? at.sort((a, b) => String(a.valido_ate).localeCompare(String(b.valido_ate))).slice(0, 15).map(a => `<div class="acd-row"><div class="n" style="cursor:pointer" data-act="acVerAluno" data-id="${esc(a.id)}"><b>${esc(a.nome)}</b><span>venceu ${a.valido_ate ? dataBR(a.valido_ate) : '—'} · ${situacao(a).dias || 0} dias · ${brl(devido(a))}</span></div>${linkZap(a, 'sm')}${pode('caixa') ? `<button class="btn sm pri" data-act="acReceber" data-id="${esc(a.id)}">Receber</button>` : ''}</div>`).join('') : vazio('Ninguém atrasado.')}</div>
+      <div class="acd-card"><h3>Próximos vencimentos</h3><div class="sub">Nos próximos 15 dias — avise antes de vencer</div>${prox.length ? prox.slice(0, 15).map(a => `<div class="acd-row"><div class="n" style="cursor:pointer" data-act="acVerAluno" data-id="${esc(a.id)}"><b>${esc(a.nome)}</b><span>vence ${dataBR(a.valido_ate)} · ${brl(valorCobrar(a, planoAc(a.plano_id)))}</span></div>${linkZap(a, 'sm')}</div>`).join('') : vazio('Nenhum vencimento nos próximos 15 dias.')}</div></div>`;
+  }
+  function dashAlunos(ini, fim){
+    const L = alunos(), A = L.filter(a => !a.inativo), hoje = hojeISO(), C = checkins().filter(c => noPer(c.em, ini, fim)), [pi, pf] = periodoAnterior(ini, fim), CA = checkins().filter(c => noPer(c.em, pi, pf));
+    const novos = L.filter(a => noPer(a.inicio, ini, fim)), mrr = r2(A.filter(a => situacao(a).k !== 'atrasado').reduce((s, a) => s + mensalEquivA(a), 0));
+    const ds = [0, 0, 0, 0, 0, 0, 0], hr = {}; C.forEach(c => { ds[new Date(c.em.slice(0, 10) + 'T12:00:00').getDay()]++; const h = +c.em.slice(11, 13); hr[h] = (hr[h] || 0) + 1; });
+    const maxH = Math.max(1, ...Object.values(hr)), horas = Array.from({ length:18 }, (_, k) => k + 5);
+    const P = planosAc().map((p, i) => ({ rot:p.nome, v:A.filter(a => a.plano_id === p.id).length, cor:COR[i % COR.length] }));
+    const sumidos = A.filter(a => situacao(a).k !== 'atrasado' && (!a.ultimo_checkin || dias(a.ultimo_checkin.slice(0, 10), hoje) >= 15));
+    const aniv = A.filter(a => (a.nascimento || '').slice(5, 7) === hoje.slice(5, 7)).sort((a, b) => a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)));
+    return `<div class="acd-kpis">${kpi('Alunos ativos', A.length, `${novos.length} novo(s) no período`, '#257de0')}${kpi('Receita mensal recorrente', brl(mrr), 'mensalidades de quem está em dia', '#13804a')}${kpi('Treinos no período', C.length, variacaoTxt(C.length, CA.length), '#f47230')}${kpi('Média por aluno', A.length ? String(Math.round(C.length / A.length * 10) / 10).replace('.', ',') : '0', 'treinos no período', '#6a4ce2')}</div>
+    <div class="acd-grid"><div class="acd-card"><h3>Treinos por dia da semana</h3><div class="sub">Dias de maior movimento</div>${C.length ? barrasV(DSEM.map((d, i) => ({ rot:d.slice(0, 3), v:ds[i], dica:d })), v => v + ' treino' + (v === 1 ? '' : 's')) : vazio('Nenhum check-in no período.')}</div>
+      <div class="acd-card"><h3>Horários de pico</h3><div class="sub">Quanto mais escuro, mais alunos naquele horário</div>${C.length ? `<div class="acd-heat">${horas.map(h => { const v = hr[h] || 0, a = v / maxH; return `<div title="${h}h: ${v} treino(s)" style="background:${v ? `rgba(10,22,48,${0.12 + a * 0.88})` : '#f1f3f7'};color:${a > .5 ? '#fff' : '#0A1630'}"><b>${v || ''}</b>${h}h</div>`; }).join('')}</div>` : vazio('Nenhum check-in no período.')}</div></div>
+    <div class="acd-grid"><div class="acd-card"><h3>Alunos por plano</h3><div class="sub">Distribuição dos ativos</div>${P.length && A.length ? `<div class="acd-stack">${P.filter(x => x.v).map(x => `<i style="flex:${x.v};background:${x.cor}" title="${esc(x.rot)}: ${x.v}"></i>`).join('')}</div>${barrasH(P, v => v + ' aluno' + (v === 1 ? '' : 's'))}` : vazio('—')}</div>
+      <div class="acd-card"><h3>Chamar de volta</h3><div class="sub">Em dia, mas sem treinar há 15 dias ou mais</div>${sumidos.length ? sumidos.slice(0, 12).map(a => { const t = fone(a.telefone); return `<div class="acd-row"><div class="n" style="cursor:pointer" data-act="acVerAluno" data-id="${esc(a.id)}"><b>${esc(a.nome)}</b><span>${a.ultimo_checkin ? 'último treino ' + dataBR(a.ultimo_checkin) + ' · ' + dias(a.ultimo_checkin.slice(0, 10), hoje) + ' dias' : 'ainda não treinou'}</span></div>${t ? `<a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${t}?text=${encodeURIComponent(`Oi ${a.nome.split(' ')[0]}! Sentimos sua falta na ${(emp() || {}).fantasia || 'academia'}. Bora voltar a treinar? 💪`)}">Chamar</a>` : ''}</div>`; }).join('') : vazio('Todo mundo treinando. 💪')}</div></div>
+    ${aniv.length ? `<div class="acd-card"><h3>🎂 Aniversariantes do mês</h3><div class="acd-leg" style="margin-top:8px">${aniv.map(a => `<span><b>${a.nascimento.slice(8, 10)}/${a.nascimento.slice(5, 7)}</b> ${esc(a.nome)}</span>`).join('')}</div></div>` : ''}`;
+  }
+  function dashFin(ini, fim){
+    const M = mensais().filter(m => noPer(m.pago_em, ini, fim)), T = titulosFin_nucleo(), hoje = hojeISO();
+    const recM = r2(M.reduce((s, m) => s + num(m.valor), 0)), outras = T.filter(t => t.tipo === 'receber' && t.auto !== 'academia' && t.pago_em && noPer(t.pago_em, ini, fim));
+    const recO = r2(outras.reduce((s, t) => s + num(t.valor_pago ?? t.valor), 0)), pagas = T.filter(t => t.tipo === 'pagar' && t.pago_em && noPer(t.pago_em, ini, fim));
+    const porCat = {}; pagas.forEach(t => { const c = t.categoria || 'Outras despesas'; porCat[c] = r2((porCat[c] || 0) + num(t.valor_pago ?? t.valor)); });
+    const ent = r2(recM + recO), sai = r2(Object.values(porCat).reduce((s, v) => s + v, 0)), res = r2(ent - sai), max = Math.max(1, ent, sai);
+    const em30 = diaMais(hoje, 30), prevRec = r2(alunos().filter(a => !a.inativo && a.valido_ate && a.valido_ate <= em30).reduce((s, a) => s + valorCobrar(a, planoAc(a.plano_id)), 0));
+    const prevPag = r2(T.filter(t => t.tipo === 'pagar' && !t.pago_em && t.venc <= em30).reduce((s, t) => s + num(t.valor), 0));
+    const meses = Array.from({ length:6 }, (_, k) => { const d = new Date(Date.UTC(+hoje.slice(0, 4), +hoje.slice(5, 7) - 6 + k, 1)).toISOString().slice(0, 7); return { rot:['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+d.slice(5, 7) - 1], v:r2(mensais().filter(m => (m.pago_em || '').slice(0, 7) === d).reduce((s, m) => s + num(m.valor), 0)), dica:d.slice(5) + '/' + d.slice(0, 4) }; });
+    return `<div class="acd-kpis">${kpi('Entrou', brl(ent), 'mensalidades + outras receitas', '#13804a')}${kpi('Saiu', brl(sai), 'despesas pagas', '#c2362f')}${kpi('Resultado', brl(res), ent ? `margem de ${Math.round(res / ent * 100)}%` : '', res < 0 ? 'var(--bad)' : 'var(--ok)', res < 0 ? 'var(--bad)' : 'var(--ok)')}${kpi('Saldo previsto 30 dias', brl(r2(prevRec - prevPag)), `${brl(prevRec)} a receber − ${brl(prevPag)} a pagar`, '#257de0')}</div>
+    <div class="acd-grid"><div class="acd-card"><h3>Entrou × saiu no período</h3><div class="sub">O que sobrou para a academia</div>
+      ${barrasH([{ rot:'Entrou', v:ent, cor:'var(--ok)' }, { rot:'Saiu', v:sai, cor:'var(--bad)' }])}
+      <div class="acd-big"><div><small>Mensalidades</small><b>${brl(recM)}</b></div><div><small>Outras receitas</small><b>${brl(recO)}</b></div></div></div>
+      <div class="acd-card"><h3>Mensalidades nos últimos 6 meses</h3><div class="sub">Evolução do que entrou por mês</div>${barrasV(meses)}</div></div>
+    <div class="acd-card"><h3>Para onde foi o dinheiro</h3><div class="sub">Despesas pagas no período, por categoria (lançadas no Financeiro)</div>${sai ? barrasH(Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ rot:k, v, extra:Math.round(v / sai * 100) + '%' }))) : vazio('Nenhuma despesa paga no período. Lance as contas da academia na aba Financeiro.')}</div>`;
+  }
   function vRelAcademia(){
     if (!pode('relatorio')) return '<h2>Relatórios</h2><div class="card empty">Seu acesso não inclui relatórios.</div>';
     if (!S.acRelIni){ S.acRelIni = true; if (!S.relPer || S.relPer === 'hoje') S.relPer = 'mes'; } // academia abre no mês
+    estiloDash();
     const aba = S.acRelAba || 'receb', M = relModelo(), [ini, fim] = relPeriodo();
+    const corpo = aba === 'inad' ? dashInad() : aba === 'alunos' ? dashAlunos(ini, fim) : aba === 'fin' ? dashFin(ini, fim) : dashReceb(ini, fim);
     return `<div class="seg rel-abas" style="margin-bottom:12px">${RAB_AC.map(([k, l]) => `<button data-act="acRelAba" data-a="${k}" class="${aba === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="row" style="align-items:center"><h2 style="flex:1;min-width:240px">${esc(M.titulo)}</h2>
+    <div class="row" style="align-items:center"><div style="flex:1;min-width:240px"><h2 style="margin-bottom:0">${esc(M.titulo)}</h2><div class="small">${esc(M.sub)}</div></div>
       <div class="actions" style="margin:0"><button class="btn" data-act="relImprimir">Imprimir / PDF</button><button class="btn" data-act="relPlanilha">Exportar planilha</button></div></div>
-    ${aba === 'inad' ? '' : `<div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${aba === 'inad' ? '' : `<div class="seg" style="margin:8px 0 12px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${fim}"></div></div>` : ''}`}
-    ${relTelaHtml(M)}`;
+    ${corpo}
+    <details class="acd-det" ${S.acTabelas ? 'open' : ''}><summary>Ver tabelas com todos os números</summary>${relTelaHtml({ ...M, sub:'', kpis:[] }).replace('<div class="card"><div class="small"></div><div class="stats rel-kpis"></div></div>', '')}</details>`;
   }
 
   // entradas no Financeiro (contas recebidas) e no fechamento do caixa
@@ -354,6 +468,7 @@
     else if (t.id === 'acCkBusca'){ S.acCk = t.value; render(); }
     else if (t.id === 'acRDe') atualizarAte();
   });
+  document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('acd-det')) S.acTabelas = ev.target.open; }, true);
   document.addEventListener('change', ev => {
     const t = ev.target; if (!modServ() || modServ().id !== 'academia') return;
     if (t.id === 'acPlano'){ const p = planoAc(t.value); if (p && $('#acValor')) $('#acValor').value = brl(p.valor); }
