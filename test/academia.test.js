@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const ctx = { window:{}, document:{ addEventListener(){} }, isoNow:() => '2026-11-25T10:00:00-03:00' };
+const ctx = { window:{}, document:{ addEventListener(){} }, isoNow:() => '2026-11-25T10:00:00-03:00',
+  num:v => Number(String(v ?? '').replace(',', '.')) || 0, r2:v => Math.round((Number(v) + Number.EPSILON) * 100) / 100 };
 vm.createContext(ctx);
 vm.runInContext(readFileSync(new URL('../modulos/servico/academia.js', import.meta.url), 'utf8'), ctx);
 const mod = ctx.window.NOTAONE_MODULOS[0]();
@@ -30,4 +31,13 @@ test('academia: registro do módulo', () => {
   assert.deepEqual([...mod.cols], ['ac_alunos', 'ac_planos', 'ac_mensalidades', 'ac_checkins']);
   assert.ok(mod.esconder.includes('nfe'));
   for (const [k] of mod.abas) assert.equal(typeof mod.views[k], 'function', 'cada aba tem sua tela: ' + k);
+});
+
+test('desconto do aluno: em R$ ou % sobre o valor do plano', () => {
+  const { comDesconto } = mod._teste;
+  assert.equal(comDesconto(100, null), 100);
+  assert.equal(comDesconto(100, { tipo:'R$', valor:15 }), 85);
+  assert.equal(comDesconto(129.9, { tipo:'%', valor:10 }), 116.91);
+  assert.equal(comDesconto(100, { tipo:'R$', valor:150 }), 0, 'nunca fica negativo');
+  assert.equal(comDesconto(100, { tipo:'%', valor:0 }), 100);
 });

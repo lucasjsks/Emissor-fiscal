@@ -28,6 +28,10 @@
   // valor a cobrar por período: mensalidade do aluno × meses do plano; sem valor no aluno, vale o preço do plano
   const valorCobrar = (a, p) => { const m = mensalDoAluno(a); return m ? r2(m * (num((p || {}).meses) || 1)) : num((p || {}).valor); };
   const mensalEquivA = a => { const m = mensalDoAluno(a); if (m) return m; const p = planoAc(a.plano_id); return p ? r2(num(p.valor) / (num(p.meses) || 1)) : 0; };
+  // desconto do aluno (pedido do Lucas, 26/11/2026): em R$ ou % sobre o valor do plano; a mensalidade do aluno = plano − desconto
+  const comDesconto = (valor, d) => { valor = num(valor); if (!d || !(num(d.valor) > 0)) return r2(valor);
+    return r2(Math.max(0, d.tipo === '%' ? valor * (1 - Math.min(100, num(d.valor)) / 100) : valor - num(d.valor))); };
+  const descTxt = d => d && num(d.valor) > 0 ? (d.tipo === '%' ? String(num(d.valor)).replace('.', ',') + '%' : brl(num(d.valor))) + (d.motivo ? ' (' + d.motivo + ')' : '') : '';
   const fone = t => { const d = dig(t); return d.length >= 10 ? (d.startsWith('55') ? d : '55' + d) : ''; };
 
   // situação do aluno pela data "pago até"
@@ -54,32 +58,46 @@
     <div class="card">${lista.length ? `<div class="fin-lista">${lista.map(a => { const p = planoAc(a.plano_id), s = situacao(a); return `
       <div class="fin-l nt-l ${s.k === 'atrasado' ? 'vencido' : s.k === 'vencendo' ? 'hoje' : ''}" data-act="acVerAluno" data-id="${esc(a.id)}">
         <div class="fin-v">${a.valido_ate ? a.valido_ate.slice(8, 10) + '/' + a.valido_ate.slice(5, 7) : '—'}<small>pago até</small></div>
-        <div class="fin-d"><b>${esc(a.nome)}</b><span>${esc(p ? p.nome : 'sem plano')}${a.telefone ? ' · ' + esc(a.telefone) : ''}${a.ultimo_checkin ? ' · último treino ' + dataBR(a.ultimo_checkin) : ''}</span></div>
+        <div class="fin-d"><b>${esc(a.nome)}</b><span>${esc(p ? p.nome : 'sem plano')}${a.desconto ? ' · desconto ' + esc(descTxt({ ...a.desconto, motivo:'' })) : ''}${a.telefone ? ' · ' + esc(a.telefone) : ''}${a.ultimo_checkin ? ' · último treino ' + dataBR(a.ultimo_checkin) : ''}</span></div>
         <div class="fin-r">${tagSit(a)}${!a.inativo && pode('caixa') ? `<button class="btn sm pri" data-act="acReceber" data-id="${esc(a.id)}">Receber</button>` : ''}</div></div>`; }).join('')}</div>`
       : `<p class="empty">${L.length ? 'Nenhum aluno neste filtro.' : 'Nenhum aluno cadastrado ainda. Toque em <b>+ Novo aluno</b>.'}</p>`}</div>`;
   }
   function formAluno(a){
     a = a || { inicio:hojeISO(), valido_ate:hojeISO() };
-    const P = planosAc();
+    const P = planosAc(), pl = planoAc(a.plano_id) || P[0];
+    // aluno antigo com mensalidade menor que o plano e sem desconto anotado: mostra a diferença como desconto em R$
+    let d = a.desconto || {};
+    if (!a.desconto && pl && num(a.valor_mensal) > 0 && num(a.valor_mensal) < num(pl.valor)) d = { tipo:'R$', valor:r2(num(pl.valor) - num(a.valor_mensal)) };
     openModal(`${mhead(a.id ? 'Editar aluno' : 'Novo aluno')}
       <div class="row">${fld('acNome', 'Nome completo *', a.nome)}${fld('acCpf', 'CPF', a.cpf ? fmtDoc(a.cpf) : '', 'inputmode="numeric" autocomplete="off"')}</div>
       <div class="row">${fld('acFone', 'WhatsApp', a.telefone, 'inputmode="tel" placeholder="(86) 99999-9999"')}${fld('acNasc', 'Nascimento', a.nascimento, 'type="date"')}</div>
-      <div class="row">${sel('acPlano', 'Plano *', a.plano_id || (P[0] || {}).id || '', P.length ? P.map(p => [p.id, `${p.nome} — ${brl(p.valor)}`]) : [['', 'Crie os planos em Empresa → Mensalidade da academia']])}${fld('acValor', 'Valor da mensalidade *', a.valor_mensal ? brl(a.valor_mensal) : P.length ? brl((planoAc(a.plano_id) || P[0]).valor) : '', 'data-rs inputmode="decimal"')}</div>
+      <div class="row">${sel('acPlano', 'Plano *', a.plano_id || (P[0] || {}).id || '', P.length ? P.map(p => [p.id, `${p.nome} — ${brl(p.valor)}`]) : [['', 'Crie os planos em Empresa → Mensalidade da academia']])}
+        <div><label for="acDescV">Desconto</label><div class="row" style="flex-wrap:nowrap;gap:6px;margin:0"><select id="acDescTipo" style="flex:0 0 74px"><option ${d.tipo === '%' ? '' : 'selected'}>R$</option><option ${d.tipo === '%' ? 'selected' : ''}>%</option></select><input id="acDescV" data-rs="acDescTipo" inputmode="decimal" placeholder="sem desconto" value="${num(d.valor) > 0 ? (d.tipo === '%' ? String(num(d.valor)).replace('.', ',') : brl(num(d.valor))) : ''}"></div></div></div>
+      <div class="row">${fld('acDescMotivo', 'Motivo do desconto (opcional)', d.motivo || '', 'placeholder="ex.: família, estudante, parceria"')}${fld('acValor', 'Mensalidade do aluno', '', 'readonly tabindex="-1" style="font-weight:700;background:#f5f7fb"')}</div>
       <div class="row">${fld('acVenc', a.id ? 'Pago até' : 'Primeiro vencimento', a.valido_ate || hojeISO(), 'type="date"')}<div></div></div>
       ${fld('acObs', 'Observações (saúde, objetivo, restrições)', a.obs)}
       ${a.id ? `<label class="chk"><input type="checkbox" id="acInativo" ${a.inativo ? 'checked' : ''}> Aluno inativo (parou de treinar)</label>` : `<label class="chk"><input type="checkbox" id="acPagarJa" checked> Receber a primeira mensalidade agora</label>`}
       <div id="errM"></div>
       <div class="actions">${a.id && pode('empresa') ? `<button class="btn bad" data-act="acDelAluno" data-id="${esc(a.id)}">Excluir</button>` : ''}<button class="btn pri" data-act="acSalvarAluno" data-id="${esc(a.id || '')}">Salvar</button></div>`);
+    atualizarMensalAluno();
+  }
+  const descDoForm = () => { const v = numIn(val('acDescV')); return v > 0 ? { tipo:val('acDescTipo') === '%' ? '%' : 'R$', valor:r2(v), motivo:val('acDescMotivo') } : null; };
+  function atualizarMensalAluno(){
+    const p = planoAc(val('acPlano')), c = $('#acValor'); if (!c) return;
+    const d = descDoForm(), v = p ? comDesconto(p.valor, d) : 0;
+    c.value = p ? brl(v) + (d ? `  (plano ${brl(p.valor)} − ${descTxt({ ...d, motivo:'' })})` : '') : '';
   }
   async function salvarAluno(id){
     const antigo = id ? alunos().find(x => x.id === id) : null;
-    const a = { ...(antigo || {}), id:id || undefined, nome:val('acNome'), cpf:dig(val('acCpf')), telefone:val('acFone'), nascimento:val('acNasc'), plano_id:val('acPlano'), valor_mensal:r2(numIn(val('acValor'))), valido_ate:val('acVenc'), obs:val('acObs') };
+    const a = { ...(antigo || {}), id:id || undefined, nome:val('acNome'), cpf:dig(val('acCpf')), telefone:val('acFone'), nascimento:val('acNasc'), plano_id:val('acPlano'), desconto:descDoForm(), valido_ate:val('acVenc'), obs:val('acObs') };
+    { const p = planoAc(a.plano_id); a.valor_mensal = p ? comDesconto(p.valor, a.desconto) : 0; if (!a.desconto) delete a.desconto; }
     if ($('#acInativo')) a.inativo = $('#acInativo').checked;
     if (!antigo) a.inicio = hojeISO();
     const e = [];
     if (a.nome.length < 3) e.push('Informe o nome do aluno.');
     if (!a.plano_id) e.push('Crie os planos em Empresa → Mensalidade da academia e escolha um.');
-    if (!(a.valor_mensal > 0)) e.push('Informe o valor da mensalidade do aluno.');
+    if (a.desconto && a.desconto.tipo === '%' && a.desconto.valor >= 100) e.push('O desconto em % tem que ser menor que 100%.');
+    if (a.plano_id && !(a.valor_mensal > 0)) e.push('Com esse desconto a mensalidade ficou zerada. Confira o valor do desconto.');
     if (a.cpf && a.cpf.length !== 11) e.push('CPF incompleto.');
     if (a.cpf && alunos().some(x => x.id !== id && x.cpf === a.cpf)) e.push('Já existe um aluno com este CPF.');
     if (e.length) return $('#errM').innerHTML = `<div class="msg err">${e.join('<br>')}</div>`;
@@ -93,7 +111,7 @@
     const C = checkins().filter(c => c.aluno_id === id).sort((x, y) => String(y.em).localeCompare(String(x.em)));
     const s = situacao(a), tel = fone(a.telefone), msg = encodeURIComponent(msgAviso(a));
     openModal(`${mhead(esc(a.nome))}
-      <p>${tagSit(a)} · mensalidade <b>${brl(mensalEquivA(a))}</b>${p ? ` · plano <b>${esc(p.nome)}</b>${num(p.meses) > 1 ? ` (${brl(valorCobrar(a, p))} a cada ${p.meses} meses)` : ''}` : ''} · pago até <b>${a.valido_ate ? dataBR(a.valido_ate) : '—'}</b></p>
+      <p>${tagSit(a)} · mensalidade <b>${brl(mensalEquivA(a))}</b>${a.desconto ? ` <span class="tag g">desconto ${esc(descTxt(a.desconto))}</span>` : ''}${p ? ` · plano <b>${esc(p.nome)}</b>${num(p.meses) > 1 ? ` (${brl(valorCobrar(a, p))} a cada ${p.meses} meses)` : ''}` : ''} · pago até <b>${a.valido_ate ? dataBR(a.valido_ate) : '—'}</b></p>
       <p class="small">${a.cpf ? 'CPF ' + fmtDoc(a.cpf) + ' · ' : ''}${a.telefone ? 'WhatsApp ' + esc(a.telefone) + ' · ' : ''}aluno desde ${dataBR(a.inicio)}${a.nascimento ? ' · nascimento ' + dataBR(a.nascimento) : ''}</p>
       ${a.obs ? `<div class="msg info">${esc(a.obs)}</div>` : ''}
       <div class="actions" style="justify-content:flex-start">${pode('caixa') && !a.inativo ? `<button class="btn pri" data-act="acReceber" data-id="${esc(a.id)}">Receber mensalidade</button>` : ''}
@@ -477,14 +495,15 @@ details.acd-det summary{cursor:pointer;font-weight:600;color:#0A1630;padding:6px
     if (t.id === 'acBusca'){ S.acBusca = t.value; render(); }
     else if (t.id === 'acCkBusca'){ S.acCk = t.value; render(); }
     else if (t.id === 'acRDe') atualizarAte();
+    else if (t.id === 'acDescV') atualizarMensalAluno();
   });
   document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('acd-det')) S.acTabelas = ev.target.open; }, true);
   document.addEventListener('change', ev => {
     const t = ev.target; if (!modServ() || modServ().id !== 'academia') return;
-    if (t.id === 'acPlano'){ const p = planoAc(t.value); if (p && $('#acValor')) $('#acValor').value = brl(p.valor); }
+    if (t.id === 'acPlano' || t.id === 'acDescTipo' || t.id === 'acDescV') atualizarMensalAluno();
     else if (t.id === 'acRPlano' || t.id === 'acRMeses'){ // valor = mensalidade (do aluno, ou do plano escolhido se trocou de plano) × meses
       const p = planoAc(val('acRPlano')), r = S.acRec || {}, a = alunos().find(x => x.id === (r.aluno || {}).id) || r.aluno || {};
-      const mensal = p && p.id === a.plano_id && mensalDoAluno(a) ? mensalDoAluno(a) : num((p || {}).valor);
+      const mensal = p && p.id === a.plano_id && mensalDoAluno(a) ? mensalDoAluno(a) : comDesconto((p || {}).valor, a.desconto); // trocou de plano: o desconto do aluno continua valendo
       if ($('#acRValor')) $('#acRValor').value = brl(r2(mensal * (+val('acRMeses') || 1))); atualizarAte(); }
     else if (t.id === 'acMesSel'){ S.acMes = t.value; render(); }
   });
@@ -530,6 +549,6 @@ details.acd-det summary{cursor:pointer;font-weight:600;color:#0A1630;padding:6px
     perm:{ acNovoAluno:'cliente', acEditAluno:'cliente', acSalvarAluno:'cliente', acReceber:'caixa', acSalvarReceb:'caixa', acCheck:'caixa', acDelCheck:'caixa',
       acRelAba:'relatorio', acDelAluno:'empresa', acEstornar:'empresa', acNovoPlano:'empresa', acEditPlano:'empresa', acSalvarPlano:'empresa', acDelPlano:'empresa' },
     acoes, inicioHtml, empresaHtml, titulosFin, caixaExtras, relModelo,
-    _teste:{ maisMeses, situacao } // usado pelos testes automáticos
+    _teste:{ maisMeses, situacao, comDesconto, descTxt } // usado pelos testes automáticos
   };
 });
