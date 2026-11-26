@@ -216,9 +216,9 @@ language plpgsql as $$
 begin
   if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
   if tg_op = 'UPDATE' then
-    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade', 'liberar_tipo', old.data->'liberar_tipo'));
+    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo' - 'mensalidade_manual') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade', 'liberar_tipo', old.data->'liberar_tipo', 'mensalidade_manual', old.data->'mensalidade_manual'));
   else
-    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo';
+    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo' - 'mensalidade_manual';
   end if;
   return new;
 end $$;
@@ -269,7 +269,7 @@ begin
     select jsonb_strip_nulls(jsonb_build_object(
       'id', e.empresa_id, 'fantasia', e.data->'fantasia', 'razao', e.data->'razao', 'cnpj', e.data->'cnpj', 'cpf', e.data->'cpf',
       'doc_tipo', e.data->'doc_tipo', 'modulo', e.data->'modulo', 'servico', e.data->'servico', 'plano', e.data->'plano',
-      'assinatura', (e.data->'assinatura') - 'mensalidades', 'sem_mensalidade', e.data->'sem_mensalidade', 'ambiente', e.data->'ambiente',
+      'assinatura', (e.data->'assinatura') - 'mensalidades', 'sem_mensalidade', e.data->'sem_mensalidade', 'mensalidade_manual', e.data->'mensalidade_manual', 'ambiente', e.data->'ambiente',
       'certificado', e.data->'certificado', 'telefone', e.data->'telefone', 'municipio', e.data->'municipio', 'uf', e.data->'uf',
       'funcionarios', case when jsonb_typeof(e.data->'funcionarios') = 'array' then jsonb_array_length(e.data->'funcionarios') else 0 end,
       'criado_em', dono.criado_em, 'dono_email', dono.email,
@@ -301,6 +301,49 @@ begin
 end $$;
 revoke execute on function public.admin_painel() from public, anon;
 grant execute on function public.admin_painel() to authenticated;
+
+-- BAIXA MANUAL DA MENSALIDADE DO NOTAONE (pedido do Lucas, 26/11/2026): o administrador registra no Painel o pagamento
+-- recebido por fora do Asaas (PIX direto, dinheiro…). Fica em empresas/<id>.mensalidade_manual {pago_ate, pagamentos[]}
+-- (a tela da empresa não grava esse campo: proteger_assinatura). Cada baixa estende o "pago até" pelos meses pagos;
+-- sem baixa nenhuma, o 1º vencimento é 30 dias depois do cadastro.
+create or replace function public.admin_baixa_mensalidade(p_empresa text, p_valor numeric, p_meses int, p_forma text, p_data date, p_obs text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare d jsonb; mm jsonb; criado date; de date; ate date; pg jsonb;
+begin
+  if not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  if p_valor is null or p_valor <= 0 then raise exception 'Informe o valor recebido.'; end if;
+  if p_meses is null or p_meses < 1 or p_meses > 24 then raise exception 'Quantidade de meses inválida.'; end if;
+  select data into d from public.docs where path = 'empresas/' || p_empresa for update;
+  if d is null then raise exception 'Empresa não encontrada.'; end if;
+  mm := coalesce(d->'mensalidade_manual', '{}'::jsonb);
+  select min(criado_em)::date into criado from public.membros where empresa_id = p_empresa and papel = 'dono';
+  de := coalesce((mm->>'pago_ate')::date, coalesce(criado, current_date) + 30);
+  ate := (de + make_interval(months => p_meses))::date;
+  pg := jsonb_build_object('id', gen_random_uuid()::text, 'de', de, 'ate', ate, 'meses', p_meses, 'valor', round(p_valor, 2), 'forma', coalesce(nullif(p_forma, ''), 'pix'),
+    'pago_em', coalesce(p_data, current_date), 'obs', nullif(trim(coalesce(p_obs, '')), ''), 'registrado_em', now(), 'por', auth.uid());
+  mm := jsonb_build_object('pago_ate', ate, 'pagamentos', coalesce(mm->'pagamentos', '[]'::jsonb) || jsonb_build_array(jsonb_strip_nulls(pg)));
+  update public.docs set data = jsonb_set(data, '{mensalidade_manual}', mm, true) where path = 'empresas/' || p_empresa;
+  return mm;
+end $$;
+-- desfaz a ÚLTIMA baixa (lançada errada): o "pago até" volta para o início dela
+create or replace function public.admin_desfazer_baixa(p_empresa text, p_id text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare d jsonb; mm jsonb; lista jsonb; ult jsonb; n int;
+begin
+  if not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  select data into d from public.docs where path = 'empresas/' || p_empresa for update;
+  mm := coalesce(d->'mensalidade_manual', '{}'::jsonb); lista := coalesce(mm->'pagamentos', '[]'::jsonb); n := jsonb_array_length(lista);
+  if n = 0 then raise exception 'Nenhuma baixa para desfazer.'; end if;
+  ult := lista->(n - 1);
+  if ult->>'id' <> p_id then raise exception 'Só dá para desfazer a última baixa.'; end if;
+  mm := jsonb_strip_nulls(jsonb_build_object('pago_ate', case when n > 1 then ult->'de' end, 'pagamentos', lista - (n - 1)));
+  update public.docs set data = jsonb_set(data, '{mensalidade_manual}', mm, true) where path = 'empresas/' || p_empresa;
+  return mm;
+end $$;
+revoke execute on function public.admin_baixa_mensalidade(text, numeric, int, text, date, text) from public, anon;
+revoke execute on function public.admin_desfazer_baixa(text, text) from public, anon;
+grant execute on function public.admin_baixa_mensalidade(text, numeric, int, text, date, text) to authenticated;
+grant execute on function public.admin_desfazer_baixa(text, text) to authenticated;
 
 -- RAMO DE ATIVIDADE (pedido do Lucas, 26/11/2026): escolhido no cadastro, não muda mais pela tela.
 -- Ao alterar, a tela (authenticated) não consegue trocar modulo/servico (empresa antiga sem ramo fica como comércio).

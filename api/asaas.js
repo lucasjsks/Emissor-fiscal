@@ -120,6 +120,19 @@ const rotaTela = rota(async (req, b) => {
   const u = await usuario(req);
   const { empresa_id, acao } = b;
   if (!empresa_id) throw new Falha('Requisição incompleta.');
+  // Painel NotaOne: o administrador da plataforma dá baixa na mensalidade aberta do Asaas (recebida por fora: PIX direto, dinheiro…)
+  if (acao === 'admin_baixa'){
+    const adm = await sb('/rest/v1/admins?select=user_id&user_id=eq.' + encodeURIComponent(u.id));
+    if (!(Array.isArray(adm) && adm.length)) throw new Falha('Só o administrador do NotaOne pode fazer isso.', 403);
+    if (!asaasLigado()) throw new Falha('A cobrança pelo Asaas está desligada.', 503);
+    const e = await getDoc('empresas/' + empresa_id); if (!e) throw new Falha('Empresa não encontrada.', 404);
+    const a = e.assinatura || {}, pid = (a.aberta || {}).id;
+    if (!a.id || !pid) throw new Falha('Esta empresa não tem mensalidade em aberto no Asaas.');
+    const p = await asaas('GET', `/payments/${encodeURIComponent(pid)}`);
+    if (p.subscription !== a.id) throw new Falha('Mensalidade não encontrada.', 404);
+    if (!PAGO.includes(p.status)) await asaas('POST', `/payments/${encodeURIComponent(pid)}/receiveInCash`, { paymentDate:/^\d{4}-\d{2}-\d{2}$/.test(b.data || '') ? b.data : hojeBR(), value:Number(b.valor) > 0 ? Number(b.valor) : Number(p.value), notifyCustomer:false });
+    return { ok:true, assinatura:await atualizar(empresa_id, e) };
+  }
   if (!['dono', 'gerente'].includes(await papelDe(empresa_id, u.id))) throw new Falha('Só o dono da empresa cuida da mensalidade.', 403);
   if (!asaasLigado()) throw new Falha('A cobrança da mensalidade ainda não foi ligada. Fale com o suporte.', 503);
   const e = await getDoc('empresas/' + empresa_id);
