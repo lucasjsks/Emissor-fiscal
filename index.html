@@ -415,6 +415,39 @@ nav button.on{color:var(--navy)}nav button.on svg{background:#E9F9B8}
 .plano b{font-size:15px}.plano .pv{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}.plano .pv small{font-size:12px;font-weight:400;color:#5b6478}
 .plano.on{border-color:#0A1630;box-shadow:0 0 0 2px #C6F432 inset;background:#f7fbe8}
 .plano:disabled{opacity:.6}
+
+/* ================== Painel dos relatórios (Comércio e Comércio PF) — mesmo modelo da academia ================== */
+.dsh-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:10px;margin-bottom:12px}
+.dsh-kpi{background:#fff;border:1px solid #e3e8f0;border-radius:18px;padding:16px 18px;position:relative;overflow:hidden;min-width:0}
+.dsh-kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--acc,#0A1630)}
+.dsh-kpi small{display:block;color:#5b6478;font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.dsh-kpi b{display:block;font-family:'Space Grotesk',Inter,sans-serif;font-size:28px;line-height:1.15;margin:6px 0 2px;color:#0A1630}
+.dsh-kpi span{font-size:12.5px;color:#5b6478}.dsh-kpi .up{color:#13804a;font-weight:700}.dsh-kpi .down{color:#c2362f;font-weight:700}
+.dsh-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:12px}.dsh-grid>*{min-width:0}
+.dsh-card{background:#fff;border:1px solid #e3e8f0;border-radius:18px;padding:16px 18px;margin-bottom:12px;min-width:0}
+.dsh-card h3{margin:0 0 2px;font-size:15px}.dsh-card .sub{font-size:12.5px;color:#5b6478;margin-bottom:12px}
+.dsh-vbars{display:flex;align-items:flex-end;gap:4px;height:170px;padding-top:18px;border-bottom:1px solid #d5dbe6}
+.dsh-vbars .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;position:relative;cursor:default}
+.dsh-vbars .c i{display:block;width:100%;max-width:34px;background:#0A1630;border-radius:4px 4px 0 0;min-height:2px}
+.dsh-vbars .c:hover i{background:#257de0}.dsh-vbars .c.zero i{background:#d5dbe6}
+.dsh-vbars .c em{position:absolute;top:-2px;font-style:normal;font-size:11px;font-weight:700;color:#0A1630;opacity:0;transform:translateY(-100%);white-space:nowrap}.dsh-vbars .c:hover em,.dsh-vbars .c.top em{opacity:1}
+.dsh-xl{display:flex;gap:4px;margin-top:4px}.dsh-xl span{flex:1;text-align:center;font-size:10.5px;color:#5b6478;min-width:0;overflow:visible;white-space:nowrap;display:flex;justify-content:center}
+.dsh-h{margin:8px 0}.dsh-h .l{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px;gap:8px}.dsh-h .l>span{flex:1 1 40%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh-h .l b{font-variant-numeric:tabular-nums;text-align:right}
+.dsh-h .t{height:10px;background:#eef1f6;border-radius:99px;overflow:hidden}.dsh-h .t i{display:block;height:100%;border-radius:99px}
+.dsh-stack{display:flex;height:22px;border-radius:99px;overflow:hidden;gap:2px;background:#fff;margin:6px 0 10px}.dsh-stack i{display:block;height:100%}
+.dsh-leg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}.dsh-leg span{display:inline-flex;align-items:center;gap:6px}.dsh-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.dsh-hero{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.dsh-ring{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
+.dsh-ring div{width:112px;height:112px;border-radius:50%;background:#fff;display:grid;place-items:center;text-align:center}
+.dsh-ring b{font-family:'Space Grotesk',Inter,sans-serif;font-size:28px;line-height:1}.dsh-ring small{font-size:11.5px;color:#5b6478}
+.dsh-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eef1f6}.dsh-row:last-child{border-bottom:0}
+.dsh-row .n{flex:1;min-width:0}.dsh-row .n b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dsh-row .n span{font-size:12px;color:#5b6478}.dsh-row>b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.dsh-heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:4px}.dsh-heat div{border-radius:8px;padding:6px 2px;text-align:center;font-size:11px}.dsh-heat div b{display:block;font-size:13px;min-height:16px}
+.dsh-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:6px}.dsh-big div{border-radius:14px;padding:12px 14px;background:#f5f7fb;min-width:0}.dsh-big small{font-size:12px;color:#5b6478}.dsh-big b{display:block;font-family:'Space Grotesk',Inter,sans-serif;font-size:22px;overflow-wrap:anywhere}
+.dsh-dre .dsh-h .l span{font-weight:600}
+.dsh-solto div{background:#fff;border:1px solid #e3e8f0}
+@media(max-width:520px){.dsh-kpi{padding:12px 14px}.dsh-kpi b{font-size:21px}.dsh-card{padding:14px}}
+details.dsh-det summary{cursor:pointer;font-weight:600;color:#0A1630;padding:6px 0}
 </style>
 </head>
 <body>
@@ -2573,7 +2606,7 @@ function vRelOutros(aba){
   ${aba === 'estoque' ? `<div class="seg" style="margin-bottom:12px"><span class="small" style="align-self:center;margin-right:6px">Parado há mais de</span>${[30, 60, 90, 180].map(d => `<button data-act="relParado" data-d="${d}" class="${(S.relParado || 60) === d ? 'on' : ''}">${d} dias</button>`).join('')}</div>`
     : `<div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${R.ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${R.fim}"></div></div>` : ''}`}
-  ${relTelaHtml(M)}`;
+  <div class="small" style="margin:-2px 0 10px">${esc(M.sub)}</div>${aba === 'estoque' ? dashEstoque(M) : aba === 'equipe' ? dashEquipe(M) : dashFinanceiro(M)}`;
 }
 function vRelVendas(){
   const R = dadosRel(), maxDia = Math.max(1, ...Object.values(R.dia)), tk = R.vend.length ? r2(R.fat / R.vend.length) : 0;
@@ -2584,18 +2617,9 @@ function vRelVendas(){
   <div class="seg" style="margin-bottom:8px">${[['hoje','Hoje'],['7d','7 dias'],['mes','Este mês'],['mesant','Mês passado'],['periodo','Escolher datas']].map(([k, l]) => `<button data-act="relPer" data-p="${k}" class="${S.relPer === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   ${S.relPer === 'periodo' ? `<div class="row" style="margin-bottom:8px"><div><label for="relIni">De</label><input id="relIni" type="date" value="${R.ini}"></div><div><label for="relFim">Até</label><input id="relFim" type="date" value="${R.fim}"></div></div>` : ''}
   ${semNota() ? '' : `<div class="seg" style="margin-bottom:12px">${[['todos','Cupom e NF-e'],['65','Só cupom'],['55','Só NF-e']].map(([k, l]) => `<button data-act="relMod" data-m="${k}" class="${R.mod === k ? 'on' : ''}">${l}</button>`).join('')}</div>`}
-  <div class="card"><div class="small">${dBR(R.ini)} a ${dBR(R.fim)}${ambAtual() !== 'producao' && !semNota() ? ' · notas de teste (homologação)' : ''}</div>
-    <div class="stats"><div><b>${brl(R.fat)}</b>faturamento</div><div><b>${R.vend.length}</b>vendas</div><div><b>${brl(tk)}</b>ticket médio</div></div>
-    ${R.mod === 'todos' && !semNota() ? linhaTot(`Cupons (${R.cupons.length})`, somaV(R.cupons), 'small') + linhaTot(`NF-e (${R.nfes.length})`, somaV(R.nfes), 'small') : ''}
-    ${R.desc ? linhaTot('Descontos concedidos', -R.desc, 'small') : ''}
-    ${R.devV ? linhaTot(`Devoluções (${R.dev.length})`, -R.devV, 'small') + linhaTot('Faturamento líquido', r2(R.fat - R.devV)) : ''}
-    ${R.canc.length ? linhaTot(`Canceladas (${R.canc.length}, fora do total)`, somaV(R.canc), 'small') : ''}</div>
-  ${!R.vend.length ? '<div class="card empty">Nenhuma venda no período.</div>' : `
-  ${Object.keys(R.dia).length > 1 ? `<div class="card"><h3 style="margin-top:0">Por dia</h3>${Object.entries(R.dia).sort().map(([d, v]) => `<div style="margin:6px 0"><div class="total small"><span>${dBR(d).slice(0, 5)}</span><span class="num">${brl(v)}</span></div><div class="bar" style="width:${Math.max(2, v / maxDia * 100)}%"></div></div>`).join('')}</div>` : ''}
-  <div class="card"><h3 style="margin-top:0">Por forma de pagamento</h3>${Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => linhaTot(`${esc(nomeForma(f))} <span class="small">${Math.round(v / totF * 100)}%</span>`, v)).join('')}</div>
-  <div class="card"><h3 style="margin-top:0">Produtos mais vendidos</h3><div class="list">${R.prod.slice(0, nProd).map((p, i) => `<div class="it"><div class="grow"><div class="t">${i + 1}. ${esc(p.d)}</div><div class="s">${qtdTxt(p.q)} ${esc(p.u)}</div></div><b class="num">${brl(p.v)}</b></div>`).join('')}</div>
-    ${R.prod.length > 10 ? `<div class="actions"><button class="btn sm" data-act="relTodos">${S.relTodos ? 'Mostrar só os 10 primeiros' : `Ver todos (${R.prod.length})`}</button></div>` : ''}</div>
-  ${R.cli.length > 1 || R.cli[0].nome !== 'Consumidor não identificado' ? `<div class="card"><h3 style="margin-top:0">Por cliente</h3><div class="list">${R.cli.slice(0, 10).map(c => `<div class="it"><div class="grow"><div class="t">${esc(c.nome)}</div><div class="s">${c.qtd} venda(s)</div></div><b class="num">${brl(c.v)}</b></div>`).join('')}</div></div>` : ''}`}`;
+  <div class="small" style="margin:-2px 0 10px">${dBR(R.ini)} a ${dBR(R.fim)}${ambAtual() !== 'producao' && !semNota() ? ' · notas de teste (homologação)' : ''}</div>
+  ${dashVendas(R)}
+  ${R.vend.length ? dTabelas(relVendasModelo(R)) : ''}`;
 }
 async function exportRel(){
   const R = dadosRel();
@@ -2622,6 +2646,126 @@ function imprimirRel(){
   ${tab('Produtos vendidos', ['Produto', 'Quantidade', 'Valor'], R.prod.map(p => `<tr><td>${esc(p.d)}</td><td class="r">${qtdTxt(p.q)} ${esc(p.u)}</td><td class="r">${brl(p.v)}</td></tr>`), [1, 2])}`;
   imprimirDoc('Relatório de vendas', css, corpo);
 }
+
+
+/* ---------- Painel visual dos relatórios (Comércio e Comércio PF) — mesmo modelo dos relatórios da academia (pedido do Lucas, 26/11/2026).
+   Cada aba desenha cartões de indicadores, gráficos e listas de ação; as tabelas completas ficam em "Ver tabelas com todos os números"
+   e continuam iguais no imprimir/planilha. ---------- */
+const DCOR = ['#0A1630','#257de0','#13804a','#f2a600','#f47230','#6a4ce2','#0ea5a4','#c2362f'];
+const DSEM_N = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const MES3 = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const dKpi = (rot, valor, sub = '', acc = '#0A1630', corValor = '') => `<div class="dsh-kpi" style="--acc:${acc}"><small>${rot}</small><b${corValor ? ` style="color:${corValor}"` : ''}>${valor}</b><span>${sub}</span></div>`;
+const dVar = (atual, ant) => { if (!ant) return atual ? '<span class="up">novo</span> vs período anterior' : 'sem dados no período anterior'; const p = Math.round((atual - ant) / Math.abs(ant) * 100); return `<span class="${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}%</span> vs período anterior`; };
+const dVazio = txt => `<p class="small" style="padding:18px 0;text-align:center">${txt}</p>`;
+const dDias = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5);
+function dBarrasV(itens, fmt = v => brl(v)){ // [{rot, v, dica}]
+  const max = Math.max(1, ...itens.map(x => x.v)), iMax = itens.findIndex(x => x.v === max && x.v > 0), passo = Math.ceil(itens.length / 8);
+  return `<div class="dsh-vbars">${itens.map((x, i) => `<div class="c ${x.v ? '' : 'zero'} ${i === iMax ? 'top' : ''}" title="${esc(x.dica || x.rot)}: ${esc(fmt(x.v))}"><em>${esc(fmt(x.v))}</em><i style="height:${Math.max(1.5, x.v / max * 100)}%"></i></div>`).join('')}</div>
+    <div class="dsh-xl">${itens.map((x, i) => `<span>${i % passo === 0 ? esc(x.rot) : ''}</span>`).join('')}</div>`;
+}
+const dBarrasH = (itens, fmt = v => brl(v)) => { const max = Math.max(1, ...itens.map(x => Math.abs(x.v))); return itens.map((x, i) => `<div class="dsh-h"><div class="l"><span>${x.cor !== false ? `<i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${x.cor || DCOR[i % DCOR.length]};margin-right:6px"></i>` : ''}${esc(x.rot)}</span><b>${esc(fmt(x.v))}${x.extra ? ` <span class="small" style="font-weight:400">${esc(x.extra)}</span>` : ''}</b></div><div class="t"><i style="width:${Math.max(1, Math.abs(x.v) / max * 100)}%;background:${x.cor || DCOR[i % DCOR.length]}"></i></div></div>`).join(''); };
+const dStack = itens => `<div class="dsh-stack">${itens.filter(x => x.v > 0).map((x, i) => `<i style="flex:${x.v};background:${x.cor || DCOR[i % DCOR.length]}" title="${esc(x.rot)}"></i>`).join('')}</div>`;
+function dPerAnterior(ini, fim){ const n = dDias(ini, fim) + 1; return [diaMais(ini, -n), diaMais(ini, -1)]; }
+function dSerieDias(ini, fim, soma){
+  const tot = dDias(ini, fim) + 1, n = Math.min(tot, 62), base = n === tot ? ini : diaMais(fim, -61);
+  return Array.from({ length:n }, (_, k) => { const d = diaMais(base, k); return { rot:d.slice(8, 10) + '/' + d.slice(5, 7), v:soma[d] || 0, dica:dataBR(d) }; });
+}
+function dUltMeses(valorDoMes, n = 6){ const h = isoNow().slice(0, 10); return Array.from({ length:n }, (_, k) => { const d = new Date(Date.UTC(+h.slice(0, 4), +h.slice(5, 7) - n + k, 1)).toISOString().slice(0, 7); return { rot:MES3[+d.slice(5, 7) - 1], v:valorDoMes(d), dica:d.slice(5) + '/' + d.slice(0, 4) }; }); }
+const dTabelas = M => `<details class="dsh-det" ${S.relTabelas ? 'open' : ''}><summary>Ver tabelas com todos os números</summary>${relTelaHtml({ ...M, sub:'', kpis:[] }).replace('<div class="card"><div class="small"></div><div class="stats rel-kpis"></div></div>', '')}</details>`;
+const dVendasDe = (ini, fim, mod = 'todos') => S.notas.filter(n => { const d = (n.data || '').slice(0, 10); return d >= ini && d <= fim && daAmb(n) && notaValida(n) && (n.op || 'venda') === 'venda' && (mod === 'todos' || n.modelo === mod); });
+
+function dashVendas(R){
+  const [pi, pf] = dPerAnterior(R.ini, R.fim), VA = dVendasDe(pi, pf, R.mod), fatA = r2(VA.reduce((a, n) => a + n.total, 0));
+  const tk = R.vend.length ? r2(R.fat / R.vend.length) : 0, tkA = VA.length ? r2(fatA / VA.length) : 0, liq = r2(R.fat - R.devV);
+  const formas = Object.entries(R.forma).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), totF = formas.reduce((a, [, v]) => a + v, 0) || 1;
+  const ds = [0, 0, 0, 0, 0, 0, 0], dsV = [0, 0, 0, 0, 0, 0, 0], hr = {};
+  R.vend.forEach(n => { const k = new Date(n.data.slice(0, 10) + 'T12:00:00').getDay(); ds[k]++; dsV[k] = r2(dsV[k] + n.total); const h = +String(n.data).slice(11, 13); if (!isNaN(h)) hr[h] = (hr[h] || 0) + 1; });
+  const hs = Object.keys(hr).map(Number), hMin = Math.min(7, ...hs), hMax = Math.max(20, ...hs), maxH = Math.max(1, ...Object.values(hr)), horas = Array.from({ length:hMax - hMin + 1 }, (_, k) => k + hMin);
+  const top = R.prod.slice(0, 10), cli = R.cli.filter(c => c.nome !== 'Consumidor não identificado').slice(0, 8), semCli = R.cli.find(c => c.nome === 'Consumidor não identificado');
+  const ambos = R.mod === 'todos' && !semNota() && R.cupons.length && R.nfes.length, somaV = a => r2(a.reduce((s, n) => s + n.total, 0));
+  const nVend = new Set(R.vend.map(n => n.emitida_por || '')).size;
+  return `<div class="dsh-kpis">${dKpi('Faturamento', brl(R.fat), dVar(R.fat, fatA), '#13804a')}${dKpi(semNota() ? 'Vendas' : 'Vendas', R.vend.length, `${VA.length} no período anterior`)}${dKpi('Ticket médio', brl(tk), dVar(tk, tkA), '#257de0')}${dKpi('Itens vendidos', qtdTxt(R.itens), `${R.prod.length} produto(s) diferente(s)`, '#f2a600')}</div>
+  ${R.desc || R.devV || R.canc.length ? `<div class="dsh-big dsh-solto" style="margin:-2px 0 12px">${R.desc ? `<div><small>Descontos concedidos</small><b style="color:var(--warn)">${brl(R.desc)}</b></div>` : ''}${R.devV ? `<div><small>Devoluções (${R.dev.length})</small><b style="color:var(--bad)">${brl(R.devV)}</b></div><div><small>Faturamento líquido</small><b>${brl(liq)}</b></div>` : ''}${R.canc.length ? `<div><small>Canceladas (fora do total)</small><b>${R.canc.length} · ${brl(somaV(R.canc))}</b></div>` : ''}</div>` : ''}
+  ${!R.vend.length ? '<div class="card empty">Nenhuma venda no período.</div>' : `
+  <div class="dsh-card"><h3>Vendas por dia</h3><div class="sub">Passe o mouse (ou toque) nas barras para ver o valor de cada dia.</div>${dBarrasV(dSerieDias(R.ini, R.fim, R.dia))}</div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Formas de pagamento</h3><div class="sub">Como os clientes pagaram</div>${dStack(formas.map(([f, v]) => ({ rot:nomeForma(f), v })))}${dBarrasH(formas.map(([f, v]) => ({ rot:nomeForma(f), v, extra:Math.round(v / totF * 100) + '%' })))}</div>
+    <div class="dsh-card"><h3>Produtos mais vendidos</h3><div class="sub">Os 10 que mais faturaram no período</div>${dBarrasH(top.map((p, i) => ({ rot:`${i + 1}. ${p.d}`, v:p.v, extra:`${qtdTxt(p.q)} ${p.u}`, cor:i < 3 ? '#13804a' : '#0A1630' })))}</div></div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Dias da semana</h3><div class="sub">Quanto vende cada dia</div>${dBarrasV(DSEM_N.map((d, i) => ({ rot:d.slice(0, 3), v:dsV[i], dica:`${d} (${ds[i]} venda${ds[i] === 1 ? '' : 's'})` })))}</div>
+    <div class="dsh-card"><h3>Horários de pico</h3><div class="sub">Quanto mais escuro, mais vendas naquele horário</div><div class="dsh-heat">${horas.map(h => { const v = hr[h] || 0, a = v / maxH; return `<div title="${h}h: ${v} venda(s)" style="background:${v ? `rgba(10,22,48,${0.12 + a * 0.88})` : '#f1f3f7'};color:${a > .5 ? '#fff' : '#0A1630'}"><b>${v || ''}</b>${h}h</div>`; }).join('')}</div></div></div>
+  <div class="dsh-grid">${ambos ? `<div class="dsh-card"><h3>Cupom × NF-e</h3><div class="sub">De onde veio o faturamento</div>${dStack([{ rot:'Cupom', v:somaV(R.cupons), cor:'#0A1630' }, { rot:'NF-e', v:somaV(R.nfes), cor:'#257de0' }])}${dBarrasH([{ rot:`Cupons (${R.cupons.length})`, v:somaV(R.cupons), cor:'#0A1630' }, { rot:`NF-e (${R.nfes.length})`, v:somaV(R.nfes), cor:'#257de0' }])}</div>` : ''}
+    <div class="dsh-card"><h3>Melhores clientes</h3><div class="sub">${semCli ? `${semCli.qtd} venda(s) sem cliente identificado (${brl(semCli.v)})` : 'Quem mais comprou no período'}</div>${cli.length ? dBarrasH(cli.map(c => ({ rot:c.nome, v:c.v, extra:c.qtd + ' compra' + (c.qtd === 1 ? '' : 's') }))) : dVazio('Nenhuma venda com cliente identificado. Informe o CPF/cliente na venda para ver quem mais compra.')}</div>
+    ${!ambos && nVend > 1 ? `<div class="dsh-card"><h3>Quem vendeu</h3><div class="sub">Detalhes na aba Vendedores e caixas</div>${dBarrasH(Object.entries(R.vend.reduce((o, n) => { const k = nomeVendedor(n.emitida_por); o[k] = r2((o[k] || 0) + n.total); return o; }, {})).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ rot:k, v })))}</div>` : ''}</div>`}`;
+}
+function relVendasModelo(R){
+  return { titulo:'Relatório de vendas', sub:'', kpis:[], secoes:[
+    { tit:'Por dia', cols:[{ t:'Dia', f:'data' }, { t:'Valor', f:'brl' }], linhas:Object.entries(R.dia).sort().map(([d, v]) => [d, v]) },
+    { tit:'Por forma de pagamento', cols:[{ t:'Forma' }, { t:'Valor', f:'brl' }], linhas:Object.entries(R.forma).sort((a, b) => b[1] - a[1]).map(([f, v]) => [nomeForma(f), v]) },
+    { tit:'Produtos vendidos', cols:[{ t:'Produto' }, { t:'Unidade' }, { t:'Quantidade', f:'qtd' }, { t:'Valor', f:'brl' }], linhas:R.prod.map(p => [p.d, p.u, p.q, p.v]) },
+    { tit:'Por cliente', cols:[{ t:'Cliente' }, { t:'Vendas', f:'qtd' }, { t:'Valor', f:'brl' }], linhas:R.cli.map(c => [c.nome, c.qtd, c.v]) } ] };
+}
+function dashEstoque(M){
+  const dias = S.relParado || 60, hoje = isoNow().slice(0, 10), corte = diaMais(hoje, -dias), ultVenda = {};
+  S.notas.filter(n => notaValida(n) && (n.op || 'venda') === 'venda' && daAmb(n)).forEach(n => (n.itens || []).forEach(i => { const d = (n.data || '').slice(0, 10); if (i.pid && (!ultVenda[i.pid] || d > ultVenda[i.pid])) ultVenda[i.pid] = d; }));
+  const P = S.produtos.filter(temSaldo), com = P.filter(p => p.estoque > 0);
+  const vCusto = r2(com.reduce((a, p) => a + p.estoque * custoDe(p), 0)), vVenda = r2(com.reduce((a, p) => a + p.estoque * num(p.preco), 0)), luc = r2(vVenda - vCusto);
+  const baixo = P.filter(p => num(p.estoque_min) > 0 && p.estoque <= num(p.estoque_min)).sort((a, b) => a.estoque - b.estoque), neg = P.filter(p => p.estoque < 0);
+  const parados = com.filter(p => !ultVenda[p.id] || ultVenda[p.id] < corte).sort((a, b) => b.estoque * custoDe(b) - a.estoque * custoDe(a));
+  const vParado = r2(parados.reduce((a, p) => a + p.estoque * custoDe(p), 0));
+  const idB = new Set(baixo.map(p => p.id)), idP = new Set(parados.map(p => p.id)), idN = new Set(neg.map(p => p.id));
+  const ok = P.filter(p => !idB.has(p.id) && !idP.has(p.id) && !idN.has(p.id)).length, alerta = P.filter(p => idB.has(p.id) && !idN.has(p.id)).length, par = P.filter(p => idP.has(p.id) && !idB.has(p.id)).length;
+  const n = P.length || 1, pOk = Math.round(ok / n * 100), pAl = Math.round(alerta / n * 100), pPa = Math.round(par / n * 100);
+  const sug = p => Math.max(0, Math.ceil(num(p.estoque_min) * 2 - p.estoque)), custoCompra = r2(baixo.reduce((a, p) => a + sug(p) * custoDe(p), 0));
+  const topV = [...com].sort((a, b) => b.estoque * custoDe(b) - a.estoque * custoDe(a)).slice(0, 8);
+  return `<div class="dsh-kpis">${dKpi('Em estoque (custo)', brl(vCusto), `${com.length} produto(s) com saldo`, '#0A1630')}${dKpi('Em estoque (venda)', brl(vVenda), 'pelo preço de venda', '#257de0')}${dKpi('Lucro se vender tudo', brl(luc), vVenda ? `margem de ${Math.round(luc / vVenda * 100)}%` : '', '#13804a', luc < 0 ? 'var(--bad)' : '')}${dKpi('Para comprar', baixo.length, baixo.length ? `cerca de ${brl(custoCompra)}` : 'nada no alerta', baixo.length ? 'var(--warn)' : 'var(--ok)', baixo.length ? 'var(--warn)' : '')}</div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Saúde do estoque</h3><div class="sub">Situação dos ${P.length} produto(s) com controle de estoque</div>
+    <div class="dsh-hero"><div class="dsh-ring" style="background:${P.length ? `conic-gradient(#13804a 0% ${pOk}%, #d97706 ${pOk}% ${pOk + pAl}%, #6a4ce2 ${pOk + pAl}% ${pOk + pAl + pPa}%, #c2362f ${pOk + pAl + pPa}% 100%)` : '#eef1f6'}"><div><span><b>${pOk}%</b><br><small>em ordem</small></span></div></div>
+      <div class="dsh-leg" style="flex-direction:column;gap:8px"><span><i style="background:#13804a"></i>✓ Em ordem: <b>${ok}</b></span><span><i style="background:#d97706"></i>▲ No alerta de estoque: <b>${alerta}</b></span><span><i style="background:#6a4ce2"></i>■ Parados há +${dias} dias: <b>${par}</b></span><span><i style="background:#c2362f"></i>● Negativos: <b>${neg.length}</b></span></div></div></div>
+    <div class="dsh-card"><h3>Onde está o dinheiro do estoque</h3><div class="sub">Produtos com mais valor parado na prateleira (custo)</div>${topV.length ? dBarrasH(topV.map(p => ({ rot:p.descricao, v:r2(p.estoque * custoDe(p)), extra:qtdTxt(p.estoque) + ' ' + (p.unidade || 'UN') }))) : dVazio('Nenhum produto com saldo e custo.')}</div></div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Mercadorias para comprar</h3><div class="sub">Chegaram no alerta de estoque · sugestão = dobro do alerta − saldo</div>${baixo.length ? baixo.slice(0, 15).map(p => `<div class="dsh-row"><div class="n" style="cursor:pointer" data-act="editProd" data-id="${esc(p.id)}"><b>${esc(p.descricao)}</b><span>saldo ${qtdTxt(p.estoque)} · alerta ${qtdTxt(num(p.estoque_min))}${custoDe(p) ? ' · ' + brl(r2(sug(p) * custoDe(p))) : ''}</span></div><b>comprar ${qtdTxt(sug(p))}</b></div>`).join('') : dVazio('Nenhum produto no alerta de estoque. 👍')}</div>
+    <div class="dsh-card"><h3>Parados há mais de ${dias} dias</h3><div class="sub">${parados.length ? `${brl(vParado)} parados — pense numa promoção` : 'Produtos com saldo e sem venda no período'}</div>${parados.length ? parados.slice(0, 15).map(p => `<div class="dsh-row"><div class="n" style="cursor:pointer" data-act="editProd" data-id="${esc(p.id)}"><b>${esc(p.descricao)}</b><span>${ultVenda[p.id] ? 'última venda ' + dataBR(ultVenda[p.id]) + ' · ' + dDias(ultVenda[p.id], hoje) + ' dias' : 'nunca vendeu'} · saldo ${qtdTxt(p.estoque)}</span></div><b>${brl(r2(p.estoque * custoDe(p)))}</b></div>`).join('') : dVazio('Tudo girando. 👍')}</div></div>
+  ${neg.length ? `<div class="dsh-card"><h3 style="color:var(--bad)">Estoque negativo</h3><div class="sub">Vendeu mais do que entrou: lance a compra ou faça o inventário</div>${neg.slice(0, 15).map(p => `<div class="dsh-row"><div class="n" style="cursor:pointer" data-act="editProd" data-id="${esc(p.id)}"><b>${esc(p.descricao)}</b></div><b style="color:var(--bad)">${qtdTxt(p.estoque)}</b></div>`).join('')}</div>` : ''}
+  ${dTabelas(M)}`;
+}
+function dashEquipe(M){
+  const [ini, fim] = relPeriodo(), noPer = d => { d = String(d || '').slice(0, 10); return d >= ini && d <= fim; };
+  const ns = S.notas.filter(n => (n.op || 'venda') === 'venda' && daAmb(n) && noPer(n.data)), vend = ns.filter(notaValida), canc = ns.filter(n => n.status === 'cancelada');
+  const V = {}, C = {};
+  vend.forEach(n => { const k = nomeVendedor(n.emitida_por); V[k] = V[k] || { qtd:0, v:0, canc:0 }; V[k].qtd++; V[k].v = r2(V[k].v + n.total);
+    const c = n.caixa_nome || (n.modelo === '55' ? 'NF-e (fora do caixa)' : 'Caixa'); C[c] = C[c] || { qtd:0, v:0 }; C[c].qtd++; C[c].v = r2(C[c].v + n.total); });
+  canc.forEach(n => { const k = nomeVendedor(n.emitida_por); V[k] = V[k] || { qtd:0, v:0, canc:0 }; V[k].canc++; });
+  const fech = S.caixas.filter(c => c.fechado_em && noPer(c.fechado_em)).sort((a, b) => String(b.fechado_em).localeCompare(String(a.fechado_em)));
+  const fat = r2(vend.reduce((a, n) => a + n.total, 0)), difT = r2(fech.reduce((a, c) => a + num(c.diferenca), 0)), comDif = fech.filter(c => Math.abs(num(c.diferenca)) >= 0.01);
+  const VV = Object.entries(V).sort((a, b) => b[1].v - a[1].v), CC = Object.entries(C).sort((a, b) => b[1].v - a[1].v), best = VV[0];
+  return `<div class="dsh-kpis">${dKpi('Faturamento', brl(fat), `${vend.length} venda(s)`, '#13804a')}${dKpi('Melhor vendedor', best ? esc(best[0]) : '—', best ? `${brl(best[1].v)} · ${fat ? Math.round(best[1].v / fat * 100) : 0}% do total` : '', '#257de0')}${dKpi('Caixas fechados', fech.length, comDif.length ? `${comDif.length} com diferença` : 'todos batendo', comDif.length ? 'var(--warn)' : 'var(--ok)')}${dKpi('Diferença nos caixas', difT ? (difT < 0 ? '−' : '+') + brl(Math.abs(difT)) : '✓ zero', difT < 0 ? 'faltou dinheiro' : difT > 0 ? 'sobrou dinheiro' : 'contado = esperado', difT < 0 ? 'var(--bad)' : difT > 0 ? 'var(--warn)' : 'var(--ok)', difT < 0 ? 'var(--bad)' : '')}</div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Por vendedor</h3><div class="sub">Faturamento de cada um no período</div>${VV.length ? `${dStack(VV.map(([k, x]) => ({ rot:k, v:x.v })))}${dBarrasH(VV.map(([k, x]) => ({ rot:k, v:x.v, extra:`${x.qtd} venda${x.qtd === 1 ? '' : 's'} · ticket ${brl(x.qtd ? r2(x.v / x.qtd) : 0)}${x.canc ? ` · ${x.canc} cancelada${x.canc === 1 ? '' : 's'}` : ''}` })))}` : dVazio('Nenhuma venda no período.')}</div>
+    <div class="dsh-card"><h3>Por caixa</h3><div class="sub">Onde as vendas foram feitas</div>${CC.length ? dBarrasH(CC.map(([k, x]) => ({ rot:k, v:x.v, extra:`${x.qtd} venda${x.qtd === 1 ? '' : 's'}` }))) : dVazio('Nenhuma venda no período.')}</div></div>
+  <div class="dsh-card"><h3>Caixas com diferença</h3><div class="sub">${fech.length ? `${fech.length - comDif.length} de ${fech.length} fechamento(s) bateram certinho · contado na gaveta × esperado (vermelho = faltou)` : 'Dinheiro contado na gaveta × esperado'}</div>${!fech.length ? dVazio('Nenhum caixa fechado no período.') : !comDif.length ? dVazio('Todos os caixas bateram. 👍') : comDif.slice(0, 15).map(c => { const d = num(c.diferenca); return `<div class="dsh-row"><div class="n" style="cursor:pointer" data-act="verCaixa" data-id="${esc(c.id)}"><b>${esc(c.pdv_nome || 'Caixa')} · ${fmtData(c.fechado_em)}</b><span>vendeu ${brl(num((c.resumo || {}).total))} · esperado ${brl(num((c.resumo || {}).dinheiroEsperado))} · contado ${brl(num(c.contado))}</span></div><b style="color:${d < 0 ? 'var(--bad)' : d > 0 ? 'var(--warn)' : 'var(--ok)'}">${Math.abs(d) < 0.01 ? '✓ certo' : (d < 0 ? '−' : '+') + brl(Math.abs(d))}</b></div>`; }).join('')}</div>
+  ${dTabelas(M)}`;
+}
+function dashFinanceiro(M){
+  const [ini, fim] = relPeriodo(), noPer = d => { d = String(d || '').slice(0, 10); return d >= ini && d <= fim; }, hoje = isoNow().slice(0, 10);
+  const dre = M.secoes[0].linhas, val = rot => { const l = dre.find(x => x[0] === rot); return l ? num(l[1]) : 0; };
+  const bruto = val('Receita bruta de vendas'), liq = val('= Receita líquida'), cmv = -val('(−) Custo das mercadorias vendidas'), lb = val('= Lucro bruto'), res = val('= Resultado do período');
+  const desp = dre.filter(l => String(l[0]).startsWith('(−) ') && l[0] !== '(−) Devoluções' && l[0] !== '(−) Custo das mercadorias vendidas').map(l => [l[0].slice(4), -num(l[1])]);
+  const despT = r2(desp.reduce((a, [, v]) => a + v, 0)), caixa = M.secoes[1].linhas, cval = rot => num((caixa.find(x => x[0] === rot) || [])[1]);
+  const ent = cval('= Entradas'), sai = -cval('= Saídas');
+  const T = titulosFin(), em30 = diaMais(hoje, 30), aberto = t => !t.pago_em && t.venc && t.venc <= em30;
+  const pRec = r2(T.filter(t => t.tipo === 'receber' && aberto(t)).reduce((a, t) => a + num(t.valor), 0)), pPag = r2(T.filter(t => t.tipo === 'pagar' && aberto(t)).reduce((a, t) => a + num(t.valor), 0));
+  const venc = T.filter(t => !t.pago_em && t.venc && t.venc < hoje), vRec = r2(venc.filter(t => t.tipo === 'receber').reduce((a, t) => a + num(t.valor), 0)), vPag = r2(venc.filter(t => t.tipo === 'pagar').reduce((a, t) => a + num(t.valor), 0));
+  const meses = dUltMeses(m => r2(S.notas.filter(n => daAmb(n) && notaValida(n) && (n.op || 'venda') === 'venda' && (n.data || '').slice(0, 7) === m).reduce((a, n) => a + n.total, 0)));
+  const pc = v => liq ? Math.round(v / liq * 100) + '%' : '';
+  return `<div class="dsh-kpis">${dKpi('Receita de vendas', brl(liq), bruto !== liq ? `bruta ${brl(bruto)}` : 'no período', '#257de0')}${dKpi('Lucro bruto', brl(lb), liq ? `margem de ${Math.round(lb / liq * 100)}%` : '', '#13804a')}${dKpi('Resultado', brl(res), liq ? `${Math.round(res / liq * 100)}% da receita` : 'receita − custo − despesas', res < 0 ? 'var(--bad)' : 'var(--ok)', res < 0 ? 'var(--bad)' : 'var(--ok)')}${dKpi('Saldo previsto 30 dias', brl(r2(pRec - pPag)), `${brl(pRec)} a receber − ${brl(pPag)} a pagar`, '#6a4ce2')}</div>
+  <div class="dsh-grid"><div class="dsh-card dsh-dre"><h3>Do faturamento ao resultado</h3><div class="sub">Quanto sobra de cada real vendido</div>
+    ${dBarrasH([{ rot:'Receita líquida', v:liq, extra:'100%', cor:'#257de0' }, { rot:'(−) Custo das mercadorias', v:cmv, extra:pc(cmv), cor:'#f2a600' }, { rot:'= Lucro bruto', v:lb, extra:pc(lb), cor:'#13804a' }, { rot:'(−) Despesas', v:despT, extra:pc(despT), cor:'#c2362f' }, { rot:'= Resultado', v:res, extra:pc(res), cor:res < 0 ? '#c2362f' : '#0A1630' }])}
+    ${M.secoes[0].nota && /sem custo/.test(M.secoes[0].nota) ? '<p class="small" style="color:var(--warn)">Há itens vendidos sem custo cadastrado: o lucro pode estar maior que o real. Veja a nota nas tabelas abaixo.</p>' : ''}</div>
+    <div class="dsh-card"><h3>Dinheiro que entrou e saiu</h3><div class="sub">O que foi recebido e pago de verdade no período</div>
+      ${dBarrasH([{ rot:'Entrou', v:ent, cor:'var(--ok)' }, { rot:'Saiu', v:sai, cor:'var(--bad)' }])}
+      <div class="dsh-big"><div><small>Saldo do período</small><b style="color:${ent - sai < 0 ? 'var(--bad)' : 'var(--ok)'}">${brl(r2(ent - sai))}</b></div><div><small>A receber vencido</small><b style="color:${vRec ? 'var(--warn)' : ''}">${vRec ? brl(vRec) : '✓ nada'}</b></div><div><small>A pagar vencido</small><b style="color:${vPag ? 'var(--bad)' : ''}">${vPag ? brl(vPag) : '✓ nada'}</b></div></div></div></div>
+  <div class="dsh-grid"><div class="dsh-card"><h3>Faturamento dos últimos 6 meses</h3><div class="sub">Evolução das vendas por mês</div>${dBarrasV(meses)}</div>
+    <div class="dsh-card"><h3>Para onde foi o dinheiro</h3><div class="sub">Despesas do período por categoria (lançadas no Financeiro)</div>${despT ? `${dStack(desp.map(([k, v]) => ({ rot:k, v })))}${dBarrasH(desp.map(([k, v]) => ({ rot:k, v, extra:Math.round(v / despT * 100) + '%' })))}` : dVazio('Nenhuma despesa no período. Lance aluguel, energia, salários… na aba Financeiro para ver o resultado real.')}</div></div>
+  ${dTabelas(M)}`;
+}
+document.addEventListener('toggle', ev => { if (ev.target.classList && ev.target.classList.contains('dsh-det')) S.relTabelas = ev.target.open; }, true);
 
 /* ---------- pacote mensal para a contabilidade (montado no servidor, com os XMLs) ---------- */
 const mesNome = m => ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
