@@ -151,3 +151,42 @@ test('plano: com a cobrança desligada o plano é salvo sem criar assinatura', a
     assert.ok(!chamadas.some(c => c.host === 'api-sandbox.asaas.com'));
   } finally { process.env.ASAAS_ATIVO = 'sim'; }
 });
+
+// regularizar (pedido do Lucas, 26/11/2026): ao ligar a cobrança, empresas que já tinham plano ganham a mensalidade sozinhas
+test('regularizar: cria a assinatura das empresas com plano e sem assinatura; pula sem_mensalidade e quem já tem', async () => {
+  const { regularizarAssinaturas, precisaAssinar } = await import('../api/asaas.js');
+  docs['empresas/E1'].plano = { id:'1caixa', nome:'1 Caixa', valor:89.99, caixas:1 };
+  docs['empresas/E2'] = { cnpj:'11.444.777/0001-61', razao:'TESTE LTDA', plano:{ id:'1caixa' }, sem_mensalidade:true };
+  docs['empresas/E3'] = { cnpj:'11.444.777/0001-62', razao:'SEM PLANO LTDA' };
+  docs['empresas/E4'] = { cnpj:'11.444.777/0001-63', razao:'JA TEM', plano:{ id:'1caixa' }, assinatura:{ id:'sub_x', ambiente:'sandbox', situacao:'cancelada' } };
+  assert.equal(precisaAssinar(docs['empresas/E1']), true); assert.equal(precisaAssinar(docs['empresas/E2']), false);
+  assert.equal(precisaAssinar(docs['empresas/E3']), false); assert.equal(precisaAssinar(docs['empresas/E4']), false);
+  assert.equal(precisaAssinar({ plano:{ id:'1caixa' }, assinatura:{ id:'sub_p', ambiente:'producao' } }), true, 'assinatura de outro ambiente não vale');
+  const antes = globalThis.fetch;
+  globalThis.fetch = async (url, opt = {}) => {
+    const u = new URL(url);
+    if (u.host === 'sb.test' && u.pathname === '/rest/v1/docs' && u.searchParams.get('data->plano->>id'))
+      return { ok:true, status:200, text:async () => JSON.stringify(Object.entries(docs).filter(([k, v]) => v.plano).map(([path, data]) => ({ path, data }))) };
+    if (u.host === 'sb.test' && u.pathname === '/rest/v1/membros') return { ok:true, status:200, text:async () => '[{"user_id":"U1"}]', json:async () => [{ user_id:'U1' }] };
+    if (u.host === 'sb.test' && u.pathname.startsWith('/auth/v1/admin/users/')) return { ok:true, status:200, json:async () => ({ email:'dono@x.com' }) };
+    return antes(url, opt);
+  };
+  try {
+    const r = await regularizarAssinaturas();
+    assert.equal(r.criadas, 1); assert.equal(r.resultado[0].id, 'E1');
+    assert.equal(docs['empresas/E1'].assinatura.id, 'sub_1'); assert.equal(docs['empresas/E2'].assinatura, undefined);
+    const sub = chamadas.find(c => c.url === '/v3/subscriptions' && c.method === 'POST'); assert.equal(sub.body.nextDueDate, primeiroVenc());
+    assert.equal(chamadas.find(c => c.url === '/v3/customers' && c.method === 'POST').body.email, 'dono@x.com');
+    process.env.ASAAS_ATIVO = 'nao';
+    assert.equal((await regularizarAssinaturas()).desligado, true);
+  } finally { process.env.ASAAS_ATIVO = 'sim'; globalThis.fetch = antes; }
+});
+test('situação: empresa com plano e sem assinatura ganha a mensalidade ao abrir o sistema', async () => {
+  docs['empresas/E1'].plano = { id:'2caixas', nome:'2 Caixas', valor:129.99, caixas:2 };
+  const r = await tela('t1', { empresa_id:'E1', acao:'situacao' });
+  assert.equal(r.code, 200); assert.equal(r.body.criada, true);
+  assert.equal(chamadas.find(c => c.url === '/v3/subscriptions' && c.method === 'POST').body.value, 129.99);
+  chamadas = [];
+  const r2 = await tela('t1', { empresa_id:'E1', acao:'situacao' });
+  assert.equal(r2.body.criada, undefined); assert.ok(!chamadas.some(c => c.url === '/v3/subscriptions' && c.method === 'POST'));
+});
