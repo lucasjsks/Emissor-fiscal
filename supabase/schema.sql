@@ -122,7 +122,8 @@ alter table public.admins enable row level security;
 drop policy if exists docs_ler on public.docs;
 create policy docs_ler on public.docs for select to authenticated
   -- empresas/<id>/segredos (senha do gerente, em hash) só o servidor lê
-  using (col = 'ncm' or (public.meu_papel(empresa_id) is not null and split_part(col, '/', 3) <> 'segredos'));
+  -- o administrador da plataforma (tabela admins) lê tudo para o Painel NotaOne e o modo suporte (só leitura: gravar continua pelo papel na empresa)
+  using (col = 'ncm' or ((public.meu_papel(empresa_id) is not null or public.eh_admin()) and split_part(col, '/', 3) <> 'segredos'));
 
 drop policy if exists docs_inserir on public.docs;
 create policy docs_inserir on public.docs for insert to authenticated
@@ -254,6 +255,52 @@ begin
   return case when p_liberar then 'Troca liberada: o dono abre Empresa → Editar e escolhe CNPJ ou CPF. Depois, rode de novo com false.' else 'Tipo de cadastro travado de novo.' end;
 end $$;
 revoke execute on function public.liberar_troca_cadastro(text, boolean) from public, anon;
+
+-- PAINEL NOTAONE (pedido do Lucas, 26/11/2026): resumo de todas as empresas, só para quem está na tabela admins.
+-- Para se cadastrar como administrador (uma vez, no SQL Editor):
+--   insert into public.admins (user_id) select id from auth.users where email = 'SEU-EMAIL' on conflict do nothing;
+create or replace function public.admin_painel() returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+declare r jsonb; ini text := to_char(date_trunc('month', now() at time zone 'America/Sao_Paulo'), 'YYYY-MM-DD');
+        d7 text := to_char((now() at time zone 'America/Sao_Paulo') - interval '7 days', 'YYYY-MM-DD');
+begin
+  if not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  select coalesce(jsonb_agg(x), '[]'::jsonb) into r from (
+    select jsonb_strip_nulls(jsonb_build_object(
+      'id', e.empresa_id, 'fantasia', e.data->'fantasia', 'razao', e.data->'razao', 'cnpj', e.data->'cnpj', 'cpf', e.data->'cpf',
+      'doc_tipo', e.data->'doc_tipo', 'modulo', e.data->'modulo', 'servico', e.data->'servico', 'plano', e.data->'plano',
+      'assinatura', (e.data->'assinatura') - 'mensalidades', 'sem_mensalidade', e.data->'sem_mensalidade', 'ambiente', e.data->'ambiente',
+      'certificado', e.data->'certificado', 'telefone', e.data->'telefone', 'municipio', e.data->'municipio', 'uf', e.data->'uf',
+      'funcionarios', case when jsonb_typeof(e.data->'funcionarios') = 'array' then jsonb_array_length(e.data->'funcionarios') else 0 end,
+      'criado_em', dono.criado_em, 'dono_email', dono.email,
+      'ultima_atividade', (select max(x.atualizado_em) from public.docs x where x.empresa_id = e.empresa_id),
+      'notas_prod_mes', n.prod_mes, 'vendas_mes', n.vendas_mes, 'fat_mes', n.fat_mes, 'notas_total', n.total, 'problemas_7d', n.problemas,
+      'produtos', (select count(*) from public.docs x where x.col = e.path || '/produtos'),
+      'alunos', (select count(*) from public.docs x where x.col = e.path || '/ac_alunos' and coalesce(x.data->>'inativo', 'false') <> 'true'),
+      'mensalidades_mes', (select coalesce(sum((x.data->>'valor')::numeric), 0) from public.docs x where x.col = e.path || '/ac_mensalidades'
+                             and coalesce(x.data->>'estornada', 'false') <> 'true' and x.data->>'pago_em' >= ini)
+    )) as x
+    from public.docs e
+    left join lateral (select m.criado_em, u.email from public.membros m join auth.users u on u.id = m.user_id
+                        where m.empresa_id = e.empresa_id and m.papel = 'dono' order by m.criado_em limit 1) dono on true
+    left join lateral (
+      select count(*) filter (where nt.data->>'modelo' in ('55','65') and nt.data->>'ambiente' = 'producao'
+                                and nt.data->>'status' in ('autorizada','cancelada') and nt.data->>'data' >= ini) as prod_mes,
+             count(*) filter (where nt.data->>'status' = 'autorizada' and nt.data->>'data' >= ini
+                                and coalesce(nt.data->>'op', 'venda') = 'venda'
+                                and coalesce(nt.data->>'ambiente', 'homologacao') = coalesce(e.data->>'ambiente', 'homologacao')) as vendas_mes,
+             coalesce(sum((nt.data->>'total')::numeric) filter (where nt.data->>'status' = 'autorizada' and nt.data->>'data' >= ini
+                                and coalesce(nt.data->>'op', 'venda') = 'venda'
+                                and coalesce(nt.data->>'ambiente', 'homologacao') = coalesce(e.data->>'ambiente', 'homologacao')), 0) as fat_mes,
+             count(*) as total,
+             count(*) filter (where nt.data->>'status' in ('rejeitada','erro_envio') and nt.data->>'corrigida_por' is null and nt.data->>'data' >= d7) as problemas
+        from public.docs nt where nt.col = e.path || '/notas') n on true
+    where e.col = 'empresas'
+  ) t;
+  return r;
+end $$;
+revoke execute on function public.admin_painel() from public, anon;
+grant execute on function public.admin_painel() to authenticated;
 
 -- RAMO DE ATIVIDADE (pedido do Lucas, 26/11/2026): escolhido no cadastro, não muda mais pela tela.
 -- Ao alterar, a tela (authenticated) não consegue trocar modulo/servico (empresa antiga sem ramo fica como comércio).

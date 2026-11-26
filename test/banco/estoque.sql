@@ -140,3 +140,17 @@ select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com');
 select public.pode_gravar('empresas/'||:'e'||'/ac_planos', :'e') as dono_grava_plano_academia_t;
 reset role;
 
+
+-- Painel NotaOne: só administrador; lê todas as empresas (inclusive de outra conta); segredos continuam fora
+reset role; insert into auth.users values ('55555555-5555-5555-5555-555555555555','admin@x.com') on conflict do nothing;
+select pg_temp.como('55555555-5555-5555-5555-555555555555','admin@x.com'); set role authenticated;
+select public.admin_painel() as sem_permissao_erro;
+select count(*) as admin_comum_ve_0 from docs where col = 'empresas';
+reset role; insert into public.admins values ('55555555-5555-5555-5555-555555555555') on conflict do nothing;
+insert into docs (path, col, empresa_id, data) values ('empresas/'||:'e'||'/segredos/gerente', 'empresas/'||:'e'||'/segredos', :'e', '{"hash":"x"}') on conflict do nothing;
+select pg_temp.como('55555555-5555-5555-5555-555555555555','admin@x.com'); set role authenticated;
+select jsonb_array_length(public.admin_painel()) >= 2 as painel_lista_todas, (select count(*) from docs where col = 'empresas') >= 2 as admin_le_todas;
+select (public.admin_painel()->0) ? 'dono_email' as painel_tem_email;
+select count(*) as admin_nao_le_segredos_0 from docs where split_part(col, '/', 3) = 'segredos';
+update docs set data = data || '{"fantasia":"HACK"}' where path='empresas/'||:'e' returning 1 as admin_nao_grava_vazio;
+reset role;
