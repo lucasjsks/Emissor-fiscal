@@ -215,9 +215,9 @@ language plpgsql as $$
 begin
   if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
   if tg_op = 'UPDATE' then
-    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade'));
+    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade', 'liberar_tipo', old.data->'liberar_tipo'));
   else
-    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade';
+    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade' - 'liberar_tipo';
   end if;
   return new;
 end $$;
@@ -239,6 +239,21 @@ begin
   return case when p_sem then 'Empresa sem mensalidade: a cobrança automática não cria assinatura para ela.' else 'Empresa volta a ter mensalidade.' end;
 end $$;
 revoke execute on function public.definir_sem_mensalidade(text, boolean) from public, anon;
+
+-- TIPO DE CADASTRO (CNPJ/CPF): depois do cadastro a tela só mostra o tipo escolhido (pedido do Lucas, 26/11/2026).
+-- Quem abriu o CNPJ: o suporte libera a troca no SQL Editor: select public.liberar_troca_cadastro('CPF ou CNPJ', true);
+create or replace function public.liberar_troca_cadastro(p_doc text, p_liberar boolean) returns text
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if current_user in ('authenticated', 'anon') and not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  update public.docs set data = case when p_liberar then jsonb_set(data, '{liberar_tipo}', 'true'::jsonb, true) else data - 'liberar_tipo' end
+   where col = 'empresas' and public.doc_empresa(data) = regexp_replace(p_doc, '\D', '', 'g');
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ/CPF.'; end if;
+  return case when p_liberar then 'Troca liberada: o dono abre Empresa → Editar e escolhe CNPJ ou CPF. Depois, rode de novo com false.' else 'Tipo de cadastro travado de novo.' end;
+end $$;
+revoke execute on function public.liberar_troca_cadastro(text, boolean) from public, anon;
 
 -- RAMO DE ATIVIDADE (pedido do Lucas, 26/11/2026): escolhido no cadastro, não muda mais pela tela.
 -- Ao alterar, a tela (authenticated) não consegue trocar modulo/servico (empresa antiga sem ramo fica como comércio).
