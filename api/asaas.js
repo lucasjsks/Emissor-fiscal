@@ -1,6 +1,7 @@
 // /api/asaas — mensalidade do NotaOne cobrada pelo Asaas.
 // POST com login (dono ou gerente):
 //   acao 'assinar'  {empresa_id}                → cria o cliente e a assinatura mensal no Asaas (1ª vence 30 dias depois, depois todo mês no mesmo dia)
+//   (também é chamada sozinha por api/plano.js quando o dono escolhe o plano: cobrança automática, pedido do Lucas 26/11/2026)
 //   acao 'situacao' {empresa_id}                → busca no Asaas as mensalidades e grava em empresa.assinatura
 //   acao 'pix'      {empresa_id, pagamento_id}  → QR Code e "copia e cola" do PIX de uma mensalidade
 //   acao 'boleto'   {empresa_id, pagamento_id}  → linha digitável, código de barras e PDF do boleto de uma mensalidade
@@ -14,6 +15,7 @@ import { rota, Falha, env, usuario, papelDe, getDoc, rpc, sb, isoBR } from './_l
 const dig = s => String(s || '').replace(/\D/g, '');
 export const ambienteAsaas = () => process.env.ASAAS_AMBIENTE === 'producao' ? 'producao' : 'sandbox';
 const base = () => ambienteAsaas() === 'producao' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
+export const asaasLigado = () => !!process.env.ASAAS_API_KEY && process.env.ASAAS_ATIVO === 'sim';
 export const valorMensal = () => { const v = Number(String(process.env.ASAAS_VALOR || '').replace(',', '.')); return v > 0 ? Math.round(v * 100) / 100 : 89.99; };
 const PAGO = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED'];
 const ABERTO = ['PENDING', 'OVERDUE', 'AWAITING_RISK_ANALYSIS'];
@@ -65,7 +67,7 @@ export async function atualizar(empresa_id, e){
   return s;
 }
 
-async function assinar(empresa_id, e, u){
+export async function assinar(empresa_id, e, u){
   const a = e.assinatura || {};
   if (a.id && (a.ambiente || 'sandbox') === ambienteAsaas() && a.situacao !== 'cancelada') throw new Falha('Esta empresa já tem a assinatura ativa.');
   const cnpj = dig(e.cnpj || e.cpf); if (cnpj.length !== 14 && cnpj.length !== 11) throw new Falha('Cadastre o CNPJ (ou CPF) da empresa antes de assinar.');
@@ -89,7 +91,7 @@ const rotaTela = rota(async (req, b) => {
   const { empresa_id, acao } = b;
   if (!empresa_id) throw new Falha('Requisição incompleta.');
   if (!['dono', 'gerente'].includes(await papelDe(empresa_id, u.id))) throw new Falha('Só o dono da empresa cuida da mensalidade.', 403);
-  if (!process.env.ASAAS_API_KEY || process.env.ASAAS_ATIVO !== 'sim') throw new Falha('A cobrança da mensalidade ainda não foi ligada. Fale com o suporte.', 503);
+  if (!asaasLigado()) throw new Falha('A cobrança da mensalidade ainda não foi ligada. Fale com o suporte.', 503);
   const e = await getDoc('empresas/' + empresa_id);
   if (!e) throw new Falha('Empresa não encontrada.', 404);
 
