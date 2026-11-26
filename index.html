@@ -584,7 +584,7 @@ function renderBadge(){
   const b = $('#badge');
   if (!S.logado){ b.textContent = ''; b.style.display = 'none'; return; }
   // sem o papel (cada empresa tem um usuário só): mostra apenas "teste" quando estiver em homologação
-  const txt = S.papel === 'operador' ? 'funcionário' : S.ambiente === 'producao' || semNota() || (S.logado && emp() && !temAba('venda')) ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
+  const txt = S.papel === 'operador' ? 'funcionário' : !emp() || S.ambiente === 'producao' || semNota() || (S.logado && emp() && !temAba('venda')) ? '' : 'teste'; b.style.display = txt ? '' : 'none'; b.textContent = txt;
   b.title = S.meuEmail || '';
 }
 async function safe(fn, okMsg){
@@ -946,6 +946,8 @@ const semNota = (e = emp()) => !!e && e.doc_tipo === 'cpf';
 // funcionário (operador): só vendas, caixa, produtos e clientes
 const ABAS_OPERADOR = ['venda','nfe','notas','caixa','produtos','clientes'];
 function abas(){
+  // conta só de administrador (sem empresa própria e sem modo suporte): o menu é só o Painel NotaOne
+  if (S.adminPlat && !emp()) return [['admin','Painel NotaOne']];
   const sn = semNota(), op = S.papel === 'operador', m = modServ(), esc_ = (m && m.esconder) || [], ren = (m && m.renomear) || {};
   // abas do módulo de serviço entram logo depois do Início: [chave, rótulo, operador vê?]
   const extra = m ? (m.abas || []).filter(([, , vOp]) => !op || vOp).map(([k, l]) => [k, l]) : [];
@@ -980,11 +982,11 @@ function render(){
   // logo depois de entrar, enquanto a lista de empresas ainda não chegou: mostra "Carregando…" (e não o "Bem-vindo, cadastre a empresa" com o menu errado)
   const esperandoEmp = S.logado && S.mode === 'db' && S.loadingDb && !S.empresas.length && !S.falha;
   const e = emp(), perf = !S.carregando && !esperandoEmp && !S.falha && S.logado && !S.recuperando ? precisaPerfil() : false, fora = S.carregando || esperandoEmp || S.falha || !S.logado || S.recuperando || !!perf;
-  $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
+  $('#nav').style.display = fora ? 'none' : ''; document.body.classList.toggle('fora', !!fora); $('#empSel').style.display = fora || (S.adminPlat && !e) ? 'none' : ''; $('#btnSair').style.display = S.logado ? '' : 'none';
   $('#btnTrocar').style.display = !fora && e && (e.funcionarios || []).length && e.senha_gerente ? '' : 'none';
   $('#ambBar').style.display = !fora && S.ambiente !== 'producao' && !semNota() && abas().some(([k]) => k === 'venda') ? '' : 'none';
   if (!fora && e && !abas().some(([k]) => k === S.tab)) S.tab = abas()[0][0];
-  if (!fora && !e && S.adminPlat && S.tab !== 'empresa') S.tab = 'admin'; // administrador sem empresa própria abre no painel // aba fora do acesso (funcionário) ou NF-e em empresa sem nota
+  if (!fora && !e && S.adminPlat) S.tab = 'admin'; // administrador sem empresa própria abre no painel // aba fora do acesso (funcionário) ou NF-e em empresa sem nota
   if (S.pdv && (fora || S.tab !== 'venda' || !e)) S.pdv = false;
   document.body.classList.toggle('pdv', !!S.pdv);
   if (S.falha){ m.innerHTML = `<div class="card empty"><h2>Ops</h2><p>${esc(S.falha)}</p></div>`; }
@@ -3262,7 +3264,7 @@ async function aoMudarSessao(session){
   startDb(); carregarNcm(); render(); renderBadge();
   // cadastro feito pelo site: no primeiro acesso, abre o cadastro da empresa já com o CNPJ (a Receita preenche o resto)
   if (S.meuMeta && (dig(S.meuMeta.cnpj).length === 14 || (S.meuMeta.tipo === 'cpf' && dig(S.meuMeta.cpf).length === 11))) setTimeout(() => {
-    if (S.meuId === uidAtual && S.logado && !S.empresas.length && !$('#mbox').innerHTML.trim()){ S.tab = 'empresa'; render(); formEmpresa(); }
+    if (S.meuId === uidAtual && S.logado && !S.adminPlat && !S.empresas.length && !$('#mbox').innerHTML.trim()){ S.tab = 'empresa'; render(); formEmpresa(); } // administrador não é levado ao cadastro
   }, 2500);
 }
 async function carregarPapel(id){
