@@ -2807,7 +2807,15 @@ function sitNotaone(e){
   if (e.sem_mensalidade) return { k:'cortesia', txt:'cortesia', cls:'' };
   if (!(e.plano && e.plano.id)) return { k:'semplano', txt:'sem plano', cls:'w' };
   const a = e.assinatura || {}, hoje = isoNow().slice(0, 10);
-  if (a.id && a.situacao) return { k:a.situacao === 'atrasada' ? 'atrasada' : a.situacao === 'cancelada' ? 'cancelada' : 'emdia', txt:{ em_dia:'em dia', atrasada:'atrasada', cancelada:'cancelada' }[a.situacao] || a.situacao, cls:a.situacao === 'atrasada' ? 'b' : a.situacao === 'em_dia' ? 'g' : '', venc:a.proximo_venc || (a.aberta || {}).venc, asaas:true };
+  // só vale a assinatura do Asaas com a cobrança ligada e no mesmo ambiente (uma assinatura antiga de teste/sandbox não conta)
+  const ambAtual = S.mensal ? (S.mensal.teste ? 'sandbox' : 'producao') : null;
+  if (a.id && a.situacao && ambAtual && (a.ambiente || 'sandbox') === ambAtual){
+    if (a.situacao === 'cancelada') return { k:'cancelada', txt:'cancelada', cls:'', venc:null, asaas:true };
+    const ab = a.aberta || null, atr = !!(ab && (ab.status === 'OVERDUE' || (ab.venc && ab.venc < hoje)));
+    const venc = (ab && ab.venc) || a.proximo_venc || null; // a data é a da mensalidade em aberto (a que venceu), não a próxima a ser gerada
+    if (atr){ const dd = Math.round((Date.parse(hoje + 'T12:00:00Z') - Date.parse(venc + 'T12:00:00Z')) / 864e5); return { k:'atrasada', txt:`atrasada ${dd} dia${dd === 1 ? '' : 's'}`, cls:'b', venc, dias:dd, asaas:true }; }
+    return { k:'emdia', txt:'em dia', cls:'g', venc, asaas:true };
+  }
   const mm = e.mensalidade_manual || {}, venc = mm.pago_ate || (e.criado_em ? diaMais(String(e.criado_em).slice(0, 10), 30) : null);
   if (!venc) return { k:'semvenc', txt:'sem vencimento', cls:'w' };
   const d = Math.round((Date.parse(venc + 'T12:00:00Z') - Date.parse(hoje + 'T12:00:00Z')) / 864e5);
