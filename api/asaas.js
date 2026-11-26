@@ -8,7 +8,7 @@
 // POST do Asaas (webhook, cabeçalho asaas-access-token = ASAAS_WEBHOOK_TOKEN) → atualiza a empresa dona da assinatura.
 // Variáveis na Vercel: ASAAS_ATIVO ('sim' liga a mensalidade na tela; sem ele fica desligada), ASAAS_API_KEY, ASAAS_AMBIENTE ('producao' ou vazio = sandbox), ASAAS_WEBHOOK_TOKEN, ASAAS_VALOR (opcional, padrão 89,99).
 // empresa.assinatura só é gravada aqui no servidor (a tela não consegue mudar: gatilho proteger_assinatura).
-import { planoDaEmpresa } from './_planos.js';
+import { valorDaEmpresa } from './_planos.js';
 import { timingSafeEqual } from 'node:crypto';
 import { rota, Falha, env, usuario, papelDe, getDoc, rpc, sb, isoBR } from './_lib.js';
 
@@ -79,7 +79,7 @@ export async function assinar(empresa_id, e, u){
     cli = await asaas('POST', '/customers', { name:e.razao || e.fantasia || 'Empresa', cpfCnpj:cnpj, email:u.email || undefined,
       mobilePhone:fone.length >= 10 ? fone : undefined, externalReference:empresa_id, company:e.fantasia || undefined });
   }
-  const sub = await asaas('POST', '/subscriptions', { customer:cli.id, billingType:'UNDEFINED', value:(planoDaEmpresa(e) || {}).valor || valorMensal(), cycle:'MONTHLY',
+  const sub = await asaas('POST', '/subscriptions', { customer:cli.id, billingType:'UNDEFINED', value:valorDaEmpresa(e) || valorMensal(), cycle:'MONTHLY',
     nextDueDate:primeiroVenc(), description:'Mensalidade NotaOne — Emissão Inteligente', externalReference:empresa_id });
   const novo = { id:sub.id, cliente:cli.id, ambiente:ambienteAsaas(), criada_em:isoBR(), criada_por:u.id };
   await rpc('gravar_campo_empresa', { e:empresa_id, caminho:['assinatura'], valor:novo });
@@ -132,6 +132,16 @@ const rotaTela = rota(async (req, b) => {
     if (p.subscription !== a.id) throw new Falha('Mensalidade não encontrada.', 404);
     if (!PAGO.includes(p.status)) await asaas('POST', `/payments/${encodeURIComponent(pid)}/receiveInCash`, { paymentDate:/^\d{4}-\d{2}-\d{2}$/.test(b.data || '') ? b.data : hojeBR(), value:Number(b.valor) > 0 ? Number(b.valor) : Number(p.value), notifyCustomer:false });
     return { ok:true, assinatura:await atualizar(empresa_id, e) };
+  }
+  // Painel NotaOne: o administrador mudou o valor da mensalidade (valor especial) → a assinatura do Asaas acompanha
+  if (acao === 'admin_valor'){
+    const adm = await sb('/rest/v1/admins?select=user_id&user_id=eq.' + encodeURIComponent(u.id));
+    if (!(Array.isArray(adm) && adm.length)) throw new Falha('Só o administrador do NotaOne pode fazer isso.', 403);
+    const e = await getDoc('empresas/' + empresa_id); if (!e) throw new Falha('Empresa não encontrada.', 404);
+    const a = e.assinatura || {}, valor = valorDaEmpresa(e);
+    if (!asaasLigado() || !a.id || a.situacao === 'cancelada' || (a.ambiente || 'sandbox') !== ambienteAsaas() || !valor) return { ok:true, asaas:false };
+    await asaas('POST', `/subscriptions/${encodeURIComponent(a.id)}`, { value:valor, updatePendingPayments:true });
+    return { ok:true, asaas:true, assinatura:await atualizar(empresa_id, e) };
   }
   if (!['dono', 'gerente'].includes(await papelDe(empresa_id, u.id))) throw new Falha('Só o dono da empresa cuida da mensalidade.', 403);
   if (!asaasLigado()) throw new Falha('A cobrança da mensalidade ainda não foi ligada. Fale com o suporte.', 503);

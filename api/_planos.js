@@ -12,3 +12,6 @@ export const planoPorId = id => PLANOS.find(p => p.id === id) || null;
 export const docDaEmpresa = e => (e && e.modulo === 'servico' && e.servico === 'academia') ? 'academia' : (e && e.doc_tipo === 'cpf') ? 'cpf' : 'cnpj';
 // plano que vale para a empresa (o gravado, se combinar com o tipo da empresa)
 export const planoDaEmpresa = e => { const p = planoPorId(((e || {}).plano || {}).id); return p && p.doc === docDaEmpresa(e) ? p : null; };
+// valor especial combinado com o cliente (Painel NotaOne) vence o valor do plano
+export const valorEspecial = e => { const v = Number((((e || {}).mensalidade_especial) || {}).valor); return v > 0 ? Math.round(v * 100) / 100 : null; };
+export const valorDaEmpresa = e => valorEspecial(e) || (planoDaEmpresa(e) || {}).valor || null;

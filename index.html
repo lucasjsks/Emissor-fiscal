@@ -2332,8 +2332,10 @@ async function aplicarPlano(empresa_id, plano){
 function cardPlano(){
   const e = emp(); if (!e || !pode('empresa')) return '';
   const p = planoAtual(e), dono = S.papelEmp === 'dono', doc = docEmp(e), op = planosDoc(doc);
-  return `<div class="card" id="cardPlano"><h3 style="margin-top:0">Plano ${p ? `<span class="tag g">${esc(p.nome)} · ${brl(p.valor)}/mês</span>` : '<span class="tag w">não escolhido</span>'}</h3>
-    ${!p ? `<p class="small">${e.plano && e.plano.id ? 'O plano anterior não vale para o tipo de cadastro atual da empresa. ' : ''}Escolha o plano da empresa${op.length > 1 ? '' : ' para continuar'}:</p>` : op.length > 1 ? '<p class="small">Precisa de mais caixas ou quer reduzir? Toque no outro plano para mudar. O valor da mensalidade acompanha o plano.</p>' : ''}
+  const esp = p && !e.sem_mensalidade ? mensEsp(e) : 0;
+  return `<div class="card" id="cardPlano"><h3 style="margin-top:0">Plano ${p ? `<span class="tag g">${esc(p.nome)} · ${brl(esp || p.valor)}/mês</span>` : '<span class="tag w">não escolhido</span>'}</h3>
+    ${esp ? `<div class="msg ok">Sua empresa tem <b>valor especial</b>: a mensalidade é <b>${brl(esp)} por mês</b> (o valor de tabela do plano é ${brl(p.valor)}).</div>` : ''}
+    ${!p ? `<p class="small">${e.plano && e.plano.id ? 'O plano anterior não vale para o tipo de cadastro atual da empresa. ' : ''}Escolha o plano da empresa${op.length > 1 ? '' : ' para continuar'}:</p>` : op.length > 1 ? '<p class="small">Precisa de mais caixas ou quer reduzir? Toque no outro plano para mudar.' + (esp ? ' Ao mudar de plano, o valor especial continua; para revê-lo, fale com o suporte.' : ' O valor da mensalidade acompanha o plano.') + '</p>' : ''}
     ${dono ? planosHtml(doc, p && p.id, 'trocarPlano') : '<p class="small">Só o dono da empresa muda o plano.</p>'}
     <div id="planoMsg"></div></div>`;
 }
@@ -2822,6 +2824,9 @@ function sitNotaone(e){
   if (d < 0) return { k:'atrasada', txt:`atrasada ${-d} dia${d === -1 ? '' : 's'}`, cls:'b', venc, dias:-d };
   return { k:'emdia', txt:(mm.pagamentos || []).length ? 'em dia' : '1º mês', cls:'g', venc };
 }
+// valor da mensalidade do NotaOne: o valor especial combinado (Painel) vence o do plano
+const mensEsp = e => { const v = num(((e || {}).mensalidade_especial || {}).valor); return v > 0 ? v : 0; };
+const valorMensEmp = e => mensEsp(e) || num(((e || {}).plano || {}).valor);
 const RAMO_NOME = e => e.modulo === 'servico' ? 'Academia' : e.doc_tipo === 'cpf' ? 'Comércio PF' : 'Comércio';
 const nomeEmp = e => e.fantasia || e.razao || '(sem nome)';
 async function admCarregar(forcar){
@@ -2835,18 +2840,18 @@ function vAdmin(){
   if (!S.adm){ admCarregar(); return `<div class="card empty">${S.admErro ? esc(S.admErro) : 'Carregando o painel…'}</div>`; }
   setTimeout(() => admCarregar(), 0);
   const L = S.adm.lista, hoje = isoNow().slice(0, 10), mes = hoje.slice(0, 7), d = (a, b) => Math.round((Date.parse(b.slice(0, 10) + 'T12:00:00Z') - Date.parse(a.slice(0, 10) + 'T12:00:00Z')) / 864e5);
-  const comPlano = L.filter(e => e.plano && e.plano.id && !e.sem_mensalidade), mrr = r2(comPlano.reduce((a, e) => a + num(e.plano.valor), 0));
+  const comPlano = L.filter(e => e.plano && e.plano.id && !e.sem_mensalidade), mrr = r2(comPlano.reduce((a, e) => a + valorMensEmp(e), 0));
   const atras = L.filter(e => sitNotaone(e).k === 'atrasada'), novos = L.filter(e => String(e.criado_em || '').slice(0, 7) === mes);
   const ativos = L.filter(e => e.ultima_atividade && d(e.ultima_atividade, hoje) <= 7), prod = L.filter(e => e.ambiente === 'producao');
   const notasProd = L.reduce((a, e) => a + num(e.notas_prod_mes), 0);
   const certAlerta = L.filter(e => e.certificado && e.certificado.valido_ate && d(hoje, e.certificado.valido_ate) <= 30);
   const semPlano = L.filter(e => !(e.plano && e.plano.id)), parados = L.filter(e => !e.ultima_atividade || d(e.ultima_atividade, hoje) > 15), probl = L.filter(e => num(e.problemas_7d) > 0);
   const ramos = ['Comércio','Comércio PF','Academia'].map((r, i) => ({ rot:r, v:L.filter(e => RAMO_NOME(e) === r).length, cor:['#0A1630','#257de0','#13804a'][i] }));
-  const pl = {}; comPlano.forEach(e => { const k = e.plano.nome || e.plano.id; pl[k] = pl[k] || { n:0, v:0 }; pl[k].n++; pl[k].v = r2(pl[k].v + num(e.plano.valor)); });
+  const pl = {}; comPlano.forEach(e => { const k = e.plano.nome || e.plano.id; pl[k] = pl[k] || { n:0, v:0 }; pl[k].n++; pl[k].v = r2(pl[k].v + valorMensEmp(e)); });
   const meses = dUltMeses(m => L.filter(e => String(e.criado_em || '').slice(0, 7) === m).length);
   const alertas = [
     ...certAlerta.map(e => ({ e, cor:'var(--bad)', txt:`certificado ${d(hoje, e.certificado.valido_ate) < 0 ? 'vencido' : 'vence em ' + d(hoje, e.certificado.valido_ate) + ' dias'} (${dataBR(e.certificado.valido_ate)})` })),
-    ...atras.map(e => ({ e, cor:'var(--bad)', txt:`mensalidade do NotaOne ${sitNotaone(e).txt} · ${brl(num((e.plano || {}).valor))}`, baixa:true })),
+    ...atras.map(e => ({ e, cor:'var(--bad)', txt:`mensalidade do NotaOne ${sitNotaone(e).txt} · ${brl(valorMensEmp(e))}`, baixa:true })),
     ...probl.map(e => ({ e, cor:'var(--warn)', txt:`${e.problemas_7d} nota(s) com problema nos últimos 7 dias` })),
     ...semPlano.map(e => ({ e, cor:'var(--warn)', txt:'ainda não escolheu o plano' })),
     ...parados.filter(e => !semPlano.includes(e)).map(e => ({ e, cor:'#6a4ce2', txt:e.ultima_atividade ? `sem usar o sistema há ${d(e.ultima_atividade, hoje)} dias` : 'nunca usou o sistema' })) ];
@@ -2854,7 +2859,7 @@ function vAdmin(){
   const lista = L.filter(e => (!fr || RAMO_NOME(e) === fr) && (!q || [nomeEmp(e), e.razao, e.cnpj, e.cpf, e.dono_email, e.municipio].some(x => String(x || '').toLowerCase().includes(q) || (dig(q) && dig(x).includes(dig(q))))))
     .sort((a, b) => String(b.ultima_atividade || '').localeCompare(String(a.ultima_atividade || '')));
   const zap = e => { const t = dig(e.telefone); return t.length >= 10 ? `<a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${t.startsWith('55') ? t : '55' + t}">WhatsApp</a>` : ''; };
-  const valMens = e => e.sem_mensalidade ? 'cortesia' : e.plano && e.plano.id ? brl(num(e.plano.valor)) + '<small style="font-weight:400;font-size:11px">/mês</small>' : '<span class="small">sem plano</span>';
+  const valMens = e => e.sem_mensalidade ? 'cortesia' : e.plano && e.plano.id ? brl(valorMensEmp(e)) + '<small style="font-weight:400;font-size:11px">/mês</small>' + (mensEsp(e) ? '<div><span class="tag" style="font-size:10px;background:#efe9ff;color:#5a3fc0">valor especial</span></div>' : '') : '<span class="small">sem plano</span>';
   const sitMens = e => { const x = sitNotaone(e); return `<span class="tag ${x.cls}">${esc(x.txt)}</span>`; };
   return `<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1"><h2 style="margin:0">Painel NotaOne</h2><div class="small">Todas as empresas do sistema · atualizado ${new Date(S.adm.em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}</div></div><button class="btn" data-act="admAtualizar">Atualizar</button></div>
   <div class="dsh-kpis">${dKpi('Clientes', L.length, `${novos.length} novo(s) este mês`, '#0A1630')}${dKpi('Mensalidades previstas', brl(mrr), `${comPlano.length} empresa(s) com plano · por mês`, '#13804a')}${dKpi('Mensalidades atrasadas', atras.length, atras.length ? 'veja a lista abaixo' : 'ninguém atrasado', atras.length ? 'var(--bad)' : 'var(--ok)', atras.length ? 'var(--bad)' : '')}${dKpi('Usaram nos últimos 7 dias', ativos.length, `${L.length ? Math.round(ativos.length / L.length * 100) : 0}% dos clientes`, '#257de0')}${dKpi('Notas fiscais no mês', notasProd, `em produção · ${prod.length} empresa(s) emitindo de verdade`, '#f2a600')}</div>
@@ -2862,22 +2867,22 @@ function vAdmin(){
     <div class="dsh-card"><h3>Planos</h3><div class="sub">Quanto cada plano rende por mês</div>${Object.keys(pl).length ? dBarrasH(Object.entries(pl).sort((a, b) => b[1].v - a[1].v).map(([k, x]) => ({ rot:k, v:x.v, extra:x.n + ' cliente' + (x.n === 1 ? '' : 's') }))) : dVazio('Nenhuma empresa escolheu plano ainda.')}</div></div>
   <div class="dsh-grid"><div class="dsh-card"><h3>Novos clientes por mês</h3><div class="sub">Últimos 6 meses</div>${dBarrasV(meses, v => v + ' cliente' + (v === 1 ? '' : 's'))}</div>
     <div class="dsh-card"><h3>Precisa de atenção</h3><div class="sub">${alertas.length ? alertas.length + ' aviso(s)' : 'Tudo certo com os clientes'}</div>${alertas.length ? alertas.slice(0, 12).map(x => `<div class="dsh-row"><div class="n"><b>${esc(nomeEmp(x.e))}</b><span style="color:${x.cor}">${esc(x.txt)}</span></div>${x.baixa ? `<button class="btn sm" data-act="admBaixa" data-id="${esc(x.e.id)}">Dar baixa</button>` : zap(x.e)}<button class="btn sm" data-act="admAbrir" data-id="${esc(x.e.id)}">Abrir</button></div>`).join('') : dVazio('Nenhum aviso. 👍')}</div></div>
-  <div class="card"><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">Todas as empresas (${lista.length})</h3><span class="small">mensalidades desta lista: <b style="font-size:15px;color:var(--text,#0A1630)">${brl(r2(lista.filter(e => e.plano && e.plano.id && !e.sem_mensalidade).reduce((a, e) => a + num(e.plano.valor), 0)))}/mês</b></span><button class="btn sm" data-act="admPlanilha">Baixar planilha</button></div><div style="height:8px"></div>
+  <div class="card"><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">Todas as empresas (${lista.length})</h3><span class="small">mensalidades desta lista: <b style="font-size:15px;color:var(--text,#0A1630)">${brl(r2(lista.filter(e => e.plano && e.plano.id && !e.sem_mensalidade).reduce((a, e) => a + valorMensEmp(e), 0)))}/mês</b></span><button class="btn sm" data-act="admPlanilha">Baixar planilha</button></div><div style="height:8px"></div>
     <div class="row" style="margin-bottom:8px"><input id="admBusca" placeholder="Buscar por nome, CNPJ/CPF, e-mail ou cidade" value="${esc(S.admBusca || '')}">
       <select id="admRamo"><option value="">Todos os ramos</option>${['Comércio','Comércio PF','Academia'].map(r => `<option ${fr === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
     ${lista.length ? `<div class="fin-lista">${lista.slice(0, S.admLim || 50).map(e => `<div class="fin-l nt-l">
       <div class="fin-v">${e.ultima_atividade ? dataBR(e.ultima_atividade).slice(0, 5) : '—'}<small>último uso</small></div>
       <div class="fin-d"><b>${esc(nomeEmp(e))} <span class="tag">${RAMO_NOME(e)}</span>${e.ambiente === 'producao' ? ' <span class="tag g">produção</span>' : ''}</b>
         <span>${esc(fmtDoc(e.cnpj || e.cpf || ''))}${e.municipio ? ' · ' + esc(e.municipio) + (e.uf ? '/' + esc(e.uf) : '') : ''}${e.dono_email ? ' · ' + esc(e.dono_email) : ''} · desde ${e.criado_em ? dataBR(e.criado_em) : '—'}<br>
-        ${e.plano && e.plano.id ? esc(e.plano.nome) + ' ' + brl(e.plano.valor) : 'sem plano'} · ${e.modulo === 'servico' ? `${num(e.alunos)} aluno(s) · ${brl(num(e.mensalidades_mes))} em mensalidades no mês` : `${num(e.vendas_mes)} venda(s) · ${brl(num(e.fat_mes))} no mês · ${num(e.notas_prod_mes)} nota(s) em produção`}</span></div>
-      <div class="fin-r"><div style="text-align:right;min-width:118px"><b style="font-family:'Space Grotesk',Inter,sans-serif;font-size:17px;white-space:nowrap">${valMens(e)}</b><div style="margin-top:2px">${sitMens(e)}</div>${sitNotaone(e).venc ? `<div class="small">${sitNotaone(e).k === 'atrasada' ? 'venceu' : 'vence'} ${dataBR(sitNotaone(e).venc)}</div>` : ''}</div>${e.plano && e.plano.id && !e.sem_mensalidade ? `<button class="btn sm" data-act="admBaixa" data-id="${esc(e.id)}">Dar baixa</button>` : ''}${zap(e)}<button class="btn sm pri" data-act="admAbrir" data-id="${esc(e.id)}">Abrir</button></div></div>`).join('')}</div>
+        ${e.plano && e.plano.id ? esc(e.plano.nome) + ' ' + brl(e.plano.valor) + (mensEsp(e) ? ` → especial ${brl(mensEsp(e))}` : '') : 'sem plano'} · ${e.modulo === 'servico' ? `${num(e.alunos)} aluno(s) · ${brl(num(e.mensalidades_mes))} em mensalidades no mês` : `${num(e.vendas_mes)} venda(s) · ${brl(num(e.fat_mes))} no mês · ${num(e.notas_prod_mes)} nota(s) em produção`}</span></div>
+      <div class="fin-r"><div style="text-align:right;min-width:118px"><b style="font-family:'Space Grotesk',Inter,sans-serif;font-size:17px;white-space:nowrap">${valMens(e)}</b><div style="margin-top:2px">${sitMens(e)}</div>${sitNotaone(e).venc ? `<div class="small">${sitNotaone(e).k === 'atrasada' ? 'venceu' : 'vence'} ${dataBR(sitNotaone(e).venc)}</div>` : ''}</div>${e.plano && e.plano.id && !e.sem_mensalidade ? `<button class="btn sm" data-act="admValor" data-id="${esc(e.id)}" title="Editar o valor da mensalidade">Editar valor</button><button class="btn sm" data-act="admBaixa" data-id="${esc(e.id)}">Dar baixa</button>` : ''}${zap(e)}<button class="btn sm pri" data-act="admAbrir" data-id="${esc(e.id)}">Abrir</button></div></div>`).join('')}</div>
       ${lista.length > (S.admLim || 50) ? '<div class="actions"><button class="btn" data-act="admMais">Mostrar mais</button></div>' : ''}` : '<p class="empty">Nenhuma empresa encontrada.</p>'}</div>
   <p class="small">"Abrir" mostra o sistema da empresa como o cliente vê, para dar suporte — somente leitura. Avise nos termos de uso que o suporte pode acessar os dados para ajudar o cliente.</p>`;
 }
 const FORMAS_NOTAONE = [['pix','PIX'],['dinheiro','Dinheiro'],['transferencia','Transferência'],['cartao','Cartão'],['boleto','Boleto']];
 function formBaixaNotaone(id){
   const e = ((S.adm || {}).lista || []).find(x => x.id === id); if (!e) return;
-  S.admBx = id; const x = sitNotaone(e), valor = num((e.plano || {}).valor), hoje = isoNow().slice(0, 10), a = e.assinatura || {};
+  S.admBx = id; const x = sitNotaone(e), valor = valorMensEmp(e), hoje = isoNow().slice(0, 10), a = e.assinatura || {};
   const pelaAsaas = x.asaas && (a.aberta || {}).id;
   const mm = e.mensalidade_manual || {}, P = (mm.pagamentos || []).slice().reverse(), ultimo = (mm.pagamentos || []).slice(-1)[0];
   openModal(`${mhead('Dar baixa na mensalidade')}
@@ -2914,12 +2919,44 @@ async function salvarBaixaNotaone(id, t){
     closeModal(); toast(`Baixa registrada: ${nomeEmp(e)} · ${brl(valor)}.`); render(); admCarregar(true);
   } catch(er){ t.disabled = false; err(er.message || 'Não foi possível registrar.'); }
 }
+function formValorNotaone(id){
+  const e = ((S.adm || {}).lista || []).find(x => x.id === id); if (!e) return;
+  const esp = (e.mensalidade_especial || {}), pl = e.plano || {};
+  openModal(`${mhead('Valor da mensalidade')}
+    <p><b>${esc(nomeEmp(e))}</b> · plano ${esc(pl.nome || '')}: <b>${brl(num(pl.valor))}/mês</b></p>
+    <div class="row">${fld('vmValor', 'Valor da mensalidade deste cliente', brl(valorMensEmp(e)), 'data-rs inputmode="decimal"')}</div>
+    ${fld('vmObs', 'Motivo (opcional, só você vê)', esp.obs || '', 'placeholder="ex.: cliente piloto, desconto combinado"')}
+    <p class="small">O novo valor aparece no painel e também no sistema do cliente (Empresa → Plano)${S.mensal ? ', e a cobrança do Asaas passa a usar esse valor (inclusive a mensalidade em aberto)' : ''}. As baixas já feitas não mudam.</p>
+    <div id="errM"></div>
+    <div class="actions"><button class="btn pri" data-act="admValorOk" data-id="${esc(e.id)}">Salvar valor</button>${mensEsp(e) ? `<button class="btn" data-act="admValorPlano" data-id="${esc(e.id)}">Voltar ao valor do plano (${brl(num(pl.valor))})</button>` : ''}</div>`);
+}
+async function salvarValorNotaone(id, t, voltar){
+  const e = ((S.adm || {}).lista || []).find(x => x.id === id); if (!e) return;
+  const err = m => { $('#errM').innerHTML = `<div class="msg err">${esc(m)}</div>`; };
+  let valor = voltar ? 0 : numIn(val('vmValor'));
+  if (!voltar && !(valor > 0)) return err('Informe o valor da mensalidade.');
+  if (!voltar && r2(valor) === r2(num((e.plano || {}).valor))) valor = 0; // igual ao plano = sem valor especial
+  t.disabled = true;
+  try {
+    const { data, error } = await SB.rpc('admin_valor_mensalidade', { p_empresa:id, p_valor:valor, p_obs:voltar ? '' : val('vmObs') });
+    if (error) throw error;
+    if (data) e.mensalidade_especial = data; else delete e.mensalidade_especial;
+    let aviso = '';
+    if ((e.assinatura || {}).id && S.mensal){
+      try { const r = await api('asaas', { empresa_id:id, acao:'admin_valor' }); if (r.assinatura) e.assinatura = r.assinatura; }
+      catch(er){ aviso = ' Atenção: não foi possível mudar o valor no Asaas (' + (er.message || 'erro') + ').'; }
+    }
+    closeModal(); toast(`${nomeEmp(e)}: mensalidade de ${brl(valorMensEmp(e))}/mês.` + aviso); render(); admCarregar(true);
+  } catch(er){ t.disabled = false; err(er.message || 'Não foi possível salvar.'); }
+}
 async function acoesAdmin(a, t, id){
-  if (!['admAtualizar','admAbrir','admSair','admMais','admPlanilha','admBaixa','admBaixaOk','admDesfazer'].includes(a)) return false;
+  if (!['admAtualizar','admAbrir','admSair','admMais','admPlanilha','admBaixa','admBaixaOk','admDesfazer','admValor','admValorOk','admValorPlano'].includes(a)) return false;
   if (!S.adminPlat) return true;
   if (a === 'admAtualizar'){ await admCarregar(true); toast('Painel atualizado.'); return true; }
   if (a === 'admMais'){ S.admLim = (S.admLim || 50) + 50; render(); return true; }
   if (a === 'admBaixa'){ formBaixaNotaone(id); return true; }
+  if (a === 'admValor'){ formValorNotaone(id); return true; }
+  if (a === 'admValorOk' || a === 'admValorPlano'){ await salvarValorNotaone(id, t, a === 'admValorPlano'); return true; }
   if (a === 'admBaixaOk'){ await salvarBaixaNotaone(id, t); return true; }
   if (a === 'admDesfazer'){
     const e = ((S.adm || {}).lista || []).find(x => x.id === S.admBx), pg = (((e || {}).mensalidade_manual || {}).pagamentos || []).find(x => x.id === id);
@@ -2931,7 +2968,7 @@ async function acoesAdmin(a, t, id){
     const L = (S.adm || {}).lista || [], sit = e => sitNotaone(e).txt;
     const linhas = [['Empresa','Razão social','CNPJ/CPF','Ramo','Cidade','E-mail do dono','Telefone','Plano','Mensalidade (R$)','Situação','Próximo vencimento','Cliente desde','Último uso']]
       .concat(L.map(e => [nomeEmp(e), e.razao || '', fmtDoc(e.cnpj || e.cpf || ''), RAMO_NOME(e), [e.municipio, e.uf].filter(Boolean).join('/'), e.dono_email || '', e.telefone || '',
-        (e.plano || {}).nome || '', e.sem_mensalidade || !(e.plano || {}).id ? '' : String(num(e.plano.valor)).replace('.', ','), sit(e),
+        (e.plano || {}).nome || '', e.sem_mensalidade || !(e.plano || {}).id ? '' : String(valorMensEmp(e)).replace('.', ','), sit(e),
         sitNotaone(e).venc ? dataBR(sitNotaone(e).venc) : '', e.criado_em ? dataBR(e.criado_em) : '', e.ultima_atividade ? dataBR(e.ultima_atividade) : '']));
     const csv = '\ufeff' + linhas.map(l => l.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
     const u = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' })), x = document.createElement('a');
@@ -2948,7 +2985,7 @@ async function acoesAdmin(a, t, id){
 }
 document.addEventListener('input', ev => { if (ev.target.id === 'admBusca'){ S.admBusca = ev.target.value; S.admLim = 50; render(); } });
 document.addEventListener('change', ev => { if (ev.target.id === 'admRamo'){ S.admRamo = ev.target.value; render(); }
-  if (ev.target.id === 'bxMeses'){ const e = ((S.adm || {}).lista || []).find(x => x.id === S.admBx); if (e && $('#bxValor')) $('#bxValor').value = brl(r2(num((e.plano || {}).valor) * (+ev.target.value || 1))); periodoBaixa(); } });
+  if (ev.target.id === 'bxMeses'){ const e = ((S.adm || {}).lista || []).find(x => x.id === S.admBx); if (e && $('#bxValor')) $('#bxValor').value = brl(r2(valorMensEmp(e) * (+ev.target.value || 1))); periodoBaixa(); } });
 
 /* ---------- pacote mensal para a contabilidade (montado no servidor, com os XMLs) ---------- */
 const mesNome = m => ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+m.slice(5, 7) - 1] + '/' + m.slice(0, 4);
@@ -4987,7 +5024,7 @@ function cardAssinatura(){
   if (!S.mensal || !pode('empresa')) return '';
   const a = msAss(), teste = S.mensal.teste ? ' <span class="tag w">modo de teste</span>' : '';
   if (!a) return `<div class="card" id="cardMensal"><h3 style="margin-top:0">Mensalidade do NotaOne${teste}</h3>
-    <p>${planoAtual() ? 'Plano ' + esc(planoAtual().nome) : 'Plano NotaOne'}: <b>${brl((planoAtual() || S.mensal).valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
+    <p>${planoAtual() ? 'Plano ' + esc(planoAtual().nome) : 'Plano NotaOne'}: <b>${brl(mensEsp(emp()) || (planoAtual() || S.mensal).valor)} por mês</b>. Pague aqui mesmo por <b>PIX</b>, boleto ou cartão.</p>
     <p class="small">A primeira mensalidade vence <b>30 dias depois</b> de assinar; depois, todo mês no mesmo dia. Você recebe o aviso aqui no sistema e por e-mail.</p>
     <div class="actions"><button class="btn pri" data-act="msAssinar">Assinar agora</button></div><div id="msMsg"></div></div>`;
   setTimeout(msAtualizarSePreciso, 0);
