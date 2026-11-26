@@ -86,6 +86,36 @@ export async function assinar(empresa_id, e, u){
   return atualizar(empresa_id, { ...e, assinatura:novo });
 }
 
+// empresa que já escolheu o plano mas ainda não tem assinatura no ambiente atual do Asaas (pedido do Lucas, 26/11/2026:
+// quando a cobrança for ligada, as empresas que escolheram plano antes ganham a mensalidade sozinhas, 1ª cobrança em 30 dias).
+// Assinatura cancelada não é recriada; empresa marcada pelo suporte com sem_mensalidade (teste, cortesia) fica de fora.
+export function precisaAssinar(e){
+  if (!e || !(e.plano && e.plano.id) || e.sem_mensalidade) return false;
+  const a = e.assinatura || {};
+  return !(a.id && (a.ambiente || 'sandbox') === ambienteAsaas());
+}
+async function emailDoDono(empresa_id){
+  try {
+    const m = await sb(`/rest/v1/membros?select=user_id&empresa_id=eq.${encodeURIComponent(empresa_id)}&papel=eq.dono&limit=1`);
+    const uid = Array.isArray(m) && m[0] && m[0].user_id; if (!uid) return { id:'automatico' };
+    const r = await fetch(env('SUPABASE_URL') + '/auth/v1/admin/users/' + uid, { headers:{ apikey:env('SUPABASE_SERVICE_ROLE_KEY'), Authorization:'Bearer ' + env('SUPABASE_SERVICE_ROLE_KEY') } });
+    const j = r.ok ? await r.json() : {};
+    return { id:uid, email:j.email && !/@funcionarios\.notaone\.example\.com$/.test(j.email) ? j.email : undefined };
+  } catch { return { id:'automatico' }; }
+}
+// chamada todo dia pelo Vercel Cron (junto com o do contador): cria as assinaturas que faltam
+export async function regularizarAssinaturas(max = 50){
+  if (!asaasLigado()) return { ok:true, desligado:true, criadas:0 };
+  const rows = await sb('/rest/v1/docs?select=path,data&col=eq.empresas&data->plano->>id=not.is.null&limit=5000') || [];
+  const fila = rows.filter(r => r.path.split('/').length === 2 && precisaAssinar(r.data)).slice(0, max), out = [];
+  for (const r of fila){
+    const id = r.path.split('/')[1];
+    try { await assinar(id, r.data, await emailDoDono(id)); out.push({ id, ok:true }); }
+    catch(err){ out.push({ id, ok:false, erro:err.message }); }
+  }
+  return { ok:true, criadas:out.filter(o => o.ok).length, total:fila.length, resultado:out };
+}
+
 const rotaTela = rota(async (req, b) => {
   const u = await usuario(req);
   const { empresa_id, acao } = b;
@@ -96,7 +126,11 @@ const rotaTela = rota(async (req, b) => {
   if (!e) throw new Falha('Empresa não encontrada.', 404);
 
   if (acao === 'assinar') return { ok:true, assinatura:await assinar(empresa_id, e, u) };
-  if (acao === 'situacao') return { ok:true, assinatura:await atualizar(empresa_id, e) };
+  if (acao === 'situacao'){
+    // empresa com plano escolhido e sem assinatura (ex.: escolheu antes da cobrança ser ligada): cria agora, sozinha
+    if (precisaAssinar(e)) return { ok:true, criada:true, assinatura:await assinar(empresa_id, e, u) };
+    return { ok:true, assinatura:await atualizar(empresa_id, e) };
+  }
   if (acao === 'pix' || acao === 'boleto'){
     const a = e.assinatura || {}, pid = String(b.pagamento_id || '');
     if (!a.id) throw new Falha('Esta empresa ainda não tem assinatura.');

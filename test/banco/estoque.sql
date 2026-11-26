@@ -84,6 +84,13 @@ select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set ro
 update docs set data = (data || '{"modulo":"comercio"}'::jsonb) - 'servico' where path='empresas/'||:'e' returning data->>'servico' as continua_academia;
 reset role;
 select public.definir_ramo((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), 'comercio') as volta_comercio;
+-- sem mensalidade: só o suporte marca; a tela não consegue se marcar para escapar da cobrança
+select pg_temp.como('11111111-1111-1111-1111-111111111111','dono@x.com'); set role authenticated;
+update docs set data = data || '{"sem_mensalidade":true}' where path='empresas/'||:'e' returning data->>'sem_mensalidade' as tela_nao_marca_vazio;
+reset role;
+select public.definir_sem_mensalidade((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), true) as suporte_marca;
+select data->>'sem_mensalidade' as sem_mensalidade_true from docs where path='empresas/'||:'e';
+select public.definir_sem_mensalidade((select public.doc_empresa(data) from docs where path='empresas/'||:'e'), false) as suporte_desmarca;
 
 -- funcionário (operador): edita e cadastra produto, mas não mexe no custo nem apaga
 reset role; select pg_temp.como('22222222-2222-2222-2222-222222222222','op@x.com'); set role authenticated;

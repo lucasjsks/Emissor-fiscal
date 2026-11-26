@@ -4794,13 +4794,18 @@ async function acoesLoja(a, t, id){
 const MS_ST = { PENDING:['Em aberto','w'], OVERDUE:['Vencida','b'], RECEIVED:['Paga','g'], CONFIRMED:['Paga','g'], RECEIVED_IN_CASH:['Paga','g'], DUNNING_RECEIVED:['Paga','g'], REFUNDED:['Estornada',''], AWAITING_RISK_ANALYSIS:['Em análise','w'] };
 const msAss = () => { const a = (emp() || {}).assinatura; return a && a.id && (a.ambiente || 'sandbox') === (S.mensal && S.mensal.teste ? 'sandbox' : 'producao') ? a : null; };
 function msAtualizarSePreciso(){
-  const a = msAss(); if (!a || S.msAuto === S.empId || S.mode !== 'db') return;
+  const a = msAss(), e = emp() || {};
+  // escolheu o plano antes da cobrança ser ligada: o servidor cria a mensalidade sozinho ao abrir (1ª cobrança em 30 dias)
+  if (!a && S.mensal && S.mode === 'db' && pode('empresa') && e.plano && e.plano.id && !e.sem_mensalidade && S.msAuto !== S.empId){
+    S.msAuto = S.empId; api('asaas', { empresa_id:S.empId, acao:'situacao' }).catch(() => {}); return;
+  }
+  if (!a || S.msAuto === S.empId || S.mode !== 'db') return;
   S.msAuto = S.empId; // uma vez por abertura do sistema, se a última conferência tiver mais de 6 h
   if (Date.now() - Date.parse(a.atualizado_em || 0) > 6 * 3600e3) api('asaas', { empresa_id:S.empId, acao:'situacao' }).catch(() => {});
 }
 function bannerAssinatura(){
   if (!S.mensal || !pode('empresa')) return '';
-  const a = msAss(); if (!a) return ''; setTimeout(msAtualizarSePreciso, 0);
+  const a = msAss(); setTimeout(msAtualizarSePreciso, 0); if (!a) return '';
   const ab = a.aberta; if (!ab || a.situacao === 'cancelada') return '';
   const hoje = isoNow().slice(0, 10), d = Math.round((Date.parse(ab.venc + 'T12:00:00Z') - Date.parse(hoje + 'T12:00:00Z')) / 864e5);
   if (d > 3) return '';

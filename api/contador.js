@@ -2,6 +2,7 @@
 //  GET  (Vercel Cron, todo dia de manhã): envia o mês anterior por e-mail às empresas cujo dia de envio chegou.
 //  POST { empresa_id, acao:'enviar'|'baixar', mes? }  (dono/gerente): envia agora ou baixa o ZIP.
 //  POST { empresa_id, cron:true }  com o CRON_SECRET: envio automático de uma empresa (chamado pelo GET).
+import { regularizarAssinaturas } from './asaas.js';
 import { Falha, usuario, papelDe, getDoc, sb, rpc, focus, focusBase, isoBR, ambienteEmp } from './_lib.js';
 import { zipar } from './_zip.js';
 import { enviarEmail, emailConfigurado } from './_email.js';
@@ -161,7 +162,9 @@ export default async function handler(req, res){
     // ---- Vercel Cron (GET): procura as empresas no dia de envio ----
     if (req.method === 'GET'){
       if (!cronOk(req)) return responder(res, 401, { erro:'Acesso negado.' });
-      if (!emailConfigurado()) return responder(res, 200, { ok:false, erro:'SMTP não configurado.' });
+      // mensalidades do NotaOne que faltam (empresas que escolheram plano antes da cobrança ser ligada) — mesmo cron diário
+      const mensalidades = await regularizarAssinaturas().catch(err => ({ ok:false, erro:err.message }));
+      if (!emailConfigurado()) return responder(res, 200, { ok:false, erro:'SMTP não configurado.', mensalidades });
       const hoje = hojeBR();
       const rows = await sb('/rest/v1/docs?select=path,data&col=eq.empresas&data->contador->>ativo=eq.true&limit=5000') || [];
       const fila = rows.filter(r => devido(r.data, hoje)).map(r => r.path.split('/')[1]);
@@ -175,7 +178,7 @@ export default async function handler(req, res){
           out.push({ id, ...(await r.json().catch(() => ({ ok:false }))) });
         } catch(err){ out.push({ id, ok:false, erro:err.message }); }
       } }));
-      return responder(res, 200, { ok:true, hoje, enviadas:out.filter(o => o.ok).length, total:fila.length, resultado:out });
+      return responder(res, 200, { ok:true, hoje, mensalidades, enviadas:out.filter(o => o.ok).length, total:fila.length, resultado:out });
     }
     if (req.method !== 'POST') throw new Falha('Use POST.', 405);
     const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});

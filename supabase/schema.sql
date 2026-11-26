@@ -215,15 +215,30 @@ language plpgsql as $$
 begin
   if new.col <> 'empresas' or current_user not in ('authenticated', 'anon') then return new; end if;
   if tg_op = 'UPDATE' then
-    new.data := (new.data - 'assinatura' - 'plano') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano'));
+    new.data := (new.data - 'assinatura' - 'plano' - 'sem_mensalidade') || jsonb_strip_nulls(jsonb_build_object('assinatura', old.data->'assinatura', 'plano', old.data->'plano', 'sem_mensalidade', old.data->'sem_mensalidade'));
   else
-    new.data := new.data - 'assinatura' - 'plano';
+    new.data := new.data - 'assinatura' - 'plano' - 'sem_mensalidade';
   end if;
   return new;
 end $$;
 drop trigger if exists proteger_assinatura on public.docs;
 create trigger proteger_assinatura before insert or update on public.docs
   for each row execute function public.proteger_assinatura();
+
+-- suporte: empresa sem mensalidade do NotaOne (teste, cortesia). Sem ela, a cobrança automática cria a assinatura no Asaas.
+-- No SQL Editor: select public.definir_sem_mensalidade('CNPJ ou CPF', true);   (false volta a cobrar)
+create or replace function public.definir_sem_mensalidade(p_doc text, p_sem boolean) returns text
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if current_user in ('authenticated', 'anon') and not public.eh_admin() then raise exception 'Sem permissão.'; end if;
+  update public.docs set data = case when p_sem then jsonb_set(data, '{sem_mensalidade}', 'true'::jsonb, true) else data - 'sem_mensalidade' end
+   where col = 'empresas' and public.doc_empresa(data) = regexp_replace(p_doc, '\D', '', 'g');
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Nenhuma empresa com esse CNPJ/CPF.'; end if;
+  return case when p_sem then 'Empresa sem mensalidade: a cobrança automática não cria assinatura para ela.' else 'Empresa volta a ter mensalidade.' end;
+end $$;
+revoke execute on function public.definir_sem_mensalidade(text, boolean) from public, anon;
 
 -- RAMO DE ATIVIDADE (pedido do Lucas, 26/11/2026): escolhido no cadastro, não muda mais pela tela.
 -- Ao alterar, a tela (authenticated) não consegue trocar modulo/servico (empresa antiga sem ramo fica como comércio).
