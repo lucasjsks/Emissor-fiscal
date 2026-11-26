@@ -1430,7 +1430,8 @@ const mhead = t => `<div class="mhead"><h2>${t}</h2><button class="x" data-act="
 function formEmpresa(e, tipo){
   const meta = S.meuMeta || {}, doSite = !e && !tipo && dig(meta.cnpj).length === 14;
   e = e || { uf:'PI', regime:'1', ambiente:'homologacao', serie_nfce:'1', prox_nfce:'1', serie_nfe:'1', prox_nfe:'1',
-    cnpj:dig(meta.cnpj), cpf:dig(meta.cpf), razao:meta.tipo === 'cpf' ? (meta.nome || '') : '', fantasia:meta.empresa || '', telefone:meta.telefone || '' };
+    cnpj:dig(meta.cnpj), cpf:dig(meta.cpf), razao:meta.tipo === 'cpf' ? (meta.nome || '') : '', fantasia:meta.empresa || '', telefone:meta.telefone || '',
+    ...(meta.modulo === 'servico' && meta.servico ? { modulo:'servico', servico:meta.servico } : {}) }; // ramo escolhido no cadastro do site
   tipo = tipo || (e.id ? (e.doc_tipo === 'cpf' ? 'cpf' : 'cnpj') : meta.tipo === 'cpf' ? 'cpf' : 'cnpj');
   S.empForm = { e, tipo, plano:(S.empForm || {}).plano };
   const blocoPlano = `<div id="empPlanoBox">${blocoPlanoEmp(grupoPlano(e.modulo, e.servico, tipo))}</div>`;
